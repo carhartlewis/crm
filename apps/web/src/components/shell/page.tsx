@@ -8,10 +8,10 @@ import {
 import {
   PageShell,
   PageShellContent,
-  PageShellHeader,
   PageShellHeading,
   PageShellTitle,
 } from "@crm/ui/patterns/page-shell";
+import { WorkspacePageHeader } from "./page-header.tsx";
 import type { ReactNode } from "react";
 import type { Page } from "../../lib/pages.ts";
 
@@ -19,11 +19,11 @@ import type { Page } from "../../lib/pages.ts";
 export function PageLayout({ page, children }: { page: Page; children: ReactNode }) {
   return (
     <PageShell>
-      <PageShellHeader>
+      <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>{page.label}</PageShellTitle>
         </PageShellHeading>
-      </PageShellHeader>
+      </WorkspacePageHeader>
       <PageShellContent>{children}</PageShellContent>
     </PageShell>
   );

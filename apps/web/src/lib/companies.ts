@@ -48,13 +48,17 @@ async function write(path: string, method: "POST" | "PATCH" | "DELETE", body?: C
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const result: { txid?: unknown; message?: unknown } = await response.json().catch(() => ({}));
-
   if (!response.ok) {
+    const failure: { message?: unknown } = await response.json().catch(() => ({}));
+
     throw new Error(
-      String(result.message) === result.message ? result.message : "The change couldn't be saved",
+      String(failure.message) === failure.message
+        ? failure.message
+        : "The change couldn't be saved",
     );
   }
+
+  const result: { txid?: unknown } = await response.json();
 
   if (!Number.isSafeInteger(result.txid)) throw new Error("The server returned no transaction id");
 

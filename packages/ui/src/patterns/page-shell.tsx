@@ -39,14 +39,27 @@ function PageShell({
   );
 }
 
-function PageShellHeader({ className, children, ...props }: React.ComponentProps<"div">) {
+/**
+ * The page's title row. `leading` sits at the row's start, outside the centered content column
+ * (e.g. the app's sidebar toggle), on the same line as the title.
+ */
+function PageShellHeader({
+  className,
+  children,
+  leading,
+  ...props
+}: React.ComponentProps<"div"> & { leading?: React.ReactNode }) {
   return (
     <header
-      className={cn("-mx-4 border-b px-4 select-none md:-mx-8 md:px-8", className)}
+      className={cn(
+        "-mx-4 flex items-center gap-3 border-b px-4 select-none md:-mx-8 md:px-8",
+        className,
+      )}
       data-slot="page-shell-header"
       {...props}
     >
-      <div className="mx-auto grid min-h-12 w-full grid-cols-page-header items-center gap-x-3 py-2 group-data-[width=narrow]/page-shell:max-w-3xl group-data-[width=standard]/page-shell:max-w-360 sm:min-h-16 sm:gap-x-4">
+      {leading}
+      <div className="mx-auto grid min-h-12 w-full min-w-0 flex-1 grid-cols-page-header items-center gap-x-3 py-2 group-data-[width=narrow]/page-shell:max-w-3xl group-data-[width=standard]/page-shell:max-w-360 sm:min-h-16 sm:gap-x-4">
         {children}
       </div>
     </header>

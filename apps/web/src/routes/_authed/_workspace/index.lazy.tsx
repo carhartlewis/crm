@@ -4,10 +4,10 @@ import {
   PageShell,
   PageShellActions,
   PageShellContent,
-  PageShellHeader,
   PageShellHeading,
   PageShellTitle,
 } from "@crm/ui/patterns/page-shell";
+import { WorkspacePageHeader } from "../../../components/shell/page-header.tsx";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { pageById } from "../../../lib/pages.ts";
@@ -34,14 +34,14 @@ function Home() {
 
   return (
     <PageShell>
-      <PageShellHeader>
+      <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>{`${hello}, ${firstName}`}</PageShellTitle>
         </PageShellHeading>
         <PageShellActions>
           <span className="text-muted-foreground">{active?.name}</span>
         </PageShellActions>
-      </PageShellHeader>
+      </WorkspacePageHeader>
       <PageShellContent>
         <div className="animate-enter enter-delay-1 grid gap-3 sm:grid-cols-2">
           {order.map((id, index) => {

@@ -33,9 +33,9 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
 
   return (
     <Sidebar variant="inset">
-      {/* Centered on the same line as the traffic lights and the page's title bar. */}
+      {/* Its row is centered 40px from the window top: the traffic lights' and page title's line. */}
       <SidebarHeader className="app-region-drag">
-        <div className="flex h-7 items-center justify-end">
+        <div className="mt-2.5 flex h-7 items-center justify-end">
           <TitleBarControls onSearch={onSearch} onSearchIntent={onSearchIntent} />
         </div>
       </SidebarHeader>

@@ -4,10 +4,10 @@ import {
   PageShell,
   PageShellActions,
   PageShellContent,
-  PageShellHeader,
   PageShellHeading,
   PageShellTitle,
 } from "@crm/ui/patterns/page-shell";
+import { WorkspacePageHeader } from "../../../components/shell/page-header.tsx";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -26,7 +26,7 @@ function Companies() {
 
   return (
     <PageShell>
-      <PageShellHeader>
+      <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>Companies</PageShellTitle>
         </PageShellHeading>
@@ -36,7 +36,7 @@ function Companies() {
             <Kbd data-icon="inline-end">C</Kbd>
           </Button>
         </PageShellActions>
-      </PageShellHeader>
+      </WorkspacePageHeader>
       <PageShellContent>
         {workspaceId ? (
           <CompaniesTable
