@@ -130,9 +130,11 @@ function DropdownMenuSubTrigger({
 
 function DropdownMenuSubContent({
   align = "start",
-  alignOffset = -3,
+  alignOffset = -4,
   side = "right",
-  sideOffset = 0,
+  // The sub-trigger sits inside the menu's padding: offset past it so the submenu stands clear of
+  // the menu's edge instead of overlapping it, with its first item level with the trigger.
+  sideOffset = 10,
   className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuContent>) {
