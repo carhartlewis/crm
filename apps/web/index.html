@@ -5,8 +5,124 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CRM</title>
     <link rel="stylesheet" href="./src/styles.css" />
+    <!--
+      The launch splash, painted before any JavaScript (and as the desktop window's first frame).
+      Plain CSS because the production CSP allows inline styles but not inline scripts, so it
+      follows the OS color scheme. Values mirror the theme tokens and AppMark (brand.tsx).
+      Removed by dismissSplash (src/splash.ts) once the first route has rendered.
+    -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        background: oklch(0.99 0 0);
+        color: oklch(0 0 0);
+        user-select: none;
+        -webkit-app-region: drag;
+        transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1);
+      }
+      #splash[data-done] {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #splash .mark {
+        display: flex;
+        width: 80px;
+        height: 80px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 24px;
+        background: oklch(1 0 0);
+        box-shadow:
+          0 0 0 1px oklch(0.92 0 0),
+          0 1px 2px hsl(0 0% 0% / 0.18),
+          0 8px 10px -1px hsl(0 0% 0% / 0.18);
+        opacity: 0;
+        /* Held back briefly so a fast launch never flashes the mark. */
+        animation: splash-in 300ms cubic-bezier(0.23, 1, 0.32, 1) 150ms forwards;
+      }
+      #splash .mark svg {
+        width: 44px;
+        height: 44px;
+      }
+      #splash .spinner {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid oklch(0 0 0 / 0.12);
+        border-top-color: oklch(0 0 0 / 0.55);
+        opacity: 0;
+        /* Only a slow launch gets a spinner. */
+        animation:
+          splash-fade 200ms cubic-bezier(0.23, 1, 0.32, 1) 1000ms forwards,
+          splash-spin 800ms linear infinite;
+      }
+      @media (prefers-color-scheme: dark) {
+        #splash {
+          background: oklch(0 0 0);
+          color: oklch(1 0 0);
+        }
+        #splash .mark {
+          background: oklch(0.14 0 0);
+          box-shadow:
+            0 0 0 1px oklch(0.26 0 0),
+            0 1px 2px hsl(0 0% 0% / 0.18),
+            0 8px 10px -1px hsl(0 0% 0% / 0.18);
+        }
+        #splash .spinner {
+          border-color: oklch(1 0 0 / 0.12);
+          border-top-color: oklch(1 0 0 / 0.55);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash .mark {
+          animation-name: splash-fade;
+        }
+      }
+      @keyframes splash-in {
+        from {
+          opacity: 0;
+          transform: scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes splash-fade {
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes splash-spin {
+        to {
+          rotate: 360deg;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" role="status" aria-label="Loading">
+      <div class="mark">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path
+            d="M10 36c9-2 19-10 24-24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="6"
+            stroke-linecap="round"
+          />
+          <path d="M27 36h11L33 27z" fill="currentColor" />
+        </svg>
+      </div>
+      <div class="spinner"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
   </body>
