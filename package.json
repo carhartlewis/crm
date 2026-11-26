@@ -20,14 +20,17 @@
     "ci": "bun run --parallel --no-exit-on-error lint fmt:check check-types test:ci build",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
-    "setup:env": "bun tools/setup-env/setup-env.ts"
+    "setup:env": "bun tools/setup-env/setup-env.ts",
+    "postinstall": "lefthook install"
   },
   "devDependencies": {
     "@aranlucas/oxlint-plugin-anti-slop": "0.1.1",
     "@biomejs/biome": "2.6.9",
     "@shadcn/lint": "0.2.5",
     "@types/bun": "1.4.5",
+    "lefthook": "2.2.4",
     "oxlint": "1.95.0",
+    "react-doctor": "0.9.23",
     "turbo": "2.11.13",
     "typescript": "7.0.2"
   },

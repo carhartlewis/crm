@@ -85,3 +85,33 @@ export function isWorkspaceSlug(value: string) {
 export function isWorkspaceLogo(value: string) {
   return URL.canParse(value) && new URL(value).protocol === "https:";
 }
+
+/** Field validators for forms: the error message, or `undefined` when the value is valid. */
+export function workspaceNameError(value: string) {
+  const result = normalizeWorkspaceName(value);
+
+  return result.ok ? undefined : result.message;
+}
+
+export function websiteError(value: string) {
+  const result = normalizeWebsite(value);
+
+  return result.ok ? undefined : result.message;
+}
+
+export interface WorkspaceInput {
+  name: string;
+  website: string;
+}
+
+/** Normalised input for creation. Call after the field validators pass; throws otherwise. */
+export function toWorkspaceInput(value: WorkspaceInput): WorkspaceInput {
+  const name = normalizeWorkspaceName(value.name);
+  const website = normalizeWebsite(value.website);
+
+  if (!name.ok) throw new Error(name.message);
+
+  if (!website.ok) throw new Error(website.message);
+
+  return { name: name.name, website: website.url };
+}

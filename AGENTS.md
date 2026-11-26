@@ -86,6 +86,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - No `useEffect`, `useLayoutEffect` or `useInsertionEffect` (lint: `crm/no-direct-effect`, a local Oxlint plugin in `tools/oxlint`). Follow the `no-use-effect` skill: derive values during render, act in event handlers, reset with `key`, and read browser state through `useSyncExternalStore`.
 - **Data before render.** The app is client-rendered by design, so the equivalent of SSR-first loading is route-first: load in `beforeLoad`/`loader` with `queryClient.fetchQuery(queryOptions)` and read with `useSuspenseQuery`. Never fetch in effects.
 - The only escape hatch is `useMountEffect` (`@crm/ui/hooks/use-mount-effect`), for subscribing to an external system on mount. Use `useEffectEvent` inside it to read the latest props.
+- Forms use TanStack Form with `revalidateLogic` and `onDynamic` field validators that reuse the shared rules from `@crm/core`, and submit through TanStack Query `mutationOptions` (`useMutation`). No hand-rolled field-error or pending state.
 - Signed-in routes live under the pathless `_authed` layout, which guards once and puts `session` in route context. Query keys come from `authKeys`; workspace data is keyed by user.
 
 ### Motion and selection
@@ -118,7 +119,7 @@ Global rules. Use the tokens and components; never one-off timings.
 
 ### Hooks and review
 
-- Lefthook pre-commit runs Biome format on staged files (re-staging fixes), Oxlint with `--deny-warnings`, and pinned React Doctor on staged `apps/web` files with blocking errors only. CI repeats everything; hooks are a speed-up, not the gate.
+- Lefthook pre-commit (`lefthook.yml`, installed by `bun install`) runs, in order on staged files: Biome format (re-staging fixes), Oxlint with `--deny-warnings`, and pinned React Doctor on changed `apps/web` lines with blocking errors only, telemetry and the network supply-chain scan off. CI repeats everything; hooks are a speed-up, not the gate. `LEFTHOOK=0` skips once.
 - Use Playwright for cold entry, warm navigation, and typing while filtering a realistic large list.
 
 ## Agent skills
@@ -128,5 +129,7 @@ Global rules. Use the tokens and components; never one-off timings.
 Track issues and specs as local Markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
 
 ### Domain docs
+
+Decisions and their reasons are in `docs/adr/` (index: `docs/adr/README.md`); vocabulary is in `GLOSSARY.md`. Read the relevant ADR before changing a decision, and supersede it with a new ADR rather than silently diverging.
 
 Use one shared `GLOSSARY.md` and `docs/adr/` at the repository root. See `docs/agents/domain.md`.

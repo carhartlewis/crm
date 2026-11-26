@@ -1,0 +1,20 @@
+# Pre-commit: fast feedback on staged files only. CI runs the full suite; this is a speed-up,
+# not the gate. Skip once with `LEFTHOOK=0 git commit …`.
+pre-commit:
+  piped: true # format first, then lint what will actually be committed
+  jobs:
+    - name: format
+      glob: "*.{ts,tsx,mts,js,jsx,mjs,cjs,json,jsonc,css,md,yml,yaml}"
+      run: bunx biome format --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+
+    - name: lint
+      glob: "*.{ts,tsx,mts,js,jsx,mjs,cjs}"
+      run: bunx oxlint --deny-warnings --report-unused-disable-directives {staged_files}
+
+    - name: react-doctor
+      glob: "apps/web/src/**/*.{ts,tsx}"
+      # No telemetry, and no network supply-chain scan on every commit (CI/Dependabot cover deps).
+      env:
+        REACT_DOCTOR_NO_TELEMETRY: "1"
+      run: bunx react-doctor apps/web --staged --scope lines --blocking error --no-supply-chain --no-score --yes --no-color
