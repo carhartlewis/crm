@@ -9,6 +9,7 @@ import {
   move,
   toggleActive,
 } from "../../lib/list-navigation.ts";
+import { shortcuts, toHotkey } from "../../lib/shortcuts.ts";
 
 /** The keyboard position in a list: the active row and where a ⇧-range started. */
 export interface ListPosition {
@@ -84,5 +85,5 @@ export function useListKeys({
     [position.activeId, onOpen],
   );
   useHotkeys("slash", onFilter, options, [onFilter]);
-  useHotkeys("c", onCreate, options, [onCreate]);
+  useHotkeys(toHotkey(shortcuts.create), onCreate, options, [onCreate]);
 }

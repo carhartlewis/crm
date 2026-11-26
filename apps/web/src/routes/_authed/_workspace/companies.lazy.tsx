@@ -13,6 +13,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { CompaniesTable } from "../../../components/companies/companies-table.tsx";
 import { sessionQuery } from "../../../lib/session.ts";
+import { shortcutKeys, shortcuts } from "../../../lib/shortcuts.ts";
 
 export const Route = createLazyFileRoute("/_authed/_workspace/companies")({
   component: Companies,
@@ -33,7 +34,7 @@ function Companies() {
         <PageShellActions>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             New company
-            <Kbd data-icon="inline-end">C</Kbd>
+            <Kbd data-icon="inline-end">{shortcutKeys(shortcuts.create).join("")}</Kbd>
           </Button>
         </PageShellActions>
       </WorkspacePageHeader>

@@ -18,6 +18,8 @@ export const shortcuts = {
   back: { code: "BracketLeft", mod: true },
   forward: { code: "BracketRight", mod: true },
   home: { code: "Digit0", alt: true },
+  // Record lists: a plain key, like Linear and Attio. ⌘C is copy and must stay copy.
+  create: { code: "KeyC" },
 } as const satisfies Record<string, Shortcut>;
 
 /** ⌥1 to ⌥9 open the pinned pages, in the order the user arranged them. */
