@@ -14,3 +14,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0008](0008-no-direct-effects.md)                 | No direct effects; data loads before render; forms via TanStack Form + mutations         |
 | [0009](0009-router-core-hmr-patch.md)             | Temporary patch to `@tanstack/router-core` for Bun HMR                                   |
 | [0010](0010-carbon-icons-per-icon-modules.md)     | Carbon icons from per-icon modules                                                       |
+| [0011](0011-guards-own-auth-navigation.md)        | Directory routes with one guard per pathless layout; auth changes re-run guards          |

@@ -1,5 +1,5 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { sessionQuery } from "../lib/session.ts";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { sessionQuery } from "../../lib/session.ts";
 
 /**
  * Every signed-in route lives under this pathless layout, so none can forget the guard.
@@ -10,10 +10,13 @@ export const Route = createFileRoute("/_authed")({
     const session = await context.queryClient.fetchQuery(sessionQuery);
 
     if (!session) {
-      throw redirect({ to: "/sign-in", search: { redirect: location.href }, replace: true });
+      throw redirect({
+        to: "/sign-in",
+        search: location.href === "/" ? {} : { redirect: location.href },
+        replace: true,
+      });
     }
 
     return { session };
   },
-  component: Outlet,
 });

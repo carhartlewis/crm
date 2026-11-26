@@ -18,7 +18,7 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Loopback**: The one-shot HTTP listener the desktop app opens on `127.0.0.1:<random port>` to receive the handoff code.
 
-**Guard**: Route `beforeLoad` logic that redirects before render. Signed-in routes sit under the pathless `_authed` layout, which guards once and puts `session` in route context.
+**Guard**: Route `beforeLoad` logic that redirects before render. Each pathless layout guards once: `_guest` (signed out only), `_authed` (signed in; puts `session` in route context) and `_authed/_workspace` (has an active workspace). When the session changes, the app re-runs the guards (`router.invalidate()`) instead of navigating by hand.
 
 **API contract**: The Effect `HttpApi` definition in `@crm/core/api`, shared by server and clients.
 
