@@ -5,7 +5,6 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "cn";
 
 import { useIsMobile } from "@crm/ui/hooks/use-mobile";
-import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { Button } from "@crm/ui/components/button";
 import { Input } from "@crm/ui/components/input";
 import { Separator } from "@crm/ui/components/separator";
@@ -24,11 +23,10 @@ import { carbonIcon } from "@crm/ui/components/icon";
 const SidePanelOpenIcon = carbonIcon(sidePanelOpen16);
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
-const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed";
@@ -39,6 +37,33 @@ type SidebarContextProps = {
   isMobile: boolean;
   toggleSidebar: () => void;
 };
+
+/**
+ * Whether the sidebar is open lives in a cookie, read through useSyncExternalStore: it survives
+ * reloads and restarts, a server could read it for the first paint, and every subscriber sees
+ * the same value. `undefined` until the user first toggles (then `defaultOpen` applies).
+ */
+const sidebarCookieListeners = new Set<() => void>();
+
+function readSidebarCookie(): boolean | undefined {
+  const match = /(?:^|;\s*)sidebar_state=(true|false)(?:;|$)/.exec(document.cookie);
+
+  return match ? match[1] === "true" : undefined;
+}
+
+function writeSidebarCookie(open: boolean) {
+  document.cookie = `${SIDEBAR_COOKIE_NAME}=${open}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; samesite=lax`;
+
+  for (const listener of sidebarCookieListeners) listener();
+}
+
+function subscribeSidebarCookie(listener: () => void) {
+  sidebarCookieListeners.add(listener);
+
+  return () => {
+    sidebarCookieListeners.delete(listener);
+  };
+}
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
@@ -68,21 +93,19 @@ function SidebarProvider({
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen);
-  const open = openProp ?? _open;
+  // Controlled through `open`/`onOpenChange`, or else by the cookie.
+  const cookieOpen = React.useSyncExternalStore(
+    subscribeSidebarCookie,
+    readSidebarCookie,
+    () => undefined,
+  );
+
+  const open = openProp ?? cookieOpen ?? defaultOpen;
 
   const setOpen = React.useCallback(
     (openState: boolean) => {
-      if (setOpenProp) {
-        setOpenProp(openState);
-      } else {
-        _setOpen(openState);
-      }
-
-      // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+      setOpenProp?.(openState);
+      writeSidebarCookie(openState);
     },
     [setOpenProp],
   );
@@ -92,22 +115,7 @@ function SidebarProvider({
     return isMobile ? setOpenMobile((current) => !current) : setOpen(!open);
   }, [isMobile, open, setOpen, setOpenMobile]);
 
-  // Cmd/Ctrl+B toggles the sidebar. useEffectEvent reads the latest toggle without
-  // re-subscribing; the window listener itself is a mount-time external subscription.
-  const onShortcut = React.useEffectEvent((event: KeyboardEvent) => {
-    if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      toggleSidebar();
-    }
-  });
-
-  useMountEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => onShortcut(event);
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
+  // ⌘B / Ctrl+B is bound by the app (react-hotkeys-hook), with its other shortcuts.
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.

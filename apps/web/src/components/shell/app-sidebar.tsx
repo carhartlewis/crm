@@ -1,8 +1,4 @@
-import chevronLeft from "@carbon/icons/es/chevron--left/16.js";
-import chevronRight from "@carbon/icons/es/chevron--right/16.js";
 import home from "@carbon/icons/es/home/16.js";
-import search from "@carbon/icons/es/search/16.js";
-import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import {
   Sidebar,
@@ -15,16 +11,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm/ui/components/sidebar";
-import { Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { PinnedNav } from "./pinned-nav.tsx";
 import { rubberBandScroll } from "./rubber-band.ts";
-import { trafficLights } from "./sidebar-toggle.tsx";
+import { TitleBarControls } from "./title-bar.tsx";
 import { WorkspaceMenu } from "./workspace-menu.tsx";
 
-const ChevronLeftIcon = carbonIcon(chevronLeft);
-const ChevronRightIcon = carbonIcon(chevronRight);
 const HomeIcon = carbonIcon(home);
-const SearchIcon = carbonIcon(search);
 
 export interface AppSidebarProps {
   readonly userId: string;
@@ -34,43 +27,14 @@ export interface AppSidebarProps {
 }
 
 export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: AppSidebarProps) {
-  const router = useRouter();
   const onHome = useRouterState({ select: (state) => state.location.pathname === "/" });
 
   return (
     <Sidebar variant="inset">
+      {/* Centered on the same line as the traffic lights and the page's title bar. */}
       <SidebarHeader className="app-region-drag">
-        <div
-          data-traffic-lights={trafficLights || undefined}
-          className="flex h-7 items-center gap-1 data-traffic-lights:pl-18"
-        >
-          <div className="app-region-no-drag ml-auto flex items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Search"
-              onClick={onSearch}
-              onPointerEnter={onSearchIntent}
-            >
-              <SearchIcon />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Back"
-              onClick={() => router.history.back()}
-            >
-              <ChevronLeftIcon />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Forward"
-              onClick={() => router.history.forward()}
-            >
-              <ChevronRightIcon />
-            </Button>
-          </div>
+        <div className="flex h-7 items-center justify-end">
+          <TitleBarControls onSearch={onSearch} onSearchIntent={onSearchIntent} />
         </div>
       </SidebarHeader>
       <SidebarContent ref={rubberBandScroll} className="overscroll-none">

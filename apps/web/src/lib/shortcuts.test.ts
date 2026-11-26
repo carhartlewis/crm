@@ -1,32 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { matchesShortcut, pinnedShortcut, shortcutKeys, shortcuts } from "./shortcuts.ts";
+import { pinnedShortcut, shortcutKeys, shortcuts, toHotkey } from "./shortcuts.ts";
 
-const key = (
-  code: string,
-  mods: Partial<Record<"meta" | "ctrl" | "alt" | "shift", boolean>> = {},
-) => ({
-  code,
-  metaKey: mods.meta ?? false,
-  ctrlKey: mods.ctrl ?? false,
-  altKey: mods.alt ?? false,
-  shiftKey: mods.shift ?? false,
-});
-
-describe("matchesShortcut", () => {
-  test("mod is ⌘ on Apple platforms and Ctrl elsewhere", () => {
-    expect(matchesShortcut(key("KeyK", { meta: true }), shortcuts.palette, true)).toBe(true);
-    expect(matchesShortcut(key("KeyK", { ctrl: true }), shortcuts.palette, true)).toBe(false);
-    expect(matchesShortcut(key("KeyK", { ctrl: true }), shortcuts.palette, false)).toBe(true);
-  });
-
-  test("extra modifiers don't match, so ⌘⇧K isn't ⌘K", () => {
-    expect(matchesShortcut(key("KeyK", { meta: true, shift: true }), shortcuts.palette, true)).toBe(
-      false,
-    );
-  });
-
-  test("matches on the physical key, so ⌥1 works although it types ¡", () => {
-    expect(matchesShortcut(key("Digit1", { alt: true }), pinnedShortcut(0)!, true)).toBe(true);
+describe("toHotkey", () => {
+  test("spells shortcuts the way react-hotkeys-hook matches event.code", () => {
+    expect(toHotkey(shortcuts.palette)).toBe("mod+k");
+    expect(toHotkey(shortcuts.back)).toBe("mod+bracketleft");
+    expect(toHotkey(pinnedShortcut(0)!)).toBe("alt+1");
+    expect(toHotkey({ code: "KeyP", mod: true, shift: true })).toBe("mod+shift+p");
   });
 });
 

@@ -7,6 +7,7 @@ import { Suspense, useState } from "react";
 import { AppSidebar } from "./app-sidebar.tsx";
 import { Shortcuts } from "./shortcuts.tsx";
 import { SidebarToggle, trafficLights } from "./sidebar-toggle.tsx";
+import { TitleBarControls, type TitleBarControlsProps } from "./title-bar.tsx";
 
 const CommandPalette = preloadable(() => import("./command-palette.tsx"));
 
@@ -37,10 +38,13 @@ export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
           onSearchIntent={() => void CommandPalette.preload()}
         />
         <SidebarInset className="min-w-0">
-          <InsetBar />
+          <InsetBar
+            onSearch={() => setPaletteOpen(true)}
+            onSearchIntent={() => void CommandPalette.preload()}
+          />
           <Outlet />
         </SidebarInset>
-        <Shortcuts key={userId} userId={userId} setPaletteOpen={setPaletteOpen} />
+        <Shortcuts userId={userId} setPaletteOpen={setPaletteOpen} />
         {paletteOpen && (
           <Suspense fallback={null}>
             <CommandPalette open onOpenChange={setPaletteOpen} userId={userId} />
@@ -52,19 +56,21 @@ export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
 }
 
 /**
- * The page panel's title bar: a window drag area with the sidebar toggle at its left. When the
- * sidebar hides on macOS desktop, it moves clear of the traffic lights.
+ * The page panel's title bar, centered on the traffic lights' line: the sidebar toggle at its
+ * left, and when the sidebar hides, the toggle moves up beside the traffic lights with search,
+ * back and forward next to it.
  */
-function InsetBar() {
+function InsetBar(controls: TitleBarControlsProps) {
   const { state, isMobile } = useSidebar();
   const hidden = state === "collapsed" || isMobile;
 
   return (
     <div
       data-clear-traffic-lights={(hidden && trafficLights) || undefined}
-      className="app-region-drag flex h-12 shrink-0 items-center px-3 data-clear-traffic-lights:pl-20"
+      className="app-region-drag flex h-11 shrink-0 items-center gap-0.5 px-2 data-clear-traffic-lights:pl-17"
     >
       <SidebarToggle />
+      {hidden && <TitleBarControls {...controls} />}
     </div>
   );
 }

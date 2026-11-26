@@ -1,6 +1,7 @@
 /**
- * Keyboard shortcuts, matched on `event.code` so they work on any layout and with Option held
- * (on macOS, ⌥1 types "¡"). `mod` is ⌘ on Apple platforms and Ctrl elsewhere.
+ * Keyboard shortcuts, bound with react-hotkeys-hook (see components/shell/shortcuts.tsx). They
+ * match on `event.code`, so they work on any layout and with Option held (on macOS, ⌥1 types
+ * "¡"). `mod` is ⌘ on Apple platforms and Ctrl elsewhere.
  */
 export interface Shortcut {
   readonly code: string;
@@ -24,21 +25,17 @@ export function pinnedShortcut(index: number): Shortcut | undefined {
   return index < 9 ? { code: `Digit${index + 1}`, alt: true } : undefined;
 }
 
-export function matchesShortcut(
-  event: Pick<KeyboardEvent, "code" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">,
-  shortcut: Shortcut,
-  apple = isApple(),
-) {
-  const mod = apple ? event.metaKey : event.ctrlKey;
-  const other = apple ? event.ctrlKey : event.metaKey;
-
-  return (
-    event.code === shortcut.code &&
-    mod === Boolean(shortcut.mod) &&
-    event.altKey === Boolean(shortcut.alt) &&
-    event.shiftKey === Boolean(shortcut.shift) &&
-    !other
-  );
+/**
+ * The shortcut in react-hotkeys-hook syntax ("mod+k", "alt+1", "mod+bracketleft"). The library
+ * matches on `event.code` with "Key"/"Digit" stripped, so we spell the key the same way.
+ */
+export function toHotkey(shortcut: Shortcut) {
+  return [
+    ...(shortcut.mod ? ["mod"] : []),
+    ...(shortcut.alt ? ["alt"] : []),
+    ...(shortcut.shift ? ["shift"] : []),
+    shortcut.code.toLowerCase().replace(/^(key|digit)/, ""),
+  ].join("+");
 }
 
 const KEY_LABELS = new Map([
