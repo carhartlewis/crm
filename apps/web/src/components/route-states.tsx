@@ -1,7 +1,7 @@
 import { Button } from "@crm/ui/components/button";
 import { Spinner } from "@crm/ui/components/spinner";
 import { Link, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { OnboardingShell } from "./onboarding-shell.tsx";
 
 /** Shown after `pendingMs` (1s) while a route's guards and data load. Announced politely. */
@@ -20,14 +20,8 @@ export function RoutePending() {
 /** A route's data failed to load (e.g. the API is down). Never redirects; offers a retry. */
 export function RouteError({ error }: ErrorComponentProps) {
   const router = useRouter();
-  const [retrying, setRetrying] = useState(false);
+  const retry = useMutation({ mutationFn: () => router.invalidate() });
   const offline = !navigator.onLine;
-
-  const retry = async () => {
-    setRetrying(true);
-    await router.invalidate();
-    setRetrying(false);
-  };
 
   return (
     <OnboardingShell title={offline ? "You're offline" : "Something went wrong"}>
@@ -37,7 +31,7 @@ export function RouteError({ error }: ErrorComponentProps) {
             ? "Reconnect to the internet, then try again."
             : `${error instanceof Error && error.message ? error.message : "CRM couldn't load this page."} Try again in a moment.`}
         </p>
-        <Button size="hero" onClick={retry} loading={retrying}>
+        <Button size="hero" onClick={() => retry.mutate()} loading={retry.isPending}>
           Try again
         </Button>
       </div>

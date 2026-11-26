@@ -1,10 +1,9 @@
 import { loadFonts } from "@crm/ui/lib/fonts";
 import { applyInitialTheme } from "@crm/ui/components/theme-provider";
-import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { queryClient, router } from "./router.tsx";
+import { router } from "./router.tsx";
 
 // Clean launch: correct theme on the first frame, and text that enters in its final font
 // rather than swapping mid-animation. The font is local (~29 kB); the wait is capped.
@@ -20,8 +19,6 @@ if (!root) throw new Error("index.html is missing #root");
 
 createRoot(root).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <RouterProvider router={router} />
   </StrictMode>,
 );
