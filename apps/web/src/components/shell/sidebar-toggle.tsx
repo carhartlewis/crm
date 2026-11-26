@@ -1,12 +1,14 @@
 import sidePanelClose from "@carbon/icons/es/side-panel--close/16.js";
-import sidePanelOpen from "@carbon/icons/es/side-panel--open/16.js";
+import openPanelLeft from "@carbon/icons/es/open-panel--left/16.js";
 import { desktopBridge } from "@crm/core/desktop";
 import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { useSidebar } from "@crm/ui/components/sidebar";
 
 const CloseIcon = carbonIcon(sidePanelClose);
-const OpenIcon = carbonIcon(sidePanelOpen);
+
+// Closed: the plain sidebar glyph (a box with a left panel), as in Glass.
+const OpenIcon = carbonIcon(openPanelLeft);
 
 // The macOS desktop window draws its traffic lights in the top-left corner.
 export const trafficLights = desktopBridge()?.platform === "darwin";
