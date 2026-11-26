@@ -1,4 +1,4 @@
-import { rubberBand } from "./rubber-band.ts";
+import { rubberBand } from "@crm/ui/lib/rubber-band";
 
 /** Where the dragged item lands: one slot per other item whose center it has passed. */
 export function slotIndex(centers: readonly number[], from: number, draggedCenter: number) {

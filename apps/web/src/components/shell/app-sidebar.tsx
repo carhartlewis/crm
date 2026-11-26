@@ -10,8 +10,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
 } from "@crm/ui/components/sidebar";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { haptic } from "../../lib/haptics.ts";
 import { PinnedNav } from "./pinned-nav.tsx";
 import { rubberBandScroll } from "./rubber-band.ts";
 import { TitleBarControls } from "./title-bar.tsx";
@@ -58,6 +60,7 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
       <SidebarFooter>
         <WorkspaceMenu userId={userId} />
       </SidebarFooter>
+      <SidebarRail onHaptic={haptic} />
     </Sidebar>
   );
 }

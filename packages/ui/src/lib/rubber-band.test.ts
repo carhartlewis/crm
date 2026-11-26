@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { rubberBand } from "./rubber-band.ts";
+import { rubberBand } from "@crm/ui/lib/rubber-band";
 
 describe("rubberBand", () => {
   test("resists more the further you pull, never reaching the dimension", () => {

@@ -177,6 +177,17 @@
   }
 }
 
+/* Resizing the sidebar: one cursor everywhere, no text selection, no tooltips popping up. */
+body[data-sidebar-resizing],
+body[data-sidebar-resizing] * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+body[data-sidebar-resizing] [data-slot="tooltip-content"] {
+  visibility: hidden;
+}
+
 /* Electron frameless title bar: drag the window from these regions; keep controls clickable. */
 @utility app-region-drag {
   -webkit-app-region: drag;

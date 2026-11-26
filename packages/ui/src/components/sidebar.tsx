@@ -19,12 +19,20 @@ import { Skeleton } from "@crm/ui/components/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@crm/ui/components/tooltip";
 import sidePanelOpen16 from "@carbon/icons/es/side-panel--open/16.js";
 import { carbonIcon } from "@crm/ui/components/icon";
+import {
+  nextOpenState,
+  parseSidebarWidth,
+  resolveSidebarWidth,
+  settledWidth,
+  SIDEBAR_WIDTH,
+  type WidthZone,
+} from "@crm/ui/lib/sidebar-width";
 
 const SidePanelOpenIcon = carbonIcon(sidePanelOpen16);
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
+const SIDEBAR_WIDTH_COOKIE_NAME = "sidebar_width";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
-const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 
@@ -36,6 +44,7 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  width: number;
 };
 
 /**
@@ -45,17 +54,27 @@ type SidebarContextProps = {
  */
 const sidebarCookieListeners = new Set<() => void>();
 
-function readSidebarCookie(): boolean | undefined {
-  const match = /(?:^|;\s*)sidebar_state=(true|false)(?:;|$)/.exec(document.cookie);
-
-  return match ? match[1] === "true" : undefined;
+function readCookie(name: string) {
+  return new RegExp(`(?:^|;\\s*)${name}=([^;]*)`).exec(document.cookie)?.[1];
 }
 
-function writeSidebarCookie(open: boolean) {
-  document.cookie = `${SIDEBAR_COOKIE_NAME}=${open}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; samesite=lax`;
+function writeCookie(name: string, value: string) {
+  document.cookie = `${name}=${value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; samesite=lax`;
 
   for (const listener of sidebarCookieListeners) listener();
 }
+
+function readSidebarCookie(): boolean | undefined {
+  const value = readCookie(SIDEBAR_COOKIE_NAME);
+
+  return value === "true" || value === "false" ? value === "true" : undefined;
+}
+
+const writeSidebarCookie = (open: boolean) => writeCookie(SIDEBAR_COOKIE_NAME, String(open));
+const readSidebarWidth = () => parseSidebarWidth(readCookie(SIDEBAR_WIDTH_COOKIE_NAME));
+
+const writeSidebarWidth = (width: number) =>
+  writeCookie(SIDEBAR_WIDTH_COOKIE_NAME, String(Math.round(width)));
 
 function subscribeSidebarCookie(listener: () => void) {
   sidebarCookieListeners.add(listener);
@@ -102,6 +121,10 @@ function SidebarProvider({
 
   const open = openProp ?? cookieOpen ?? defaultOpen;
 
+  const width =
+    React.useSyncExternalStore(subscribeSidebarCookie, readSidebarWidth, () => undefined) ??
+    SIDEBAR_WIDTH.default;
+
   const setOpen = React.useCallback(
     (openState: boolean) => {
       setOpenProp?.(openState);
@@ -130,8 +153,9 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      width,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, width],
   );
 
   return (
@@ -141,7 +165,7 @@ function SidebarProvider({
         style={
           // SAFETY: React.CSSProperties does not model CSS custom properties; every key here is a `--*` variable with a string value.
           {
-            "--sidebar-width": SIDEBAR_WIDTH,
+            "--sidebar-width": `${width}px`,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties
@@ -228,7 +252,7 @@ function Sidebar({
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-out in-data-resizing:transition-none",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -240,7 +264,7 @@ function Sidebar({
         data-slot="sidebar-container"
         data-side={side}
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-out in-data-resizing:transition-[left,right] data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -283,28 +307,224 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
   );
 }
 
-function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
-  const { toggleSidebar } = useSidebar();
+const RESIZE_STEP = 16;
+const DRAG_THRESHOLD = 3;
+
+interface ResizeDrag {
+  readonly pointerId: number;
+  readonly startX: number;
+  readonly startWidth: number;
+  readonly openAtStart: boolean;
+  raw: number;
+  open: boolean;
+  zone: WidthZone;
+  moved: boolean;
+}
+
+/**
+ * The sidebar's edge, as in Glass: drag to resize, click to collapse. The width follows the
+ * pointer between the limits, sticks at the default, resists past either limit, and the sidebar
+ * collapses when dragged past the minimum (and reopens when dragged back). `onHaptic` ticks at
+ * each of those moments. Arrow keys resize; Enter collapses; Escape cancels a drag.
+ *
+ * Dragging writes `--sidebar-width` straight onto the wrapper, so React doesn't render while the
+ * pointer moves; it hears about collapse and reopen, and the final width (kept in a cookie).
+ */
+function SidebarRail({
+  className,
+  onHaptic,
+  ...props
+}: React.ComponentProps<"hr"> & { onHaptic?: () => void }) {
+  const { setOpen, open, width } = useSidebar();
+
+  const handleRef = React.useCallback(
+    (handle: HTMLHRElement | null) => {
+      const wrapper = handle?.closest<HTMLElement>('[data-slot="sidebar-wrapper"]');
+      const sidebar = handle?.closest<HTMLElement>('[data-slot="sidebar"]');
+
+      if (!handle || !wrapper || !sidebar) return;
+
+      let drag: ResizeDrag | null = null;
+
+      const isOpen = () => sidebar.dataset["state"] === "expanded";
+
+      const currentWidth = () =>
+        Number.parseFloat(getComputedStyle(wrapper).getPropertyValue("--sidebar-width")) ||
+        SIDEBAR_WIDTH.default;
+
+      const setWidthVar = (value: number) =>
+        wrapper.style.setProperty("--sidebar-width", `${value}px`);
+
+      const finish = (commit: boolean) => {
+        if (!drag) return;
+
+        const current = drag;
+
+        drag = null;
+        delete wrapper.dataset["resizing"];
+        delete document.body.dataset["sidebarResizing"];
+        delete handle.dataset["limit"];
+
+        if (handle.hasPointerCapture(current.pointerId)) {
+          handle.releasePointerCapture(current.pointerId);
+        }
+
+        if (!current.moved) return;
+
+        if (!commit && current.open !== current.openAtStart) setOpen(current.openAtStart);
+
+        const kept = commit ? settledWidth(current.raw) : current.startWidth;
+
+        // Transitions are back on, so an overdrag glides to the limit.
+        setWidthVar(kept);
+
+        if (commit && current.open) writeSidebarWidth(kept);
+      };
+
+      const onPointerDown = (event: PointerEvent) => {
+        if (event.button !== 0) return;
+
+        event.preventDefault();
+        handle.setPointerCapture(event.pointerId);
+
+        const startWidth = currentWidth();
+
+        drag = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startWidth,
+          openAtStart: isOpen(),
+          raw: startWidth,
+          open: isOpen(),
+          zone: "free",
+          moved: false,
+        };
+      };
+
+      const onPointerMove = (event: PointerEvent) => {
+        if (drag?.pointerId !== event.pointerId) return;
+
+        const dx = event.clientX - drag.startX;
+
+        if (!drag.moved) {
+          if (Math.abs(dx) < DRAG_THRESHOLD) return;
+
+          drag.moved = true;
+          wrapper.dataset["resizing"] = "";
+          document.body.dataset["sidebarResizing"] = "";
+        }
+
+        drag.raw = drag.startWidth + dx;
+
+        const nextOpen = nextOpenState(drag.raw, drag.open);
+
+        if (nextOpen !== drag.open) {
+          drag.open = nextOpen;
+          setOpen(nextOpen);
+          onHaptic?.();
+        }
+
+        if (!drag.open) return;
+
+        const { width: resolved, zone } = resolveSidebarWidth(drag.raw);
+
+        if (zone !== drag.zone) {
+          if (zone !== "free") onHaptic?.();
+
+          drag.zone = zone;
+
+          if (zone === "min" || zone === "max") handle.dataset["limit"] = zone;
+          else delete handle.dataset["limit"];
+        }
+
+        setWidthVar(resolved);
+      };
+
+      const onPointerUp = (event: PointerEvent) => {
+        if (drag?.pointerId !== event.pointerId) return;
+
+        // A press that never moved is a click: collapse.
+        if (!drag.moved) setOpen(!isOpen());
+
+        finish(true);
+      };
+
+      const onPointerCancel = () => finish(false);
+
+      const onWindowKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape" && drag?.moved) {
+          event.preventDefault();
+          finish(false);
+        }
+      };
+
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+
+          const step = event.key === "ArrowLeft" ? -RESIZE_STEP : RESIZE_STEP;
+
+          writeSidebarWidth(settledWidth(currentWidth() + step));
+        } else if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setOpen(!isOpen());
+        }
+      };
+
+      handle.addEventListener("pointerdown", onPointerDown);
+      handle.addEventListener("pointermove", onPointerMove);
+      handle.addEventListener("pointerup", onPointerUp);
+      handle.addEventListener("pointercancel", onPointerCancel);
+      handle.addEventListener("keydown", onKeyDown);
+      window.addEventListener("keydown", onWindowKeyDown);
+
+      return () => {
+        finish(false);
+        handle.removeEventListener("pointerdown", onPointerDown);
+        handle.removeEventListener("pointermove", onPointerMove);
+        handle.removeEventListener("pointerup", onPointerUp);
+        handle.removeEventListener("pointercancel", onPointerCancel);
+        handle.removeEventListener("keydown", onKeyDown);
+        window.removeEventListener("keydown", onWindowKeyDown);
+      };
+    },
+    [setOpen, onHaptic],
+  );
 
   return (
-    <button
-      data-sidebar="rail"
-      data-slot="sidebar-rail"
-      aria-label="Toggle Sidebar"
-      tabIndex={-1}
-      onClick={toggleSidebar}
-      title="Toggle Sidebar"
-      className={cn(
-        "absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
-        "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
-        "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
-        "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar",
-        "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
-        "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
-        className,
-      )}
-      {...props}
-    />
+    <Tooltip>
+      <TooltipTrigger
+        delay={600}
+        render={
+          <hr
+            ref={handleRef}
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            aria-valuemin={SIDEBAR_WIDTH.min}
+            aria-valuemax={SIDEBAR_WIDTH.max}
+            aria-valuenow={open ? width : 0}
+            // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- WAI-ARIA window splitter: a focusable separator that arrow keys resize.
+            tabIndex={0}
+            data-sidebar="rail"
+            data-slot="sidebar-rail"
+            className={cn(
+              "group/rail absolute inset-y-0 right-0 z-20 m-0 hidden h-auto w-2 cursor-col-resize border-0 touch-none outline-none select-none md:block",
+              "before:absolute before:inset-y-3 before:left-1/2 before:w-px before:-translate-x-1/2 before:rounded-full before:transition-colors hover:before:bg-foreground/15 focus-visible:before:bg-ring in-data-resizing:before:bg-foreground/25",
+              "after:absolute after:inset-y-0 after:-inset-x-1",
+              "data-[limit=min]:cursor-e-resize data-[limit=max]:cursor-w-resize",
+              className,
+            )}
+            {...props}
+          />
+        }
+      />
+      <TooltipContent side="right">
+        <span className="flex flex-col">
+          <span>Drag to resize</span>
+          <span className="text-background/70">Click to collapse</span>
+        </span>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
