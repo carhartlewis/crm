@@ -42,7 +42,7 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
       <SidebarHeader className="app-region-drag">
         <div
           data-traffic-lights={trafficLights || undefined}
-          className="flex h-7 items-center gap-1 pl-9 data-traffic-lights:pl-26"
+          className="flex h-7 items-center gap-1 data-traffic-lights:pl-18"
         >
           <div className="app-region-no-drag ml-auto flex items-center gap-0.5">
             <Button

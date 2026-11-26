@@ -1,4 +1,4 @@
-import { SidebarInset, SidebarProvider } from "@crm/ui/components/sidebar";
+import { SidebarInset, SidebarProvider, useSidebar } from "@crm/ui/components/sidebar";
 import { TooltipProvider } from "@crm/ui/components/tooltip";
 import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { preloadable } from "@crm/ui/lib/preloadable";
@@ -6,7 +6,7 @@ import { Outlet } from "@tanstack/react-router";
 import { Suspense, useState } from "react";
 import { AppSidebar } from "./app-sidebar.tsx";
 import { Shortcuts } from "./shortcuts.tsx";
-import { SidebarToggle } from "./sidebar-toggle.tsx";
+import { SidebarToggle, trafficLights } from "./sidebar-toggle.tsx";
 
 const CommandPalette = preloadable(() => import("./command-palette.tsx"));
 
@@ -36,7 +36,6 @@ export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
           onSearch={() => setPaletteOpen(true)}
           onSearchIntent={() => void CommandPalette.preload()}
         />
-        <SidebarToggle />
         <SidebarInset className="min-w-0">
           <InsetBar />
           <Outlet />
@@ -52,7 +51,20 @@ export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
   );
 }
 
-/** The page's title-bar strip: a window drag area (the fixed sidebar toggle sits over it). */
+/**
+ * The page panel's title bar: a window drag area with the sidebar toggle at its left. When the
+ * sidebar hides on macOS desktop, it moves clear of the traffic lights.
+ */
 function InsetBar() {
-  return <div className="app-region-drag h-12 shrink-0" />;
+  const { state, isMobile } = useSidebar();
+  const hidden = state === "collapsed" || isMobile;
+
+  return (
+    <div
+      data-clear-traffic-lights={(hidden && trafficLights) || undefined}
+      className="app-region-drag flex h-12 shrink-0 items-center px-3 data-clear-traffic-lights:pl-20"
+    >
+      <SidebarToggle />
+    </div>
+  );
 }

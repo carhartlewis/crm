@@ -12,9 +12,8 @@ const OpenIcon = carbonIcon(sidePanelOpen);
 export const trafficLights = desktopBridge()?.platform === "darwin";
 
 /**
- * Shows or hides the sidebar (⌘B). A title-bar control, not part of the sidebar: it stays in the
- * same place, beside the traffic lights, whether the sidebar is open or not. The icon shows what
- * a click will do.
+ * Shows or hides the sidebar (⌘B). It sits at the top-left of the page panel, never in the
+ * sidebar, and the icon shows what a click will do.
  */
 export function SidebarToggle() {
   const { open, openMobile, isMobile, toggleSidebar } = useSidebar();
@@ -22,19 +21,15 @@ export function SidebarToggle() {
   const ToggleIcon = expanded ? CloseIcon : OpenIcon;
 
   return (
-    <div
-      data-traffic-lights={trafficLights || undefined}
-      className="app-region-no-drag fixed top-2.5 left-3 z-20 data-traffic-lights:left-19"
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="app-region-no-drag"
+      aria-label={expanded ? "Hide sidebar" : "Show sidebar"}
+      aria-expanded={expanded}
+      onClick={toggleSidebar}
     >
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={expanded ? "Hide sidebar" : "Show sidebar"}
-        aria-expanded={expanded}
-        onClick={toggleSidebar}
-      >
-        <ToggleIcon />
-      </Button>
-    </div>
+      <ToggleIcon />
+    </Button>
   );
 }
