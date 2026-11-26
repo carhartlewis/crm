@@ -67,7 +67,7 @@ function InsetBar(controls: TitleBarControlsProps) {
   return (
     <div
       data-clear-traffic-lights={(hidden && trafficLights) || undefined}
-      className="app-region-drag flex h-11 shrink-0 items-center gap-0.5 px-2 data-clear-traffic-lights:pl-17"
+      className="app-region-drag flex h-11 shrink-0 items-center gap-0.5 px-2 data-clear-traffic-lights:pl-23"
     >
       <SidebarToggle />
       {hidden && <TitleBarControls {...controls} />}

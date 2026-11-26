@@ -9,10 +9,11 @@ import { preloadable } from "@crm/ui/lib/preloadable";
 import { ForesightManager, useForesight } from "@foresightjs/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
-import { Suspense } from "react";
+import { Suspense, useState, useSyncExternalStore } from "react";
 import type { Page } from "../../lib/pages.ts";
 import { workspaceQuery } from "../../lib/session.ts";
 import type { Shortcut } from "../../lib/shortcuts.ts";
+import { isReordering, subscribeReordering } from "./reorder.ts";
 
 // ForesightJS tags tracked elements with data-active/data-status by default, which our sidebar
 // styles read as "selected" (and which clobbers TanStack Router's data-status).
@@ -44,6 +45,12 @@ export function NavLink({ page, active, shortcut, userId, workspaceId }: NavLink
   });
 
   const PageIcon = page.icon;
+  const [peekOpen, setPeekOpen] = useState(false);
+  const reordering = useSyncExternalStore(subscribeReordering, isReordering, () => false);
+
+  // A drag captures the pointer, so the peek would never hear it leave: close it when one
+  // starts, and don't let it reopen until the pointer comes back after the drop.
+  if (reordering && peekOpen) setPeekOpen(false);
 
   const warm = () => {
     void PeekContent.preload();
@@ -51,7 +58,10 @@ export function NavLink({ page, active, shortcut, userId, workspaceId }: NavLink
   };
 
   return (
-    <PreviewCard>
+    <PreviewCard
+      open={peekOpen && !reordering}
+      onOpenChange={(open) => setPeekOpen(open && !isReordering())}
+    >
       <SidebarMenuButton
         isActive={active}
         onPointerEnter={warm}

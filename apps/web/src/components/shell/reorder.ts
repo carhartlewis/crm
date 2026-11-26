@@ -14,6 +14,34 @@ export function siblingShift(index: number, from: number, to: number, pitch: num
   return 0;
 }
 
+/**
+ * Whether a reorder drag is in progress, for UI that must stand down meanwhile (peeks).
+ * Changes twice per drag, so subscribers render at the start and the end, never while moving.
+ */
+const reorderingListeners = new Set<() => void>();
+let reordering = false;
+
+function setReordering(value: boolean) {
+  if (value === reordering) return;
+
+  reordering = value;
+
+  if (value) document.body.dataset["reordering"] = "";
+  else delete document.body.dataset["reordering"];
+
+  for (const listener of reorderingListeners) listener();
+}
+
+export const isReordering = () => reordering;
+
+export function subscribeReordering(listener: () => void) {
+  reorderingListeners.add(listener);
+
+  return () => {
+    reorderingListeners.delete(listener);
+  };
+}
+
 export interface ReorderOptions {
   /** The dragged item entered a new slot (a haptic tick). */
   onSlotChange: () => void;
@@ -59,6 +87,8 @@ export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
     let press: Press | null = null;
     let drag: Drag | null = null;
     let swallowClick = false;
+    // The settle animation of the previous drop, if still running: a new press finishes it first.
+    let settling: (() => void) | null = null;
 
     const begin = (current: Press): Drag | null => {
       const items = [...list.querySelectorAll<HTMLElement>(`:scope > ${ITEM}`)];
@@ -74,7 +104,7 @@ export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
       const gap = second ? second.top - first.bottom : 0;
 
       list.setPointerCapture(current.pointerId);
-      document.body.dataset["reordering"] = "";
+      setReordering(true);
 
       const transition = reduceMotion() ? "none" : SETTLE;
 
@@ -124,16 +154,22 @@ export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
       const to = commit ? current.index : current.from;
 
       const done = () => {
+        if (settling !== done) return;
+
+        settling = null;
+
         for (const each of current.items) {
           each.style.transform = "";
           each.style.transition = "";
           each.style.zIndex = "";
         }
 
-        delete document.body.dataset["reordering"];
+        setReordering(false);
 
         if (to !== current.from) onCommit(current.from, to);
       };
+
+      settling = done;
 
       if (!commit) {
         for (const sibling of current.items) if (sibling !== item) sibling.style.transform = "";
@@ -162,13 +198,19 @@ export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
     };
 
     const end = (commit: boolean) => {
-      if (press && drag) {
-        if (list.hasPointerCapture(press.pointerId)) list.releasePointerCapture(press.pointerId);
-        finish(drag, press.item, commit);
-      }
+      const current = { press, drag };
 
+      // Cleared first: releasing capture fires lostpointercapture, which calls end() again.
       press = null;
       drag = null;
+
+      if (!current.press || !current.drag) return;
+
+      if (list.hasPointerCapture(current.press.pointerId)) {
+        list.releasePointerCapture(current.press.pointerId);
+      }
+
+      finish(current.drag, current.press.item, commit);
     };
 
     const onPointerDown = (event: PointerEvent) => {
@@ -178,6 +220,7 @@ export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
 
       if (item?.parentElement !== list) return;
 
+      settling?.();
       press = { pointerId: event.pointerId, startY: event.clientY, item };
     };
 
@@ -215,6 +258,7 @@ export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
       end(true);
     };
 
+    // The system took the pointer away (window blur, context menu, Mission Control): put it back.
     const onPointerCancel = () => end(false);
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -235,17 +279,22 @@ export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
     list.addEventListener("pointermove", onPointerMove);
     list.addEventListener("pointerup", onPointerUp);
     list.addEventListener("pointercancel", onPointerCancel);
+    list.addEventListener("lostpointercapture", onPointerCancel);
     list.addEventListener("click", onClick, true);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("blur", onPointerCancel);
 
     return () => {
       end(false);
+      settling?.();
       list.removeEventListener("pointerdown", onPointerDown);
       list.removeEventListener("pointermove", onPointerMove);
       list.removeEventListener("pointerup", onPointerUp);
       list.removeEventListener("pointercancel", onPointerCancel);
+      list.removeEventListener("lostpointercapture", onPointerCancel);
       list.removeEventListener("click", onClick, true);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("blur", onPointerCancel);
     };
   };
 }

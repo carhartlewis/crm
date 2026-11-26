@@ -475,8 +475,11 @@ function SidebarRail({
       handle.addEventListener("pointermove", onPointerMove);
       handle.addEventListener("pointerup", onPointerUp);
       handle.addEventListener("pointercancel", onPointerCancel);
+      // The system took the pointer away (window blur, context menu): cancel, don't stick.
+      handle.addEventListener("lostpointercapture", onPointerCancel);
       handle.addEventListener("keydown", onKeyDown);
       window.addEventListener("keydown", onWindowKeyDown);
+      window.addEventListener("blur", onPointerCancel);
 
       return () => {
         finish(false);
@@ -484,8 +487,10 @@ function SidebarRail({
         handle.removeEventListener("pointermove", onPointerMove);
         handle.removeEventListener("pointerup", onPointerUp);
         handle.removeEventListener("pointercancel", onPointerCancel);
+        handle.removeEventListener("lostpointercapture", onPointerCancel);
         handle.removeEventListener("keydown", onKeyDown);
         window.removeEventListener("keydown", onWindowKeyDown);
+        window.removeEventListener("blur", onPointerCancel);
       };
     },
     [setOpen, onHaptic],
