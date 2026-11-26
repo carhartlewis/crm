@@ -12,7 +12,8 @@ const result = await Bun.build({
   target: "node",
   format: "cjs",
   naming: "[name].cjs",
-  external: ["electron"],
+  // Native addons load from node_modules at runtime; they can't be bundled.
+  external: ["electron", "macos-haptics"],
   sourcemap: "linked",
 });
 

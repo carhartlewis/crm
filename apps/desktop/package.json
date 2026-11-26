@@ -17,5 +17,8 @@
     "dev": "bun build.ts && electron .",
     "build": "bun build.ts",
     "check-types": "bun check --no-script --project tsconfig.json"
+  },
+  "optionalDependencies": {
+    "macos-haptics": "1.0.4"
   }
 }

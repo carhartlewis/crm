@@ -71,10 +71,12 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - Route loaders start critical data while the route chunk downloads. Read it with suspense; give secondary panels their own Suspense boundaries.
 - Predict navigation from pointer movement: ForesightJS for primary navigation, plus the native `PointerEvent.getPredictedEvents()` delegate for `a[data-prefetch]` links. Both call the same `router.preloadRoute` entry point, feature-detect, skip `saveData`, and dedupe.
 - Use nuqs (TanStack Router adapter) for UI overlay state such as open sheets (`?person=<id>`), tabs, and filters, so every view is linkable and back-button safe. Route-level params that loaders depend on stay in router `validateSearch`. Never write the same key from both.
-- Warm the same `import()` that `React.lazy` uses for editors and charts on deliberate hover, focus, or press. Load rarely used tools on demand.
+- Code-split components with `preloadable()` (`@crm/ui/lib/preloadable`), not `React.lazy`: call `.preload()` on deliberate hover, focus, or press (or when idle for keyboard-first tools like ⌘K), and it renders synchronously once loaded instead of waiting a scheduler tick. Load rarely used tools on demand.
+- ForesightJS runs with `setDataAttributes: false`: its default `data-active`/`data-status` attributes collide with component variants and TanStack Router.
 
 ### Desktop (Electron)
 
+- Preconnect to the app origin before the window exists (`session.preconnect`). Native addons stay external to the main bundle and are required through `createRequire(<app path>/package.json)`: Bun bakes `import.meta.url` and `__dirname` into the build as source paths.
 - Follow the Electron security checklist; `apps/desktop/src/security.ts` holds the tested policy. Keep `contextIsolation`, `sandbox` (plus `app.enableSandbox()`), no `nodeIntegration`, no `webview`, a CSP on the app origin, and deny-by-default permissions.
 - The renderer only shows the app origin. External links go through `shell.openExternal`, and only `https:` and `mailto:` are allowed.
 - The preload exposes a minimal typed bridge, never `ipcRenderer` itself. Every IPC handler checks that the sender is the app's top-level frame.
@@ -100,12 +102,15 @@ Global rules. Use the tokens and components; never one-off timings.
 - **Buttons** press to `scale-97` (160ms). Async actions use `<Button loading>`, which fades in a spinner, keeps the width, sets `aria-busy` and disables the button. Don't swap labels to "Loading…". Field errors animate in through `FieldError`.
 - **Never animate** keyboard-initiated or high-frequency actions (Cmd+K, shortcuts, list navigation). Use the `animate`, `review-animations` and `remove-animations` skills when designing or reviewing motion.
 - **Reduced motion** ships with every animation: opacity-only, never zero (`prefers-reduced-motion` rules in globals.css). Spinners keep spinning.
-- **Selection:** interface chrome is not selectable (buttons, labels, tabs, menu items, badges, kbd, sidebar nav, onboarding screens), through component variants or `select-none` on the screen shell. CRM content (names, emails, notes, values, record titles) stays selectable for copying. Inputs and textareas are always `select-text`.
+- **Selection:** interface chrome is not selectable, through `select-none` in the component itself: buttons, labels, tabs, badges, kbd, cards, dialogs, sheets, menus, popovers, peeks, tooltips, the command palette, the sidebar, and onboarding screens. CRM content (names, emails, notes, values, record titles) stays copyable: mark it `select-text`, including inside cards. Inputs and textareas are always `select-text`.
 
 ### Interaction rules
 
 - **Icons:** Carbon only, from per-icon modules: `import close from "@carbon/icons/es/close/16.js"` and `const CloseIcon = carbonIcon(close)` (`@crm/ui/components/icon`). Don't use `@carbon/icons-react`: its bucket modules defeat tree-shaking. The shadcn CLI emits `lucide-react`; convert after `shadcn add`. Lint rejects both.
 
+- **Workspace shell** (`apps/web/src/components/shell`): sidebar with Home and the pinned pages (`lib/pages.ts`; order per user in `lib/pinned-order.ts`), drag-to-reorder with a haptic tick per slot (`reorder.ts`, zero renders while dragging), rubber-band overscroll (`rubber-band.ts`), peek cards on hover that warm their chunk and data, and a fixed title-bar sidebar toggle. Shortcuts live in `lib/shortcuts.ts` (⌘K, ⌘B, ⌘[ ⌘], ⌥0 Home, ⌥1–⌥9 pinned pages) and match on `event.code`.
+- **Haptics:** `haptic()` (`apps/web/src/lib/haptics.ts`) calls the desktop bridge, which plays the macOS trackpad alignment pattern through the optional `macos-haptics` addon (loaded lazily in main, throttled, a no-op elsewhere). Use it for snaps and slot changes, not for every hover.
+- **Cards** carry the border beam (`@crm/ui/components/border-beam`, monochrome), running only while the card has pointer or focus interest.
 - **Cmd+K:** shadcn `Command`. Data is prefetched and kept fresh (sync engine, SSE, or polling); results are contextual to the current page. Do your own ranking and pass `shouldFilter={false}` for large sets. Slight backdrop blur only.
 - **AI chat:** stream assistant markdown with `@pierre/words` (`Markdown` with `isAnimating` while streaming). Wrap the composer in `border-beam`'s `BorderBeam` via a `packages/ui` component, not ad hoc in the app.
 - **Emoji picker:** preload the catalog on the first `:`; open after two letters at a word boundary; rank exact, prefix, word, then substring; one row per glyph; the caret stays in the editor.

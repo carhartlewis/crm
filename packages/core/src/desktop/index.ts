@@ -14,11 +14,16 @@ export interface DesktopBridge {
    * verifier; the renderer redeems both at `/api/auth/desktop/redeem` for its own session.
    */
   signInWithGoogle(): Promise<DesktopHandoff>;
+  /**
+   * Trackpad haptic feedback (macOS alignment pattern), for moments like a reordered item
+   * snapping into a new slot. Fire-and-forget; a no-op where the hardware can't do it.
+   */
+  haptic(): void;
 }
 
 export const DESKTOP_BRIDGE_KEY = "crmDesktop";
 
-export const DESKTOP_IPC = { signInWithGoogle: "auth:google" } as const;
+export const DESKTOP_IPC = { signInWithGoogle: "auth:google", haptic: "haptics:perform" } as const;
 
 /** The preload bridge in the Electron app, `undefined` in a normal browser. */
 export function desktopBridge(): DesktopBridge | undefined {

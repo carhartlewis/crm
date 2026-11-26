@@ -1,1 +1,10 @@
 @import "@crm/ui/globals.css";
+
+/* While a pinned page is dragged: a grabbing cursor everywhere, and no peeks popping up. */
+body[data-reordering] {
+  cursor: grabbing;
+}
+
+body[data-reordering] [data-slot="preview-card-content"] {
+  visibility: hidden;
+}

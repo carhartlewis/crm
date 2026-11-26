@@ -1,6 +1,7 @@
 import { mutationOptions } from "@tanstack/react-query";
 import { toWorkspaceInput, workspaceSlug, type WorkspaceInput } from "@crm/core/workspace";
 import { authClient } from "./auth.ts";
+import { resetAuth } from "./session.ts";
 
 /**
  * Creates a workspace (a better-auth organization; the server re-validates name and website).
@@ -31,4 +32,16 @@ async function createWorkspace(value: WorkspaceInput) {
 export const createWorkspaceMutation = mutationOptions({
   mutationKey: ["workspaces", "create"],
   mutationFn: createWorkspace,
+});
+
+/** Makes another workspace active for this session, then reloads auth state for it. */
+export const switchWorkspaceMutation = mutationOptions({
+  mutationKey: ["workspaces", "switch"],
+  mutationFn: async (workspaceId: string, { client }) => {
+    const { error } = await authClient.organization.setActive({ organizationId: workspaceId });
+
+    if (error) throw new Error(error.message ?? "Couldn't switch workspace");
+
+    await resetAuth(client);
+  },
 });

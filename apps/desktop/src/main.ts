@@ -6,10 +6,13 @@ import {
   nativeTheme,
   session,
   shell,
+  type IpcMainEvent,
   type IpcMainInvokeEvent,
 } from "electron";
 import { createHash, randomBytes } from "node:crypto";
+import { createRequire } from "node:module";
 import { join } from "node:path";
+import { createHaptics, nativeHaptics } from "./haptics.ts";
 import { startLoopback } from "./loopback.ts";
 import { contentSecurityPolicy, isAllowedExternal, isAppUrl } from "./security.ts";
 
@@ -137,7 +140,7 @@ function focusWindow() {
 }
 
 /** IPC is accepted only from the app's own top-level frame. */
-function assertTrustedSender(event: IpcMainInvokeEvent) {
+function assertTrustedSender(event: IpcMainEvent | IpcMainInvokeEvent) {
   const frame = event.senderFrame;
 
   if (!frame || frame !== event.sender.mainFrame || !isAppUrl(frame.url, WEB_URL.origin)) {
@@ -179,9 +182,23 @@ ipcMain.handle(DESKTOP_IPC.signInWithGoogle, (event) => {
   return inFlightSignIn;
 });
 
+const haptics = createHaptics({
+  platform: process.platform,
+  now: () => performance.now(),
+  load: () => nativeHaptics(createRequire(join(app.getAppPath(), "package.json"))),
+});
+
+ipcMain.on(DESKTOP_IPC.haptic, (event) => {
+  assertTrustedSender(event);
+  haptics.perform();
+});
+
 async function launch() {
   await app.whenReady();
   hardenSession();
+  // Open the connection to the app origin (it also serves /api) before the window exists, so
+  // the first document request skips DNS, TCP and TLS setup.
+  session.defaultSession.preconnect({ url: WEB_URL.origin, numSockets: 2 });
   window = createWindow();
 
   app.on("activate", () => {
