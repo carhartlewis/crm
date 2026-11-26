@@ -1,0 +1,50 @@
+[
+  {
+    "id": "unique.account.account_providerId_accountId_key",
+    "label": "Add unique constraint on \"account\" (providerId, accountId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "account_providerId_accountId_key",
+        "table": "account"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"account_providerId_accountId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "account_providerId_accountId_key",
+          "public",
+          "\"public\".\"account\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "constraint \"account_providerId_accountId_key\" on \"account\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"account_providerId_accountId_key\"",
+        "sql": "ALTER TABLE \"public\".\"account\" ADD CONSTRAINT \"account_providerId_accountId_key\" UNIQUE (\"providerId\", \"accountId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify unique constraint \"account_providerId_accountId_key\" exists on (providerId, accountId)",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb)) AS \"result\"",
+        "params": [
+          "account_providerId_accountId_key",
+          "public",
+          "\"public\".\"account\"",
+          "u",
+          "[\"providerId\",\"accountId\"]"
+        ]
+      }
+    ]
+  }
+]

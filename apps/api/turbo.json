@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "dev": {
+      "dependsOn": ["//#infra:up", "@crm/core#db:migrate"],
+      "passThroughEnv": [
+        "PORT",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "WEB_ORIGIN",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET"
+      ]
+    }
+  }
+}

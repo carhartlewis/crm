@@ -1,0 +1,23 @@
+{
+  "name": "@crm/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@crm/core": "workspace:*",
+    "ai": "7.0.183",
+    "effect": "4.1.6",
+    "eve": "1.5.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@crm/typescript-config": "workspace:*",
+    "@types/bun": "1.4.5"
+  },
+  "scripts": {
+    "dev": "eve dev --no-ui",
+    "build": "eve build",
+    "start": "eve start",
+    "check-types": "bun check --no-script --project tsconfig.json"
+  }
+}

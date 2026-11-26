@@ -1,9 +1,17 @@
 {
-  "extends": "@repo/typescript-config/react-library.json",
+  "extends": "@crm/typescript-config/react-library.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "strictNullChecks": true
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["bun"],
+    "paths": {
+      "@crm/ui/*": ["./src/*"]
+    }
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "node_modules/@crm/typescript-config/assets.d.ts"]
 }

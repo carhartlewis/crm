@@ -1,0 +1,23 @@
+{
+  "name": "@crm/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/main.ts",
+    "start": "bun src/main.ts",
+    "check-types": "bun check --no-script --project tsconfig.json"
+  },
+  "dependencies": {
+    "@crm/core": "workspace:*",
+    "@effect/platform-bun": "4.1.6",
+    "better-auth": "1.7.28",
+    "effect": "4.1.6",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@crm/typescript-config": "workspace:*",
+    "@types/bun": "1.4.5",
+    "@types/pg": "8.23.1"
+  }
+}

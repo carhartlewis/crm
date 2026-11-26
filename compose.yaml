@@ -1,0 +1,25 @@
+# Local development infrastructure: `docker compose up -d`.
+name: crm
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: crm
+    command: ["postgres", "-c", "wal_level=logical"] # ElectricSQL needs logical replication
+    ports: ["55432:5432"]
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crm"]
+      interval: 2s
+      retries: 30
+  redis:
+    image: redis:8-alpine
+    ports: ["56379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+volumes:
+  postgres:

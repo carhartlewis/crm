@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "transit"],
+      "outputs": [".eve/**", ".output/**"]
+    },
+    "dev": {
+      "env": ["CRM_API_URL"],
+      "with": ["@crm/api#dev"]
+    }
+  }
+}

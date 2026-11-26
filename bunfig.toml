@@ -1,0 +1,7 @@
+[install]
+linker = "isolated"
+globalStore = true
+
+[test]
+timeout = 10000
+pathIgnorePatterns = ["**/node_modules/**", "**/.agents/**", "**/.claude/skills/**", "**/.scratch/**", "**/dist/**", "**/build/**", "**/out/**", "**/.next/**", "**/.cache/**", "**/.eve/**", "**/.output/**", "**/e2e/**", "**/*.e2e.*"]

@@ -1,0 +1,15 @@
+{
+  "extends": "@crm/typescript-config/base.json",
+  "compilerOptions": {
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM"],
+    "types": ["bun"]
+  },
+  "include": ["agent"]
+}

@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: canary
+      - name: Record Bun canary build
+        id: bun
+        run: echo "revision=$(bun --revision)" >> "$GITHUB_OUTPUT"
+      - name: Restore Bun downloads and links
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ steps.bun.outputs.revision }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ steps.bun.outputs.revision }}-
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Restore task cache and test timings
+        uses: actions/cache@v4
+        with:
+          path: |
+            .turbo
+            .cache/test-timings.json
+          key: quality-${{ runner.os }}-${{ steps.bun.outputs.revision }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: quality-${{ runner.os }}-${{ steps.bun.outputs.revision }}-${{ hashFiles('bun.lock') }}-
+      - name: Lint, format, typecheck, test, and build in parallel
+        run: bun run ci
+        env:
+          TEST_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_TELEMETRY_DISABLED: "1"

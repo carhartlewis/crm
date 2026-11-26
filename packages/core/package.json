@@ -1,0 +1,42 @@
+{
+  "name": "@crm/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api": "./src/api/index.ts",
+    "./auth": "./src/auth/server.ts",
+    "./auth/client": "./src/auth/client.ts",
+    "./db": "./src/prisma/db.ts",
+    "./kv": "./src/kv/index.ts",
+    "./desktop": "./src/desktop/index.ts",
+    "./workspace": "./src/workspace/index.ts",
+    "./auth/desktop-handoff": "./src/auth/desktop-handoff.ts"
+  },
+  "scripts": {
+    "check-types": "bun check --no-script --project tsconfig.json",
+    "contract:emit": "prisma contract emit",
+    "db:migrate": "bun scripts/migrate-local.ts"
+  },
+  "dependencies": {
+    "@prisma/orm-postgres": "8.0.0-rc.25",
+    "better-auth": "1.7.28",
+    "effect": "4.1.6",
+    "pg": "8.23.1",
+    "temporal-polyfill": "1.0.8",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@crm/typescript-config": "workspace:*",
+    "@prisma/cli-engine": "0.10.4",
+    "@types/bun": "1.4.5",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.3",
+    "dotenv": "18.0.10",
+    "prisma": "8.0.0-rc.36",
+    "react": "19.3.1"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

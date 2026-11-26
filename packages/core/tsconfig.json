@@ -1,0 +1,17 @@
+{
+  "extends": "@crm/typescript-config/base.json",
+  "compilerOptions": {
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "jsx": "react-jsx",
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["bun"],
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "prisma.config.ts", "scripts"]
+}

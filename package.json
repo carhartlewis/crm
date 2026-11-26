@@ -4,26 +4,50 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives .",
+    "lint:fix": "oxlint --fix --deny-warnings --report-unused-disable-directives .",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "format": "bun run fmt",
+    "format:check": "bun run fmt:check",
+    "check-types": "bun run --parallel --no-exit-on-error typecheck:root typecheck:packages",
+    "typecheck:root": "bun check --no-script --project tsconfig.json",
+    "typecheck:packages": "turbo run check-types",
+    "test": "bun test --parallel",
+    "test:watch": "bun test --watch",
+    "test:ci": "bun tools/test-ci.ts",
+    "check": "bun run --parallel --no-exit-on-error lint fmt:check check-types test build",
+    "ci": "bun run --parallel --no-exit-on-error lint fmt:check check-types test:ci build",
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down"
   },
   "devDependencies": {
-    "prettier": "3.9.6",
-    "turbo": "^2.11.13",
+    "@aranlucas/oxlint-plugin-anti-slop": "0.1.1",
+    "@biomejs/biome": "2.6.9",
+    "@shadcn/lint": "0.2.5",
+    "@types/bun": "1.4.5",
+    "oxlint": "1.95.0",
+    "turbo": "2.11.13",
     "typescript": "7.0.2"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24",
+    "bun": "^1.4.5"
   },
   "devEngines": {
     "packageManager": {
       "name": "bun",
-      "version": "1.4.4"
+      "version": "^1.4.5"
     }
   },
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "trustedDependencies": [
+    "electron"
+  ],
+  "patchedDependencies": {
+    "@tanstack/router-core@1.171.39": "patches/@tanstack%2Frouter-core@1.171.39.patch"
+  }
 }

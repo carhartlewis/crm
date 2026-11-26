@@ -1,0 +1,118 @@
+// use prisma-8
+
+// better-auth tables. Prisma owns their migrations; better-auth reads and writes
+// them through the shared pg.Pool. Keep fields in sync with `getAuthTables` from
+// "better-auth/db" when the auth config or plugins change.
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  sessions      Session[]
+  accounts      Account[]
+  memberships   Member[]
+  invitations   Invitation[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  // The workspace this session acts in (better-auth `activeOrganizationId`).
+  activeOrganizationId String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime
+  updatedAt  DateTime
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// Workspaces: better-auth organizations, stored as `workspace` (see `workspaces` in src/auth/server.ts).
+
+model Workspace {
+  id          String       @id
+  name        String
+  slug        String       @unique
+  logo        String?
+  metadata    String?
+  website     String
+  createdAt   DateTime
+  members     Member[]
+  invitations Invitation[]
+
+  @@map("workspace")
+}
+
+model Member {
+  id             String    @id
+  organizationId String
+  workspace      Workspace @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String    @default("member")
+  createdAt      DateTime
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String    @id
+  organizationId String
+  workspace      Workspace @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String    @default("pending")
+  expiresAt      DateTime
+  createdAt      DateTime
+  inviterId      String
+  inviter        User      @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invitation")
+}

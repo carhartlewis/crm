@@ -1,0 +1,21 @@
+import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
+import { Effect, Layer } from "effect";
+import { HttpRouter } from "effect/http";
+import { AppConfig } from "./config.ts";
+import { Routes } from "./http/routes.ts";
+import { Auth } from "./services/Auth.ts";
+
+const Server = Layer.unwrap(
+  Effect.gen(function* () {
+    const config = yield* AppConfig;
+
+    const Cors = HttpRouter.cors({ allowedOrigins: [config.webOrigin.origin], credentials: true });
+
+    return HttpRouter.serve(Layer.mergeAll(Routes, Cors)).pipe(
+      Layer.provide(Auth.layer),
+      Layer.provide(BunHttpServer.layer({ port: config.port })),
+    );
+  }),
+);
+
+Layer.launch(Server).pipe(BunRuntime.runMain);

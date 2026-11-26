@@ -1,0 +1,27 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "transit", "routes"],
+      "env": ["RENDERER"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "dependsOn": ["routes"],
+      "with": ["@crm/api#dev", "@crm/web#routes:watch"],
+      "env": ["RENDERER", "PORT", "CRM_API_URL"]
+    },
+    "routes": {
+      "inputs": ["src/routes/**", "tsr.config.json"],
+      "outputs": ["src/routeTree.gen.ts"]
+    },
+    "check-types": {
+      "dependsOn": ["transit", "routes"]
+    },
+    "routes:watch": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

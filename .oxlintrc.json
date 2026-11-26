@@ -1,0 +1,120 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "import", "promise"],
+  "jsPlugins": [
+    {
+      "name": "anti-slop",
+      "specifier": "@aranlucas/oxlint-plugin-anti-slop"
+    },
+    "@shadcn/lint",
+    {
+      "name": "crm",
+      "specifier": "./tools/oxlint/crm-plugin.mts"
+    }
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "typescript/no-explicit-any": "error",
+    "oxc/no-accumulating-spread": "error",
+    "anti-slop/no-array-filter-map": "error",
+    "anti-slop/no-reduce-accumulator-copy": "error",
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-conditional-empty-object-spread": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-runtime-typeof": "error",
+    "anti-slop/no-shape-in-symbol-names": "error",
+    "anti-slop/no-unknown-parameters": "error",
+    "anti-slop/no-unknown-returns": "error",
+    "anti-slop/no-unknown-type-aliases": "error",
+    "anti-slop/no-unsafe-dictionary-type": "error",
+    "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-readable-spacing": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "error",
+    "shadcn/no-arbitrary-values": "error",
+    "shadcn/no-raw-colors": "error",
+    "shadcn/require-static-classes": "error",
+    "shadcn/no-restyle": [
+      "error",
+      {
+        "allow": ["layout"]
+      }
+    ],
+    "react/react-in-jsx-scope": "off",
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "lucide-react",
+            "message": "Use Carbon icons: carbonIcon(descriptor) from @crm/ui/components/icon with @carbon/icons/es/<name>/16.js. The shadcn CLI emits lucide-react; convert after `shadcn add`."
+          },
+          {
+            "name": "@carbon/icons-react",
+            "message": "Its bucket modules defeat tree-shaking (~75 kB brotli). Use @carbon/icons/es/<name>/16.js with carbonIcon() from @crm/ui/components/icon."
+          }
+        ]
+      }
+    ],
+    "crm/no-direct-effect": "error"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/out/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/.turbo/**",
+    ".cache/**",
+    ".agents/**",
+    ".claude/skills/**",
+    ".scratch/**",
+    "**/*.generated.*",
+    "**/routeTree.gen.ts",
+    "**/src/prisma/contract.d.ts",
+    "**/migrations/**",
+    "**/.eve/**",
+    "**/.output/**",
+    "**/.vercel/**"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.{test,spec}.{ts,tsx,js,jsx,mts,cts,mjs,cjs}"],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "property": "only",
+            "message": "Focused tests must not be committed. Run a targeted file or use --test-name-pattern instead."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/components/ui/**", "packages/ui/src/components/**"],
+      "rules": {
+        "shadcn/no-restyle": "off",
+        "shadcn/no-arbitrary-values": "off"
+      }
+    }
+  ],
+  "settings": {
+    "shadcn": {
+      "componentImports": ["^@crm/ui(/|$)"],
+      "note": "See docs/engineering.md for component and performance conventions."
+    },
+    "react-hooks": {
+      "additionalEffectHooks": "(useMountEffect)"
+    }
+  }
+}
