@@ -12,7 +12,9 @@
         "BETTER_AUTH_URL",
         "WEB_ORIGIN",
         "GOOGLE_CLIENT_ID",
-        "GOOGLE_CLIENT_SECRET"
+        "GOOGLE_CLIENT_SECRET",
+        "ELECTRIC_URL",
+        "ELECTRIC_SECRET"
       ]
     }
   }

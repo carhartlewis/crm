@@ -2,6 +2,7 @@ import { mutationOptions } from "@tanstack/react-query";
 import { toWorkspaceInput, workspaceSlug, type WorkspaceInput } from "@crm/core/workspace";
 import { authClient } from "./auth.ts";
 import { resetAuth } from "./session.ts";
+import { releaseSynced } from "./synced.ts";
 
 /**
  * Creates a workspace (a better-auth organization; the server re-validates name and website).
@@ -42,6 +43,6 @@ export const switchWorkspaceMutation = mutationOptions({
 
     if (error) throw new Error(error.message ?? "Couldn't switch workspace");
 
-    await resetAuth(client);
+    await Promise.all([resetAuth(client), releaseSynced(workspaceId)]);
   },
 });

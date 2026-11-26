@@ -8,6 +8,12 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Active workspace**: The workspace a session acts in (`session.activeOrganizationId`). Set at sign-in to the most recently joined workspace. Not proof of membership on its own.
 
+**Company**: A CRM record for an organisation a workspace deals with (table `company`): name, optional domain (bare hostname), owner. Belongs to one workspace; synced to the client through a workspace-scoped shape (ADR 0012).
+
+**Shape**: An ElectricSQL stream of the rows of one table that match a filter. The API proxy fixes each shape to the active workspace (ADR 0012).
+
+**txid**: The Postgres transaction id an API write returns. The client keeps its optimistic change until that txid appears in the shape stream.
+
 **Setup**: The `/setup-workspace` step for a signed-in user with no workspace (name + website).
 
 **Session**: A better-auth sign-in, stored in Redis and Postgres and identified by the session cookie. Desktop and browser sessions are separate.

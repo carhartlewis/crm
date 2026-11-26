@@ -166,6 +166,86 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  /* Hairline frames for tables and panels; they follow the theme's border colour. */
+  --shadow-hairline: 0 0 0 1px var(--border);
+  --inset-shadow-hairline: inset 0 -1px 0 var(--border);
+  /* Marks the keyboard-active table row (an inset bar on its first cell). */
+  --shadow-active-row: inset 2px 0 0 var(--ring);
+}
+
+/* Type scale for data-dense screens (tables, page shells, record sheets). */
+@theme {
+  --text-title: 1.5rem;
+  --text-title--line-height: 2rem;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.04em;
+
+  --text-heading-20: 1.25rem;
+  --text-heading-20--line-height: 1.75rem;
+  --text-heading-20--font-weight: 600;
+  --text-heading-20--letter-spacing: -0.02em;
+
+  --text-heading-16: 1rem;
+  --text-heading-16--line-height: 1.5rem;
+  --text-heading-16--font-weight: 600;
+  --text-heading-16--letter-spacing: -0.02em;
+
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-body--font-weight: 400;
+
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.125rem;
+  --text-label--font-weight: 400;
+
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-caption--font-weight: 400;
+
+  /* Widest a record sheet grows; see `w-record-fit`. */
+  --container-record: 1600px;
+}
+
+/* Page header: title on the left, actions on the right. */
+@utility grid-cols-page-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+/*
+ * The sticky end column of a data table shows a left hairline only while the table can scroll
+ * further right (a scroll-driven animation, so no JS and no React renders while scrolling).
+ */
+@keyframes pinned-end-edge {
+  from,
+  99% {
+    box-shadow: inset 1px 0 0 var(--border);
+  }
+  to {
+    box-shadow: none;
+  }
+}
+
+@utility pinned-end-edge {
+  animation: pinned-end-edge linear both;
+  animation-timeline: scroll(inline);
+}
+
+@utility drawer-content-height {
+  --drawer-content-height: calc(100dvh - 6rem);
+}
+
+/* A wide record sheet fills the window beside the sidebar, up to `--container-record`. */
+@utility w-record-fit {
+  width: min(var(--container-record), calc(100vw - var(--workspace-sidebar-width, 3rem) - 0.5rem));
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer base {

@@ -11,11 +11,17 @@ export class AuthError extends Schema.TaggedError<AuthError>()("AuthError", {
   cause: Schema.Defect(),
 }) {}
 
+/** The signed-in user and the workspace the session acts in (not yet checked for membership). */
+export interface SessionInfo {
+  readonly user: SessionUser;
+  readonly activeWorkspaceId: string | null;
+}
+
 export interface AuthService {
   /** better-auth's Web handler for `/api/auth/*`. */
   readonly handler: (request: Request) => Promise<Response>;
   /** Resolves the session from request headers (cookie). `None` when signed out. */
-  readonly session: (headers: Headers) => Effect.Effect<Option.Option<SessionUser>, AuthError>;
+  readonly session: (headers: Headers) => Effect.Effect<Option.Option<SessionInfo>, AuthError>;
   /** Desktop sign-in, step 1: record the attempt and send the browser to Google. */
   readonly desktopStart: (
     request: DesktopStart,
@@ -30,6 +36,11 @@ export interface AuthService {
 }
 
 const decodeUser = Schema.decodeUnknownEffect(SessionUser);
+
+const decodeActiveWorkspace = Schema.decodeUnknownEffect(
+  Schema.Struct({ activeOrganizationId: Schema.optional(Schema.NullOr(Schema.String)) }),
+);
+
 const decodeRedirect = Schema.decodeUnknownPromise(Schema.Struct({ url: Schema.String }));
 
 /** better-auth as an Effect service. Tests provide `Auth.of(...)` with a fake instead of this layer. */
@@ -65,7 +76,11 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
           Effect.mapError((cause) => new AuthError({ cause })),
         );
 
-        return Option.some(user);
+        const { activeOrganizationId } = yield* decodeActiveWorkspace(result.session).pipe(
+          Effect.mapError((cause) => new AuthError({ cause })),
+        );
+
+        return Option.some<SessionInfo>({ user, activeWorkspaceId: activeOrganizationId ?? null });
       });
 
       const handoff = makeDesktopHandoff({

@@ -106,6 +106,12 @@
         "shadcn/no-restyle": "off",
         "shadcn/no-arbitrary-values": "off"
       }
+    },
+    {
+      "files": ["packages/ui/src/patterns/**"],
+      "rules": {
+        "shadcn/no-restyle": "off"
+      }
     }
   ],
   "settings": {

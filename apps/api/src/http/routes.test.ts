@@ -2,7 +2,10 @@ import { SessionUser } from "@crm/core/api";
 import { afterAll, describe, expect, test } from "bun:test";
 import { Effect, Layer, Option } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
-import { Auth, AuthError } from "../services/Auth.ts";
+import { Auth, AuthError, type SessionInfo } from "../services/Auth.ts";
+import { Companies, makeCompanies } from "../services/Companies.ts";
+import { createMemoryCompanyStore } from "../services/company-store-memory.ts";
+import { Electric, makeElectric } from "../services/Electric.ts";
 import { loopbackUrl } from "./desktop.ts";
 import { Routes } from "./routes.ts";
 
@@ -14,8 +17,22 @@ const alice = new SessionUser({
   image: null,
 });
 
-// Fake better-auth: a valid session cookie resolves to Alice, "broken" simulates a store outage,
-// and `/api/auth/*` echoes the path so the mount can be asserted.
+// Sessions by cookie: Alice acts in ws_a (a member); "nows" has no active workspace; "intruder"
+// claims ws_a without a membership.
+const sessions = new Map<string, SessionInfo>([
+  ["session=valid", { user: alice, activeWorkspaceId: "ws_a" }],
+  ["session=nows", { user: alice, activeWorkspaceId: null }],
+  [
+    "session=intruder",
+    {
+      user: new SessionUser({ ...alice, id: "user_2", email: "mallory@example.com" }),
+      activeWorkspaceId: "ws_a",
+    },
+  ],
+]);
+
+// Fake better-auth: a known session cookie resolves to its session, "broken" simulates a store
+// outage, and `/api/auth/*` echoes the path so the mount can be asserted.
 const FakeAuth = Layer.succeed(
   Auth,
   Auth.of({
@@ -26,7 +43,7 @@ const FakeAuth = Layer.succeed(
 
       if (cookie.includes("broken")) return Effect.fail(new AuthError({ cause: "redis down" }));
 
-      return Effect.succeed(cookie.includes("session=valid") ? Option.some(alice) : Option.none());
+      return Effect.succeed(Option.fromNullishOr(sessions.get(cookie)));
     },
     desktopStart: (start, ip) =>
       Effect.succeed(
@@ -55,8 +72,38 @@ const FakeAuth = Layer.succeed(
   }),
 );
 
+const memory = createMemoryCompanyStore(["ws_a:user_1"]);
+const FakeCompanies = Layer.succeed(Companies, makeCompanies(memory.store));
+
+// Fake Electric: records each upstream URL and answers like Electric's initial snapshot.
+const electricCalls: URL[] = [];
+
+const FakeElectric = Layer.succeed(
+  Electric,
+  makeElectric({
+    url: new URL("http://electric.test"),
+    secret: "electric-secret",
+    fetch: async (url) => {
+      electricCalls.push(url);
+
+      if (url.searchParams.get("offset") === "boom") throw new Error("connection refused");
+
+      return new Response('[{"headers":{"control":"up-to-date"}}]', {
+        status: url.searchParams.get("handle") === "gone" ? 409 : 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=604800, s-maxage=3600",
+          "access-control-allow-origin": "*",
+          "electric-handle": "h-1",
+          "electric-offset": "0_0",
+        },
+      });
+    },
+  }),
+);
+
 const app = HttpRouter.toWebHandler(
-  Routes.pipe(Layer.provide([FakeAuth, HttpServer.layerServices])),
+  Routes.pipe(Layer.provide([FakeAuth, FakeCompanies, FakeElectric, HttpServer.layerServices])),
   {
     disableLogger: true,
   },
@@ -66,6 +113,17 @@ afterAll(() => app.dispose());
 
 const get = (path: string, cookie?: string) =>
   app.handler(new Request(`http://api.test${path}`, { headers: cookie ? { cookie } : {} }));
+
+type Body = Record<string, string | null>;
+
+const send = (method: string, path: string, cookie: string, body?: Body) =>
+  app.handler(
+    new Request(`http://api.test${path}`, {
+      method,
+      headers: { cookie, "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  );
 
 describe("api routes", () => {
   test("health is public", async () => {
@@ -143,5 +201,108 @@ describe("api routes", () => {
     );
 
     expect(responses.map((response) => response.status)).toEqual(responses.map(() => 400));
+  });
+});
+
+describe("companies api", () => {
+  test("create, update and delete return the write's txid", async () => {
+    const id = crypto.randomUUID();
+
+    const created = await send("POST", "/api/companies", "session=valid", {
+      id,
+      name: " Acme ",
+      domain: "https://www.acme.com",
+    });
+
+    expect(created.status).toBe(200);
+    expect(await created.json()).toEqual({ txid: expect.any(Number) });
+    expect(memory.rows().get(id)).toMatchObject({
+      name: "Acme",
+      domain: "acme.com",
+      workspaceId: "ws_a",
+    });
+
+    const updated = await send("PATCH", `/api/companies/${id}`, "session=valid", { domain: null });
+
+    expect(updated.status).toBe(200);
+    expect(memory.rows().get(id)?.domain).toBeNull();
+
+    expect((await send("DELETE", `/api/companies/${id}`, "session=valid")).status).toBe(200);
+    expect(memory.rows().has(id)).toBe(false);
+  });
+
+  test("typed errors map to 400, 401, 403 and 404", async () => {
+    const id = crypto.randomUUID();
+    const body = { id, name: "Acme", domain: null };
+
+    const invalid = await send("POST", "/api/companies", "session=valid", { ...body, name: "" });
+
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ _tag: "Invalid" });
+    expect((await send("POST", "/api/companies", "", body)).status).toBe(401);
+    expect((await send("POST", "/api/companies", "session=nows", body)).status).toBe(403);
+    expect((await send("POST", "/api/companies", "session=intruder", body)).status).toBe(403);
+
+    const missing = await send("PATCH", `/api/companies/${id}`, "session=valid", { name: "B" });
+
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ _tag: "NotFound" });
+  });
+});
+
+describe("companies shape proxy", () => {
+  const path = "/api/shapes/companies";
+
+  test("requires a session", async () => {
+    const response = await get(`${path}?workspace=ws_a&offset=-1`);
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("requires ?workspace= to be the session's active workspace with a membership", async () => {
+    const before = electricCalls.length;
+
+    for (const [query, cookie] of [
+      ["offset=-1", "session=valid"],
+      ["workspace=ws_b&offset=-1", "session=valid"],
+      ["workspace=ws_a&offset=-1", "session=nows"],
+      ["workspace=ws_a&offset=-1", "session=intruder"],
+    ] as const) {
+      // oxlint-disable-next-line no-await-in-loop -- each case is independent and small.
+      expect((await get(`${path}?${query}`, cookie)).status).toBe(403);
+    }
+
+    expect(electricCalls.length).toBe(before);
+  });
+
+  test("proxies a fixed, workspace-filtered shape and makes caching private", async () => {
+    const response = await get(
+      `${path}?workspace=ws_a&offset=-1&table=user&where=true&secret=x&params%5B1%5D=ws_b`,
+      "session=valid",
+    );
+
+    const upstream = electricCalls.at(-1);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('[{"headers":{"control":"up-to-date"}}]');
+    expect(Object.fromEntries(upstream?.searchParams ?? [])).toEqual({
+      offset: "-1",
+      table: "company",
+      where: "workspace_id = $1",
+      "params[1]": "ws_a",
+      secret: "electric-secret",
+    });
+    expect(response.headers.get("electric-handle")).toBe("h-1");
+    expect(response.headers.get("cache-control")).toBe("private, max-age=604800");
+    expect(response.headers.get("vary")).toBe("Cookie");
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  test("passes Electric's error status through, and reports an unreachable Electric as 502", async () => {
+    expect(
+      (await get(`${path}?workspace=ws_a&offset=0_0&handle=gone`, "session=valid")).status,
+    ).toBe(409);
+    expect((await get(`${path}?workspace=ws_a&offset=boom`, "session=valid")).status).toBe(502);
   });
 });

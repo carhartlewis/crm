@@ -18,8 +18,9 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'77636a3385d2099596011941eb6679dfe88cd6d12a8264635fc25f7526badc7f'>;
-export type ExecutionHash = ExecutionHashBase<string>;
+  StorageHashBase<'bf7c84ffe31a2bd0038746da6dabb667f6c084e645cce158f562d198e499c7e1'>;
+export type ExecutionHash =
+  ExecutionHashBase<'bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -320,6 +321,18 @@ export namespace Models {
     user: public_User;
     readonly [RelationKeys]?: 'user';
   };
+  export type public_Company = {
+    createdAt: FieldOutputTypes['public']['Company']['createdAt'];
+    domain: FieldOutputTypes['public']['Company']['domain'];
+    id: FieldOutputTypes['public']['Company']['id'];
+    name: FieldOutputTypes['public']['Company']['name'];
+    ownerId: FieldOutputTypes['public']['Company']['ownerId'];
+    updatedAt: FieldOutputTypes['public']['Company']['updatedAt'];
+    workspaceId: FieldOutputTypes['public']['Company']['workspaceId'];
+    owner: public_User | null;
+    workspace: public_Workspace;
+    readonly [RelationKeys]?: 'owner' | 'workspace';
+  };
   export type public_Invitation = {
     createdAt: FieldOutputTypes['public']['Invitation']['createdAt'];
     email: FieldOutputTypes['public']['Invitation']['email'];
@@ -396,6 +409,7 @@ export namespace Models {
 export declare const models: {
   public: {
     Account: Models.public_Account;
+    Company: Models.public_Company;
     Invitation: Models.public_Invitation;
     Member: Models.public_Member;
     Session: Models.public_Session;
@@ -524,6 +538,98 @@ type ContractBase = Omit<
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'account';
                     readonly columns: readonly ['userId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'user';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly company: {
+              columns: {
+                readonly created_at: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly domain: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
+                readonly id: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly name: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly owner_id: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
+                readonly updated_at: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly workspace_id: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'company_owner_id_idx_ade9f347';
+                  readonly prefix: 'company_owner_id_idx';
+                  readonly columns: readonly ['owner_id'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'company_workspace_id_idx_90a9f461';
+                  readonly prefix: 'company_workspace_id_idx';
+                  readonly columns: readonly ['workspace_id'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'company';
+                    readonly columns: readonly ['workspace_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'workspace';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'company';
+                    readonly columns: readonly ['owner_id'];
                   };
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
@@ -974,6 +1080,7 @@ type ContractBase = Omit<
   readonly targetFamily: 'sql';
   readonly roots: {
     readonly account: { readonly namespace: 'public' & NamespaceId; readonly model: 'Account' };
+    readonly company: { readonly namespace: 'public' & NamespaceId; readonly model: 'Company' };
     readonly invitation: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'Invitation';
@@ -1090,6 +1197,82 @@ type ContractBase = Omit<
                 readonly scope: { readonly column: 'scope' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
                 readonly userId: { readonly column: 'userId' };
+              };
+            };
+          };
+          readonly Company: {
+            readonly fields: {
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly typeParams: { readonly precision: 3 };
+                };
+              };
+              readonly domain: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly ownerId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly typeParams: { readonly precision: 3 };
+                };
+              };
+              readonly workspaceId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly owner: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['ownerId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly workspace: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Workspace';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['workspaceId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'company';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly createdAt: { readonly column: 'created_at' };
+                readonly domain: { readonly column: 'domain' };
+                readonly id: { readonly column: 'id' };
+                readonly name: { readonly column: 'name' };
+                readonly ownerId: { readonly column: 'owner_id' };
+                readonly updatedAt: { readonly column: 'updated_at' };
+                readonly workspaceId: { readonly column: 'workspace_id' };
               };
             };
           };
@@ -1575,6 +1758,25 @@ type ContractBase = Omit<
     };
   };
   readonly extensions: {};
+  readonly execution: {
+    readonly executionHash: ExecutionHash;
+    readonly mutations: {
+      readonly defaults: readonly [
+        {
+          readonly onUpdate: {
+            readonly id: 'timestampNow';
+            readonly kind: 'generator';
+            readonly params: { readonly precision: 3 };
+          };
+          readonly ref: {
+            readonly entry: 'company';
+            readonly field: 'updated_at';
+            readonly namespace: 'public';
+          };
+        },
+      ];
+    };
+  };
   readonly meta: {};
   readonly profileHash: ProfileHash;
 };

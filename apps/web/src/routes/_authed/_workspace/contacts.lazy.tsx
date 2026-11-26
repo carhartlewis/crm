@@ -9,7 +9,7 @@ export const Route = createLazyFileRoute("/_authed/_workspace/contacts")({
 function Contacts() {
   return (
     <PageLayout page={pageById("contacts")}>
-      <EmptyState title="No contacts yet">
+      <EmptyState page={pageById("contacts")} title="No contacts yet">
         People appear here as you add them or connect your email and calendar.
       </EmptyState>
     </PageLayout>

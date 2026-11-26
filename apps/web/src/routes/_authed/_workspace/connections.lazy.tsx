@@ -9,7 +9,7 @@ export const Route = createLazyFileRoute("/_authed/_workspace/connections")({
 function Connections() {
   return (
     <PageLayout page={pageById("connections")}>
-      <EmptyState title="Nothing connected yet">
+      <EmptyState page={pageById("connections")} title="Nothing connected yet">
         Connect email and calendar to fill your CRM from real conversations.
       </EmptyState>
     </PageLayout>
