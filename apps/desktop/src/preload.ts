@@ -29,6 +29,9 @@ const bridge: DesktopBridge = {
 
     return handoff;
   },
+  haptic() {
+    ipcRenderer.send(DESKTOP_IPC.haptic);
+  },
 };
 
 contextBridge.exposeInMainWorld(DESKTOP_BRIDGE_KEY, bridge);

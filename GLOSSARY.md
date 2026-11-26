@@ -31,3 +31,9 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 **Mount effect**: `useMountEffect`, the only sanctioned effect: subscribing to an external system on mount (ADR 0008).
 
 **Onboarding shell**: The full-window layout for sign-in, setup and route-level states: shader backdrop, app mark, title, content.
+
+**Pinned pages**: The workspace's top-level pages in the sidebar: Companies, Contacts, Workflows, Connections. Each user orders them by dragging; ⌥1–⌥9 open them in that order.
+
+**Peek**: The card that opens when you hover or focus a pinned page: what it holds, its shortcut, and the workspace's members. Its code and data load on hover, before it opens.
+
+**Workspace shell**: The signed-in frame: sidebar, title bar, the current page, ⌘K and the global shortcuts.

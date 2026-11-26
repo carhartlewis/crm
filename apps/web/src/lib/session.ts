@@ -11,6 +11,8 @@ export const authKeys = {
   all: ["auth"] as const,
   session: () => [...authKeys.all, "session"] as const,
   workspaces: (userId: string) => [...authKeys.all, "workspaces", userId] as const,
+  workspace: (userId: string, workspaceId: string) =>
+    [...authKeys.all, "workspace", userId, workspaceId] as const,
 };
 
 export const sessionQuery = queryOptions({
@@ -31,6 +33,21 @@ export const workspacesQuery = (userId: string) =>
       const { data, error } = await authClient.organization.list();
 
       if (error) throw new Error(error.message ?? "Couldn't load your workspaces");
+
+      return data;
+    },
+  });
+
+/** A workspace with its members, for peeks and the workspace menu. */
+export const workspaceQuery = (userId: string, workspaceId: string) =>
+  queryOptions({
+    queryKey: authKeys.workspace(userId, workspaceId),
+    queryFn: async () => {
+      const { data, error } = await authClient.organization.getFullOrganization({
+        query: { organizationId: workspaceId },
+      });
+
+      if (error || !data) throw new Error(error?.message ?? "Couldn't load the workspace");
 
       return data;
     },

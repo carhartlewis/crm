@@ -24,7 +24,7 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "flex size-full flex-col overflow-hidden rounded-xl! bg-popover p-1 text-popover-foreground",
+        "select-none flex size-full flex-col overflow-hidden rounded-xl! bg-popover/80 p-1 backdrop-blur-xl backdrop-saturate-150 text-popover-foreground",
         className,
       )}
       {...props}
@@ -52,8 +52,13 @@ function CommandDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
+      {/* Opened from the keyboard, so it appears at once: no enter or exit animation. */}
       <DialogContent
-        className={cn("top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0", className)}
+        className={cn(
+          "top-1/3 translate-y-0 overflow-hidden rounded-xl! bg-transparent p-0 data-open:animate-none data-closed:animate-none",
+          className,
+        )}
+        overlayClassName="bg-black/5 data-open:animate-none data-closed:animate-none"
         showCloseButton={showCloseButton}
       >
         {children}
@@ -72,7 +77,7 @@ function CommandInput({
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+            "select-text w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
           {...props}
