@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "dev": {
-      "dependsOn": ["//#infra:up", "@crm/core#db:migrate"],
+      "dependsOn": ["//#infra:up", "//#setup:env", "@crm/core#db:migrate"],
       "passThroughEnv": [
         "PORT",
         "DATABASE_URL",

@@ -20,6 +20,9 @@
     },
     "//#infra:up": {
       "cache": false
+    },
+    "//#setup:env": {
+      "cache": false
     }
   },
   "agentGuidance": true,

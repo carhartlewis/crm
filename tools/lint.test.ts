@@ -97,15 +97,22 @@ describe("lint policy through the real Oxlint CLI", () => {
   });
 
   test("rejects direct React effects, named or through the namespace", async () => {
-    const named = await lint('import { useEffect } from "react";\n\nexport const tick = () => useEffect(() => undefined, []);\n');
-    const namespaced = await lint('import * as React from "react";\n\nexport const tick = () => React.useLayoutEffect(() => undefined, []);\n');
+    const named = await lint(
+      'import { useEffect } from "react";\n\nexport const tick = () => useEffect(() => undefined, []);\n',
+    );
+
+    const namespaced = await lint(
+      'import * as React from "react";\n\nexport const tick = () => React.useLayoutEffect(() => undefined, []);\n',
+    );
 
     expect(named.output).toContain("crm(no-direct-effect)");
     expect(namespaced.output).toContain("crm(no-direct-effect)");
   });
 
   test("allows namespace React imports that don't use effects", async () => {
-    const result = await lint('import * as React from "react";\n\nexport const useCount = () => React.useState(0);\n');
+    const result = await lint(
+      'import * as React from "react";\n\nexport const useCount = () => React.useState(0);\n',
+    );
 
     expect(result.output).not.toContain("no-direct-effect");
   });

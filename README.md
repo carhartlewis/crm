@@ -1,16 +1,25 @@
 # CRM
 
-Bun + Turborepo workspace scaffold for a collaborative AI application.
-The starter applications have been removed; there is no runnable product or UI package yet.
+A desktop-first CRM: Electron + React on Bun, an Effect API with better-auth, Prisma 8 on Postgres, and Redis.
+
+## First run
+
+Needs the Bun **canary** channel (1.4.5 or newer; older Bun can't read `bun.lock`), Node **24** (for Oxlint's JavaScript plugins), and Docker.
+
+```sh
+bun upgrade --canary
+bun install --frozen-lockfile
+turbo dev --filter=@crm/desktop   # env setup, Postgres + Redis, migrations, API, web, Electron
+```
+
+`turbo dev` creates any missing `.env` from its `.env.example` and generates the auth secret. The first time, it stops and asks for two values only you can provide: a Google OAuth client ID and secret in `apps/api/.env` (Web application client, redirect URI `http://localhost:3001/api/auth/callback/google`). Add them and run it again.
 
 ## Development
 
-Use the Bun **canary** channel (`bun upgrade --canary`, 1.4.5 minimum) and Node **24**. Node runs Oxlint's JavaScript plugins.
-
 ```sh
-bun install --frozen-lockfile
-turbo dev --filter=@crm/desktop   # Postgres + Redis, migrations, API, web, Electron
-bun run check
+turbo dev --filter=@crm/desktop   # the whole desktop stack
+bun run check                     # what CI runs
+bun run infra:down                # stop Postgres and Redis
 ```
 
 | Command               | Purpose                                                                |

@@ -19,7 +19,8 @@
     "check": "bun run --parallel --no-exit-on-error lint fmt:check check-types test build",
     "ci": "bun run --parallel --no-exit-on-error lint fmt:check check-types test:ci build",
     "infra:up": "docker compose up -d --wait",
-    "infra:down": "docker compose down"
+    "infra:down": "docker compose down",
+    "setup:env": "bun tools/setup-env/setup-env.ts"
   },
   "devDependencies": {
     "@aranlucas/oxlint-plugin-anti-slop": "0.1.1",

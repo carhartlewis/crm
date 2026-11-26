@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "db:migrate": {
-      "dependsOn": ["//#infra:up"],
+      "dependsOn": ["//#infra:up", "//#setup:env"],
       "cache": false,
       "passThroughEnv": ["DATABASE_URL", "ALLOW_REMOTE_MIGRATE"]
     }
