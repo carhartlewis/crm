@@ -5,6 +5,10 @@ import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "..");
 
+/** Diagnostic lines only (`path:line:col: error|warning …`); Oxlint may also print a summary. */
+const diagnostics = (output: string) =>
+  output.split("\n").filter((line) => /:\d+:\d+: (?:error|warning) /.test(line));
+
 async function lint(source: string, filename = "fixture.tsx") {
   const directory = await mkdtemp(join(tmpdir(), "crm-lint-"));
 
@@ -43,7 +47,7 @@ describe("lint policy through the real Oxlint CLI", () => {
       "export function double(value: number): number { return value * 2; }\n",
     );
 
-    expect(result.output).toBe("");
+    expect(diagnostics(result.output)).toEqual([]);
     expect(result.exitCode).toBe(0);
   });
 
@@ -92,7 +96,7 @@ describe("lint policy through the real Oxlint CLI", () => {
       'import { Button } from "@crm/ui/button";\n\nexport const view = <div className="bg-background text-foreground"><Button className="w-full" /></div>;\n',
     );
 
-    expect(result.output).toBe("");
+    expect(diagnostics(result.output)).toEqual([]);
     expect(result.exitCode).toBe(0);
   });
 
