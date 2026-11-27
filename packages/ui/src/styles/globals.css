@@ -357,7 +357,7 @@
   line-height: 1.6;
   overflow-wrap: anywhere;
 
-  & :where(p, ul, ol, blockquote, table, [data-markdown="code-block"]) {
+  & :where(p, ul, ol, blockquote, [data-markdown="table"], [data-markdown="code-block"]) {
     margin-block: 0.75em;
   }
 
@@ -514,7 +514,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  & :is(th, td) {
+  & [data-markdown="table"] :is(th, td) {
     padding: 0.5rem 0.75rem;
     text-align: left;
     vertical-align: top;
@@ -522,7 +522,7 @@
     word-break: normal;
   }
 
-  & th {
+  & [data-markdown="table"] th {
     background: color-mix(in oklab, var(--muted) 50%, transparent);
     color: var(--muted-foreground);
     font-size: 0.75rem;
@@ -530,42 +530,42 @@
     white-space: nowrap;
   }
 
-  & td {
+  & [data-markdown="table"] td {
     border-top: 1px solid var(--border);
   }
 
-  & td:not(:last-child) {
+  & [data-markdown="table"] td:not(:last-child) {
     white-space: nowrap;
   }
 
-  & td:first-child {
+  & [data-markdown="table"] td:first-child {
     color: var(--foreground);
     font-weight: 500;
   }
 
-  & tbody tr {
+  & [data-markdown="table"] tbody tr {
     transition: background-color 150ms var(--ease-out);
   }
 
-  & tbody tr:hover {
+  & [data-markdown="table"] tbody tr:hover {
     background: color-mix(in oklab, var(--muted) 50%, transparent);
   }
 
   /* A record in a table cell names its row, so the whole row opens it, as in the app's own
      tables: the name is plain text and its button stretches over the row. */
-  & tbody tr:has([data-slot="record-chip"]) {
+  & [data-markdown="table"] tbody tr:has([data-slot="record-chip"]) {
     position: relative;
     cursor: pointer;
   }
 
-  & td [data-slot="record-chip"] {
+  & [data-markdown="table"] td [data-slot="record-chip"] {
     position: static;
     background: transparent;
     padding: 0;
     cursor: pointer;
   }
 
-  & td [data-slot="record-chip"]::after {
+  & [data-markdown="table"] td [data-slot="record-chip"]::after {
     content: "";
     position: absolute;
     inset: 0;
