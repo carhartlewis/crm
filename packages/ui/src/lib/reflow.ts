@@ -56,7 +56,9 @@ export function observeReflow(element: HTMLElement | null) {
   const observer = new ResizeObserver(([entry]) => {
     const next = entry?.contentRect.width ?? 0;
 
-    if (width !== null && Math.abs(next - width) >= 1) markReflow();
+    // Marked on the next frame: writing to the document inside a ResizeObserver callback restyles
+    // the page mid-loop, which the browser reports as an undelivered-notifications error.
+    if (width !== null && Math.abs(next - width) >= 1) requestAnimationFrame(markReflow);
 
     width = next;
   });
