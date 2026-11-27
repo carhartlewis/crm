@@ -40,6 +40,8 @@ export interface AuthDependencies {
   google: GoogleClient;
   /** Copies profile pictures and workspace logos into storage. Omit to keep remote URLs. */
   images?: ImageCache;
+  /** Calls Google's userinfo endpoint for a missing profile picture. Defaults to `fetch`. */
+  fetch?: (url: string, init: RequestInit) => Promise<Response>;
   /** The MCP authorization server for the connections gateway (see mcp.ts). */
   mcp: McpAuthOptions;
 }
@@ -147,11 +149,13 @@ export async function cacheSignInImages(
   context: AuthContext,
   userId: string,
   workspaceId: string | null,
+  fetchImpl: NonNullable<AuthDependencies["fetch"]> = fetch,
 ) {
   const user = await context.internalAdapter.findUserById(userId);
+  const source = user && (user.image || (await googlePicture(context, user.id, fetchImpl)));
 
-  if (user?.image && !images.isStored(user.image)) {
-    const image = await images.avatar(user.id, user.image);
+  if (user && source && !images.isStored(source)) {
+    const image = await images.avatar(user.id, source);
 
     if (image) await context.internalAdapter.updateUser(user.id, { image });
   }
@@ -176,15 +180,45 @@ export async function cacheSignInImages(
   }
 }
 
+const decodeUserInfo = Schema.decodeUnknownSync(
+  Schema.Struct({ picture: Schema.optional(Schema.String) }),
+);
+
+/**
+ * Google can leave `picture` out of the ID token (seen for a Workspace account with a ~1.5 kB
+ * photo URL), and better-auth reads only the ID token, so the user is saved without an image.
+ * The userinfo endpoint still returns it, for the access token stored at sign-in.
+ */
+async function googlePicture(
+  context: AuthContext,
+  userId: string,
+  fetchImpl: NonNullable<AuthDependencies["fetch"]>,
+) {
+  const accounts = await context.internalAdapter.findAccounts(userId);
+  const accessToken = accounts.find((account) => account.providerId === "google")?.accessToken;
+
+  if (!accessToken) return null;
+
+  const response = await fetchImpl("https://openidconnect.googleapis.com/v1/userinfo", {
+    headers: { authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(5000),
+  });
+
+  if (!response.ok) return null;
+
+  return decodeUserInfo(await response.json()).picture ?? null;
+}
+
 /** Failures only log: images are a nicety and never block sign-in. */
 async function cacheSignInImagesSafely(
   images: ImageCache,
   context: AuthContext,
   userId: string,
   workspaceId: string | null,
+  fetchImpl: AuthDependencies["fetch"],
 ) {
   try {
-    await cacheSignInImages(images, context, userId, workspaceId);
+    await cacheSignInImages(images, context, userId, workspaceId, fetchImpl);
   } catch (error) {
     context.logger.warn("Couldn't cache sign-in images", error);
   }
@@ -254,6 +288,7 @@ export function createAuth(deps: AuthDependencies) {
                 context.context,
                 session.userId,
                 activeOrganizationId ?? null,
+                deps.fetch,
               ),
             );
           },

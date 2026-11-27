@@ -20,10 +20,17 @@ interface Member {
 }
 
 /** Signs a user in through the real desktop redeem endpoint, which creates a session. */
-async function signIn({ logo }: { logo: string | null }) {
+async function signIn({
+  logo,
+  image = GOOGLE_IMAGE,
+}: {
+  logo: string | null;
+  image?: string | null;
+}) {
   const kv = createMemoryKv();
   const storage = createMemoryStorage();
   const requested: string[] = [];
+  const userInfoRequests: (string | null)[] = [];
 
   const images = createImageCache({
     storage,
@@ -77,14 +84,26 @@ async function signIn({ logo }: { logo: string | null }) {
       agentCallbackPrefix: "http://localhost:2000/eve/v1/connections/connections/callback/",
     },
     images,
+    fetch: async (_url, init) => {
+      userInfoRequests.push(new Headers(init.headers).get("authorization"));
+
+      return Response.json({ name: "A", picture: GOOGLE_IMAGE });
+    },
   });
 
   const context = await auth.$context;
 
   const user = await context.internalAdapter.createUser(
-    { email: "a@example.com", name: "A", emailVerified: true, image: GOOGLE_IMAGE },
+    { email: "a@example.com", name: "A", emailVerified: true, image },
     { method: "admin" },
   );
+
+  await context.internalAdapter.createAccount({
+    userId: user.id,
+    providerId: "google",
+    accountId: "g1",
+    accessToken: "google-access-token",
+  });
 
   members.push({
     id: "m1",
@@ -117,6 +136,7 @@ async function signIn({ logo }: { logo: string | null }) {
     workspace: db.workspace[0],
     storage,
     requested,
+    userInfoRequests,
   };
 }
 
@@ -127,6 +147,20 @@ describe("sign-in images", () => {
     expect(user?.image).toMatch(/^memory:\/\/storage\/users\/.+\/avatar\?v=[0-9a-f]{16}$/);
     expect(workspace?.logo).toStartWith("memory://storage/favicons/acme.com?v=");
     expect(storage.read("favicons/acme.com")?.contentType).toBe("image/png");
+  });
+
+  test("asks Google's userinfo for the picture when the ID token had none", async () => {
+    const { user, requested, userInfoRequests } = await signIn({ logo: null, image: null });
+
+    expect(userInfoRequests).toEqual(["Bearer google-access-token"]);
+    expect(requested).toContain("https://lh3.googleusercontent.com/a/abc=s256-c");
+    expect(user?.image).toMatch(/^memory:\/\/storage\/users\/.+\/avatar\?v=[0-9a-f]{16}$/);
+  });
+
+  test("doesn't call userinfo when the user already has a picture", async () => {
+    const { userInfoRequests } = await signIn({ logo: null });
+
+    expect(userInfoRequests).toEqual([]);
   });
 
   test("keeps a workspace logo that is already set", async () => {
