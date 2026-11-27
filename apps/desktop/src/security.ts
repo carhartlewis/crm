@@ -22,7 +22,11 @@ export function isAppUrl(url: string, appOrigin: string) {
 export function contentSecurityPolicy(dev: boolean) {
   return [
     "default-src 'self'",
-    dev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
+    // 'wasm-unsafe-eval' lets the Markdown renderer (@pierre/words) compile its WebAssembly. It
+    // allows WebAssembly compilation only, not eval() or new Function().
+    dev
+      ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'"
+      : "script-src 'self' 'wasm-unsafe-eval'",
     // React `style` props and Base UI positioning set inline styles.
     "style-src 'self' 'unsafe-inline'",
     // Stored images (avatars, workspace logos): Vercel Blob, or the local RustFS container in dev.

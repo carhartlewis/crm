@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* Markdown (`@crm/ui/components/markdown`): spacing and lists in the inherited text colour. */
+@import "@pierre/words/styles.css";
 
 @source "../../../apps/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";

@@ -4,7 +4,8 @@ const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matche
 
 /**
  * Callback ref for a scroll container: pulling past either end (wheel or trackpad) stretches
- * the first child with resistance, and letting go springs it back. Native overscroll is off
+ * the first child with resistance, and letting go springs it back. Only when the content
+ * overflows: a list that fits stays still. Native overscroll is off
  * (`overscroll-none` on the container) so the two don't fight. Style writes only: no renders.
  * With reduced motion the edge simply stops.
  */
@@ -31,6 +32,9 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
   const onWheel = (event: WheelEvent) => {
     // Pinch-zoom arrives as ctrl+wheel; horizontal swipes are for history navigation.
     if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || reduceMotion()) return;
+
+    // Content that fits has nothing to scroll, so it doesn't stretch either.
+    if (overscroll === 0 && scroller.scrollHeight <= scroller.clientHeight + 1) return;
 
     const atTop = scroller.scrollTop <= 0;
     const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;

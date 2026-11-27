@@ -11,16 +11,10 @@ import {
   DropdownMenuTrigger,
 } from "@crm/ui/components/dropdown-menu";
 import { carbonIcon } from "@crm/ui/components/icon";
-import {
-  AdaptiveSheet,
-  AdaptiveSheetContent,
-  AdaptiveSheetDescription,
-  AdaptiveSheetFooter,
-  AdaptiveSheetHeader,
-  AdaptiveSheetTitle,
-} from "@crm/ui/patterns/adaptive-sheet";
 import { FormattedDate } from "@crm/ui/patterns/formatted-date";
+import { preloadable } from "@crm/ui/lib/preloadable";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Suspense } from "react";
 import { parseAsString, useQueryState } from "nuqs";
 import { toast } from "sonner";
 import {
@@ -28,7 +22,6 @@ import {
   installSkillMutation,
   removeSkillMutation,
   setSkillEnabledMutation,
-  skillQuery,
 } from "../../lib/skills.ts";
 import { SectionHeading } from "./connectors-panel.tsx";
 
@@ -36,6 +29,9 @@ const AddIcon = carbonIcon(add);
 const MoreIcon = carbonIcon(overflow);
 
 const onError = (error: Error) => toast.error(error.message);
+
+/** The skill reader: loaded when a row is hovered or focused (its renderer is WebAssembly). */
+const SkillSheet = preloadable(() => import("./skill-sheet.tsx"));
 
 interface Scope {
   readonly userId: string;
@@ -71,7 +67,15 @@ export function SkillsPanel({
         <DiscoverSkills scope={scope} query={settledQuery} onOpen={(id) => void setOpen(id)} />
       )}
       {open ? (
-        <SkillSheet key={open} scope={scope} id={open} onClose={() => void setOpen(null)} />
+        <Suspense fallback={null}>
+          <SkillSheet
+            key={open}
+            userId={userId}
+            workspaceId={workspaceId}
+            id={open}
+            onClose={() => void setOpen(null)}
+          />
+        </Suspense>
       ) : null}
     </>
   );
@@ -121,6 +125,8 @@ function SkillRow({ skill, onOpen }: { skill: SkillSummary; onOpen: (id: string)
     <li className="flex items-center gap-3 py-3">
       <button
         type="button"
+        onPointerEnter={() => void SkillSheet.preload()}
+        onFocus={() => void SkillSheet.preload()}
         onClick={() => onOpen(skill.id)}
         aria-label={`Read ${skill.name}`}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -145,6 +151,8 @@ function SkillRow({ skill, onOpen }: { skill: SkillSummary; onOpen: (id: string)
             <Button
               variant="ghost"
               size="icon"
+              // The dots, not the button's padding, line up with the content edge.
+              className="-mr-2"
               aria-label={`${skill.name} actions`}
               loading={setEnabled.isPending || remove.isPending}
             />
@@ -231,57 +239,5 @@ function DiscoverRow({ result, onOpen }: { result: SkillsShResult; onOpen: (id: 
         </Button>
       )}
     </li>
-  );
-}
-
-function SkillSheet({ scope, id, onClose }: { scope: Scope; id: string; onClose: () => void }) {
-  const skill = useQuery(skillQuery(scope.userId, scope.workspaceId, id));
-  const setEnabled = useMutation({ ...setSkillEnabledMutation, onError });
-  const remove = useMutation({ ...removeSkillMutation, onError, onSuccess: onClose });
-  const detail = skill.data;
-
-  return (
-    <AdaptiveSheet open onOpenChange={(next) => (next ? undefined : onClose())} size="wide">
-      <AdaptiveSheetContent>
-        <AdaptiveSheetHeader>
-          <AdaptiveSheetTitle>{detail?.name ?? "Skill"}</AdaptiveSheetTitle>
-          <AdaptiveSheetDescription>
-            {detail?.description ?? (skill.isError ? skill.error.message : "Loading…")}
-          </AdaptiveSheetDescription>
-        </AdaptiveSheetHeader>
-        {detail ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
-            <p className="text-sm text-muted-foreground select-none">
-              {detail.sourceId
-                ? `from ${detail.sourceId.split("/").slice(0, -1).join("/")}`
-                : "Written in this workspace"}
-              {detail.files.length === 1 ? " · 1 more file" : ""}
-              {detail.files.length > 1 ? ` · ${detail.files.length} more files` : ""}
-            </p>
-            <pre className="rounded-lg bg-muted p-3 font-mono text-xs whitespace-pre-wrap select-text">
-              {detail.content}
-            </pre>
-          </div>
-        ) : null}
-        {detail ? (
-          <AdaptiveSheetFooter>
-            <Button
-              variant="ghost"
-              onClick={() => remove.mutate(detail.id)}
-              loading={remove.isPending}
-            >
-              Remove
-            </Button>
-            <Button
-              variant={detail.enabled ? "secondary" : "default"}
-              onClick={() => setEnabled.mutate({ id: detail.id, enabled: !detail.enabled })}
-              loading={setEnabled.isPending}
-            >
-              {detail.enabled ? "Disable for the workspace" : "Enable for the workspace"}
-            </Button>
-          </AdaptiveSheetFooter>
-        ) : null}
-      </AdaptiveSheetContent>
-    </AdaptiveSheet>
   );
 }

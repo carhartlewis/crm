@@ -160,6 +160,7 @@
         "@carbon/icons": "11.92.0",
         "@fontsource-variable/geist": "5.3.0",
         "@paper-design/shaders-react": "0.0.82",
+        "@pierre/words": "0.3.0",
         "border-beam": "1.4.1",
         "class-variance-authority": "0.7.1",
         "cmdk": "1.1.1",
@@ -631,6 +632,8 @@
     "@paper-design/shaders": ["@paper-design/shaders@0.0.82", "", {}, "sha512-eCxYQrrCxRVc4KG8sLSQecsq8Ymstbaq/FqZjq/fhOa6UiR1ZZfdMO5IJpHmwL0GYmfzvZVQ4l8ZOLux0uLVdg=="],
 
     "@paper-design/shaders-react": ["@paper-design/shaders-react@0.0.82", "", { "dependencies": { "@paper-design/shaders": "0.0.82" }, "peerDependencies": { "@types/react": "^18 || ^19", "react": "^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-DSPvsCgqagN23sYJP4vB9UpKj0IM6Aq9DOulI8c6ByHdDD6mIKRCNN6tqHK1FDdzCEQNz0dstlRtcdImAWcqqQ=="],
+
+    "@pierre/words": ["@pierre/words@0.3.0", "", { "peerDependencies": { "@pierre/highlights": ">=0.5.1", "react": "^18.3.1 || ^19.0.0", "react-dom": "^18.3.1 || ^19.0.0" }, "optionalPeers": ["@pierre/highlights", "react", "react-dom"] }, "sha512-k38qoYj0eUCr+vGQlXlSer78q5EeG7rSge9b2ADBFvLQ0L+OJH5zAdgdgm1jqkFq2Q6zXUuBkZWB5nQgPy2iUQ=="],
 
     "@prisma/cli-engine": ["@prisma/cli-engine@0.10.4", "", { "dependencies": { "@clack/prompts": "1.5.0", "@stricli/core": "1.3.0", "arktype": "^2.2.7", "c12": "3.3.4", "colorette": "^2.0.20", "package-manager-detector": "1.8.0", "string-width": "^8.2.1" }, "peerDependencies": { "@prisma/management-api-sdk": "^1.55.0" } }, "sha512-0QfXodYJpnWmMUcOt03gGYBMsW8VbX8+Ok1E/O6dpSQyOZ2kF4okslfDZJGwsB+OU+KYUR/fQQJYdDf0v8A0LQ=="],
 

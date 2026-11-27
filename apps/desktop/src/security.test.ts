@@ -26,9 +26,12 @@ describe("desktop security policy", () => {
   test("packaged builds forbid inline scripts and plugins", () => {
     const csp = contentSecurityPolicy(false);
 
-    expect(csp).toContain("script-src 'self';");
+    expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval';");
+    expect(csp).not.toContain("'unsafe-eval'");
     expect(csp).toContain("object-src 'none'");
-    expect(contentSecurityPolicy(true)).toContain("script-src 'self' 'unsafe-inline'");
+    expect(contentSecurityPolicy(true)).toContain(
+      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
+    );
   });
 
   test("images load only from the app and image storage", () => {
