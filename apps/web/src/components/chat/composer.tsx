@@ -4,6 +4,7 @@ import {
   PromptInput,
   PromptInputBody,
   PromptInputButton,
+  PromptInputCommands,
   PromptInputFooter,
   PromptInputHeader,
   PromptInputImages,
@@ -30,7 +31,16 @@ import {
   readImage,
 } from "../../lib/attachments.ts";
 
+import {
+  commandFor,
+  matchCommands,
+  type SlashCommand,
+  slashQuery,
+} from "../../lib/slash-commands.ts";
+
 const AttachIcon = carbonIcon(attachment);
+
+const NO_COMMANDS: readonly SlashCommand[] = [];
 
 export interface ComposerProps {
   /** The message: its text (trimmed) and any images the person attached. */
@@ -49,6 +59,8 @@ export interface ComposerProps {
   readonly onTypingStart?: () => void;
   /** The text field, for putting a message back to edit. */
   readonly fieldRef?: RefObject<HTMLTextAreaElement | null>;
+  /** What `/` offers. A sent message that names one runs it instead of sending. */
+  readonly commands?: readonly SlashCommand[];
 }
 
 /**
@@ -75,12 +87,17 @@ export function Composer({
   tools,
   onTypingStart,
   fieldRef,
+  commands = NO_COMMANDS,
 }: ComposerProps) {
-  const setField = useCallback(
-    (field: HTMLTextAreaElement | null) => {
-      if (fieldRef) fieldRef.current = field;
+  const field = useRef<HTMLTextAreaElement | null>(null);
 
-      if (focusOnMount) focusField(field);
+  const setField = useCallback(
+    (element: HTMLTextAreaElement | null) => {
+      field.current = element;
+
+      if (fieldRef) fieldRef.current = element;
+
+      if (focusOnMount) focusField(element);
     },
     [fieldRef, focusOnMount],
   );
@@ -89,6 +106,38 @@ export function Composer({
   const [hasText, setHasText] = useState(false);
   const [images, setImages] = useState<readonly ImageAttachment[]>([]);
   const picker = useRef<HTMLInputElement>(null);
+
+  // The `/` menu: open while only `/name` is typed, until Escape or a pick.
+  const [query, setQuery] = useState<string | null>(null);
+  const [active, setActive] = useState(0);
+  const matches = query === null ? [] : matchCommands(query, commands);
+  const menuOpen = matches.length > 0;
+
+  const setText = (text: string) => {
+    const box = field.current;
+
+    if (!box) return;
+
+    box.value = text;
+    setHasText(text.trim() !== "");
+    setQuery(null);
+    box.focus();
+    box.setSelectionRange(text.length, text.length);
+  };
+
+  const pick = (command: SlashCommand | undefined) => {
+    if (!command) return;
+
+    // A skill waits for what it should work on; the rest run now.
+    if (command.takesText) {
+      setText(`/${command.name} `);
+
+      return;
+    }
+
+    setText("");
+    command.run("");
+  };
 
   const attach = async (files: readonly File[]) => {
     const { accepted, refused } = checkImages(files, images.length);
@@ -124,6 +173,31 @@ export function Composer({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (menuOpen && !event.nativeEvent.isComposing) {
+      const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+
+      if (step !== undefined) {
+        event.preventDefault();
+        setActive((active + step + matches.length) % matches.length);
+
+        return;
+      }
+
+      if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+        event.preventDefault();
+        pick(matches[Math.min(active, matches.length - 1)]);
+
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setQuery(null);
+
+        return;
+      }
+    }
+
     if (event.key === "Escape" && working && onStop) {
       event.preventDefault();
       onStop();
@@ -140,6 +214,16 @@ export function Composer({
         if (!message && images.length === 0) return;
 
         setHasText(false);
+        setQuery(null);
+
+        const typed = commandFor(message, commands);
+
+        if (typed) {
+          typed.command.run(typed.rest);
+
+          return;
+        }
+
         setImages([]);
         onSend(message, images);
       }}
@@ -149,6 +233,12 @@ export function Composer({
       onDrop={onDrop}
     >
       {header && <PromptInputHeader>{header}</PromptInputHeader>}
+      <PromptInputCommands
+        commands={matches}
+        active={Math.min(active, matches.length - 1)}
+        onActive={setActive}
+        onPick={(index) => pick(matches[index])}
+      />
       <PromptInputImages
         images={images.map((image) => ({ id: image.id, src: image.dataUrl, name: image.filename }))}
         onRemove={(id) => setImages((held) => held.filter((image) => image.id !== id))}
@@ -158,12 +248,21 @@ export function Composer({
           name="message"
           placeholder={working ? "Add to this, or ask something else" : "Work on anything"}
           aria-label="Message"
+          aria-expanded={menuOpen}
+          aria-autocomplete="list"
           ref={setField}
           disabled={disabled}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           onInput={(event) => {
-            setHasText(event.currentTarget.value.trim() !== "");
+            const { value } = event.currentTarget;
+            const next = slashQuery(value);
+
+            setHasText(value.trim() !== "");
+
+            if (next !== query) setActive(0);
+
+            setQuery(next);
             onTypingStart?.();
           }}
         />

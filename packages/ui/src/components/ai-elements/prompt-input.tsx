@@ -179,6 +179,55 @@ function PromptInputImages({ images, onRemove }: PromptInputImagesProps) {
   );
 }
 
+export interface PromptInputCommand {
+  readonly name: string;
+  readonly description: string;
+}
+
+export interface PromptInputCommandsProps {
+  readonly commands: readonly PromptInputCommand[];
+  /** The row ↑ and ↓ move to; Enter or Tab picks it. */
+  readonly active: number;
+  readonly onPick: (index: number) => void;
+  readonly onActive: (index: number) => void;
+}
+
+/**
+ * The `/` commands matching what is typed, as in T3 Code: one row each, the name then what it
+ * does. It sits at the top of the composer; the composer's keys move through it.
+ */
+function PromptInputCommands({ commands, active, onPick, onActive }: PromptInputCommandsProps) {
+  if (commands.length === 0) return null;
+
+  return (
+    <PromptInputHeader className="p-1 select-none">
+      <div
+        aria-label="Commands"
+        data-slot="prompt-input-commands"
+        className="flex max-h-64 w-full flex-col overflow-y-auto"
+      >
+        {commands.map((command, index) => (
+          <button
+            key={command.name}
+            type="button"
+            // The caret stays in the text box; the composer's keys move through the list.
+            tabIndex={-1}
+            aria-current={index === active || undefined}
+            data-active={index === active || undefined}
+            className="flex min-w-0 items-baseline gap-3 rounded-md px-3 py-1.5 text-left text-sm data-active:bg-muted"
+            onMouseDown={(event) => event.preventDefault()}
+            onMouseMove={() => onActive(index)}
+            onClick={() => onPick(index)}
+          >
+            <span className="shrink-0 font-medium text-foreground">/{command.name}</span>
+            <span className="min-w-0 truncate text-muted-foreground">{command.description}</span>
+          </button>
+        ))}
+      </div>
+    </PromptInputHeader>
+  );
+}
+
 export type PromptInputFooterProps = Omit<ComponentProps<typeof InputGroupAddon>, "align">;
 
 /** The row under the textarea: tools on the left, submit on the right. */
@@ -312,6 +361,7 @@ export {
   PromptInput,
   PromptInputBody,
   PromptInputButton,
+  PromptInputCommands,
   PromptInputFooter,
   PromptInputHeader,
   PromptInputImages,

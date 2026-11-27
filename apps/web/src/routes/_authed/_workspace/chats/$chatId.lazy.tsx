@@ -18,6 +18,8 @@ import {
 import { ChatView } from "../../../../components/chat/chat-view.tsx";
 import { NameDialog } from "../../../../components/chat/name-dialog.tsx";
 import { useChats } from "../../../../components/chat/use-chats.ts";
+import { skillsCollection } from "../../../../lib/skills.ts";
+import { useLiveQuery } from "@tanstack/react-db";
 import { WorkspacePageHeader } from "../../../../components/shell/page-header.tsx";
 import {
   branchMessage,
@@ -42,6 +44,14 @@ function ChatPage() {
   const userId = session.user.id;
   const workspaceId = session.session.activeOrganizationId ?? "";
   const api = useChats(workspaceId, userId);
+
+  // Enabled workspace skills, synced, for the composer's `/` commands.
+  const skillRows = useLiveQuery(() => skillsCollection(workspaceId));
+
+  const skills = (skillRows.data ?? []).flatMap((skill) =>
+    skill.enabled ? [{ name: skill.name, description: skill.description }] : [],
+  );
+
   const chat = api.chatById(chatId);
   const space = api.spaces.find((item) => item.id === chat?.space_id);
   const [dialog, setDialog] = useState<ChatMenuRequest | null>(null);
@@ -107,6 +117,7 @@ function ChatPage() {
         }}
         history={history}
         firstMessage={peekFirstMessage(chatId)?.text}
+        skills={skills}
         onBranch={(transcript) => {
           const title = chat?.title ?? "Chat";
           const mode = chat?.permission_mode ?? "";

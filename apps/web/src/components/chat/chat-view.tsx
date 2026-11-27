@@ -38,7 +38,9 @@ import { toast } from "sonner";
 import { branchOf, chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
 import { type ImageAttachment, messageContent } from "../../lib/attachments.ts";
 import { askToNotify, chatNotice, newQuestion, notifyChat } from "../../lib/chat-notify.ts";
-import { RUN_PLAN_MODE } from "../../lib/permission-mode.ts";
+import { PERMISSION_MODE_OPTIONS, RUN_PLAN_MODE } from "../../lib/permission-mode.ts";
+import { type SlashCommand, skillCommandName, skillMessage } from "../../lib/slash-commands.ts";
+import { useNavigate } from "@tanstack/react-router";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { ReplyResponse } from "./reply-islands.tsx";
 import { Composer } from "./composer.tsx";
@@ -124,7 +126,17 @@ export interface ChatViewProps {
   readonly firstMessage?: string;
   /** Starts a new chat that continues this one up to a reply (its words as a transcript). */
   readonly onBranch?: (transcript: string) => void;
+  /** The workspace's enabled skills, offered as `/` commands. */
+  readonly skills?: readonly ChatSkill[];
 }
+
+/** A workspace skill as the `/` menu offers it. */
+export interface ChatSkill {
+  readonly name: string;
+  readonly description: string;
+}
+
+const NO_SKILLS: readonly ChatSkill[] = [];
 
 /**
  * One chat: the saved events render at once, then the live stream follows from their cursor
@@ -139,6 +151,7 @@ export function ChatView({
   history,
   firstMessage,
   onBranch,
+  skills = NO_SKILLS,
 }: ChatViewProps) {
   // The composer's text box, for Edit to put a message back.
   const field = useRef<HTMLTextAreaElement | null>(null);
@@ -280,6 +293,58 @@ export function ChatView({
   const [question] = pending;
   const questionNumber = questions.length - pending.length + 1;
 
+  const navigate = useNavigate();
+
+  const compact = useMutation({
+    mutationFn: () => agent.compact(),
+    onSuccess: () => toast.success("Compacted the conversation"),
+    onSettled: historyChanged,
+    onError: (error) => toast.error(error.message),
+  });
+
+  const clear = useMutation({
+    mutationFn: () => agent.clear(),
+    onSuccess: () => toast.success("The assistant starts fresh from here"),
+    onSettled: historyChanged,
+    onError: (error) => toast.error(error.message),
+  });
+
+  // `/plan add Mercury` switches the mode, then sends the rest.
+  const switchMode = async (mode: PermissionMode, rest: string) => {
+    try {
+      await onPermissionModeChange(mode);
+    } catch {
+      return;
+    }
+
+    if (rest) send.mutate({ text: rest });
+  };
+
+  const commands: SlashCommand[] = [
+    ...PERMISSION_MODE_OPTIONS.map((option) => ({
+      name: option.value,
+      description: option.description,
+      run: (rest: string) => void switchMode(option.value, rest),
+    })),
+    {
+      name: "compact",
+      description: "Summarize the conversation so far to make room",
+      run: () => compact.mutate(),
+    },
+    {
+      name: "clear",
+      description: "Start fresh: the assistant forgets this chat, the messages stay",
+      run: () => clear.mutate(),
+    },
+    { name: "new", description: "Start a new chat", run: () => void navigate({ to: "/" }) },
+    ...skills.map((skill) => ({
+      name: skillCommandName(skill.name),
+      description: skill.description,
+      takesText: true,
+      run: (rest: string) => send.mutate({ text: skillMessage(skill.name, rest) }),
+    })),
+  ];
+
   // In Plan, a finished reply ends with the plan; running it switches the chat to Auto first, so
   // the API forwards the new mode with the message that starts the work.
   const runPlan = useMutation({
@@ -380,6 +445,7 @@ export function ChatView({
           status={working ? "streaming" : "ready"}
           disabled={agent.status === "resuming"}
           onSend={(text, images) => send.mutate({ text, images })}
+          commands={commands}
           onStop={() => stop.mutate()}
           tools={
             <PermissionModeMenu

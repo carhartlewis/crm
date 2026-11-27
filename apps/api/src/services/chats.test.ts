@@ -399,6 +399,13 @@ describe("the agent proxy", () => {
   test("session paths: the session itself and its stream, nothing else", () => {
     expect(proxiedSession("/eve/v1/session/ses_1")).toBe("ses_1");
     expect(proxiedSession("/eve/v1/session/ses_1/stream")).toBe("ses_1");
+
+    for (const control of ["cancel", "compact", "clear"]) {
+      expect(proxiedSession(`/eve/v1/session/ses_1/${control}`)).toBe("ses_1");
+    }
+
+    expect(proxiedSession("/eve/v1/session/ses_1/end")).toBeUndefined();
+    expect(proxiedSession("/eve/v1/session/ses_1/reset")).toBeUndefined();
     expect(proxiedSession("/eve/v1/session")).toBeUndefined();
     expect(proxiedSession("/eve/v1/info")).toBeUndefined();
     expect(proxiedSession("/eve/v1/session/ses_1/../other")).toBeUndefined();

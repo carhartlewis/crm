@@ -257,9 +257,12 @@ export interface ChatsService {
   ) => Effect.Effect<Response, Failure>;
 }
 
-/** The path a proxied request may take: one session's routes, never session creation. */
+/**
+ * The path a proxied request may take: one session's messages, stream, Stop, compact and clear.
+ * Never session creation, and never end or reset, which would retire the chat's session.
+ */
 export function proxiedSession(path: string): string | undefined {
-  const match = /^\/eve\/v1\/session\/([^/]+)(?:\/stream)?$/.exec(path);
+  const match = /^\/eve\/v1\/session\/([^/]+)(?:\/(?:stream|cancel|compact|clear))?$/.exec(path);
 
   return match?.[1] ? decodeURIComponent(match[1]) : undefined;
 }
