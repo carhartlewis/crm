@@ -286,10 +286,13 @@
 }
 
 /* Markdown (`@crm/ui/components/markdown`, rendered by @pierre/words) at the app's type scale:
-   body-size headings, tight rhythm, code on the muted surface. Only what static documents use;
-   the streaming chat adds the caret rules when it ships. */
+   a readable measure, a reading line height, body text a step softer than headings, and quiet
+   links and list markers. Only what static documents use; the streaming chat adds the caret
+   rules when it ships. */
 [data-slot="markdown"] [data-markdown="root"] {
-  line-height: var(--text-body--line-height);
+  max-width: 68ch;
+  color: color-mix(in oklab, var(--foreground) 82%, transparent);
+  line-height: 1.6;
   overflow-wrap: anywhere;
 
   & :where(p, ul, ol, blockquote, table, [data-markdown="code-block"]) {
@@ -297,9 +300,19 @@
   }
 
   & :is(h1, h2, h3, h4, h5, h6) {
-    margin-block: 1.5em 0.5em;
+    margin-block: 1.75em 0.5em;
+    color: var(--foreground);
     font-weight: 600;
     line-height: 1.35;
+  }
+
+  & :is(h3, h4, h5, h6) {
+    font-weight: 500;
+  }
+
+  & strong {
+    color: var(--foreground);
+    font-weight: 600;
   }
 
   & > :first-child {
@@ -313,11 +326,15 @@
 
 [data-slot="markdown"] {
   & [data-markdown="h1"] {
-    font-size: 1.25em;
+    font-size: 1.125em;
   }
 
   & [data-markdown="h2"] {
-    font-size: 1.125em;
+    font-size: 1em;
+  }
+
+  & :is([data-markdown="h3"], [data-markdown="h4"], [data-markdown="h5"], [data-markdown="h6"]) {
+    font-size: 1em;
   }
 
   & :is([data-markdown="ul"], [data-markdown="ol"]) {
@@ -332,13 +349,35 @@
     list-style: decimal;
   }
 
+  & [data-markdown="li"] {
+    margin-block: 0.25em;
+    padding-inline-start: 0.25em;
+  }
+
+  & [data-markdown="li"]::marker {
+    color: var(--muted-foreground);
+  }
+
   & [data-markdown="li"] > :is(ul, ol, p) {
     margin-block: 0.25em;
   }
 
   & [data-markdown="a"] {
+    color: var(--foreground);
     text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, var(--foreground) 30%, transparent);
+    text-decoration-thickness: 1px;
     text-underline-offset: 3px;
+    transition: text-decoration-color 150ms var(--ease-out);
+  }
+
+  & [data-markdown="a"]:hover {
+    text-decoration-color: currentColor;
+  }
+
+  & [data-markdown="hr"] {
+    margin-block: 1.5em;
+    border-color: var(--border);
   }
 
   & [data-markdown="blockquote"] {

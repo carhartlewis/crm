@@ -26,6 +26,56 @@ function line(label: string, value: string | null | undefined) {
   return value ? [`- ${label}: ${value}`] : [];
 }
 
+function capitalize(word: string) {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/** A line of page chrome: a step number or rating ("01", "4.9/5"), or a button ("Book Demo"). */
+function isChrome(text: string) {
+  const trimmed = text.trim();
+
+  if (!trimmed || /^(#|[-*+]\s|\d+\.\s|>|\|)/.test(trimmed)) return false;
+
+  if (!/\p{L}/u.test(trimmed)) return true;
+
+  return trimmed.split(/\s+/).length <= 3 && !/[.!?:\]]/.test(trimmed);
+}
+
+/** Drops page chrome outside code, so the page reads as text and yields no junk facts. */
+function dropChrome(markdown: string) {
+  let fenced = false;
+
+  return markdown
+    .split("\n")
+    .filter((text) => {
+      if (/^\s*(```|~~~)/.test(text)) {
+        fenced = !fenced;
+
+        return true;
+      }
+
+      return fenced || !isChrome(text);
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
+/** Moves the page's own headings two levels down, so they sit under "Home page". */
+function nestHeadings(markdown: string) {
+  let fenced = false;
+
+  return markdown
+    .split("\n")
+    .map((text) => {
+      if (/^\s*(```|~~~)/.test(text)) fenced = !fenced;
+
+      if (fenced) return text;
+
+      return text.replace(/^(#{1,6})(?=\s)/, (marks) => "#".repeat(Math.min(marks.length + 2, 6)));
+    })
+    .join("\n");
+}
+
 /** The source text, or null when the research found nothing to remember. */
 export function researchText(input: ResearchInput, retrievedAt: Date): string | null {
   const found = [
@@ -36,16 +86,18 @@ export function researchText(input: ResearchInput, retrievedAt: Date): string | 
     ...line("Public email", input.email),
     ...line("Public phone", input.phone),
     ...line("Stock", input.stock),
-    ...input.socials.map((social) => `- ${social.type}: ${social.url}`),
-    ...Object.entries(input.links).map(([kind, url]) => `- ${kind} page: ${url}`),
+    ...input.socials.flatMap((social) => line(capitalize(social.type), social.url)),
+    ...Object.entries(input.links).flatMap(([kind, url]) => line(`${capitalize(kind)} page`, url)),
   ];
 
-  const homepage = input.homepage?.trim().slice(0, MAX_HOMEPAGE_CHARACTERS) ?? "";
+  const homepage = dropChrome(input.homepage ?? "")
+    .trim()
+    .slice(0, MAX_HOMEPAGE_CHARACTERS);
 
   // The name and domain alone are what we asked with, not something research found.
   if (found.length === 0 && !homepage) return null;
 
-  const profile = [...line("Name", input.name), `- Website: ${input.domain}`, ...found];
+  const profile = [...line("Name", input.name), ...line("Website", input.domain), ...found];
 
   return [
     `# Website research for ${input.name ?? input.domain}`,
@@ -56,7 +108,7 @@ export function researchText(input: ResearchInput, retrievedAt: Date): string | 
     "",
     ...profile,
     "",
-    ...(homepage ? ["## Home page", "", homepage] : []),
+    ...(homepage ? ["## Home page", "", nestHeadings(homepage)] : []),
   ]
     .join("\n")
     .trim();

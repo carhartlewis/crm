@@ -66,12 +66,37 @@ describe("research", () => {
     expect(researchText(empty, date)).toBeNull();
 
     const text = researchText(
-      { ...empty, name: "Acme", industries: ["Aerospace"], homepage: "x".repeat(20_000) },
+      {
+        ...empty,
+        name: "Acme",
+        industries: ["Aerospace"],
+        socials: [{ type: "linkedin", url: "https://linkedin.com/company/acme" }],
+        homepage: [
+          "# Anvils",
+          "",
+          "01",
+          "",
+          "Book Demo",
+          "",
+          "We ship anvils overnight.",
+          "",
+          "```\n# not a heading\n```",
+          "",
+          "x".repeat(20_000),
+        ].join("\n"),
+      },
       date,
     );
 
     expect(text).toContain("# Website research for Acme");
     expect(text).toContain("- Industry: Aerospace");
+    expect(text).toContain("- Linkedin: https://linkedin.com/company/acme");
+    // The page's headings nest under "## Home page"; code is left alone.
+    expect(text).toContain("## Home page\n\n### Anvils");
+    expect(text).toContain("```\n# not a heading\n```");
+    // Step numbers and buttons are page chrome, not text.
+    expect(text).toContain("### Anvils\n\nWe ship anvils overnight.");
+    expect(text).not.toContain("Book Demo");
     expect(text).toContain("retrieved on 2026-11-26");
     expect(text?.length).toBeLessThan(13_000);
   });
