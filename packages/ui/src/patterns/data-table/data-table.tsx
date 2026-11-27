@@ -809,13 +809,13 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
         <div
           aria-hidden={selecting}
           className={cn(
-            "col-start-1 row-start-1 flex flex-col gap-2 @4xl:flex-row @4xl:flex-wrap @4xl:items-center @4xl:justify-between",
+            "col-start-1 row-start-1 flex flex-col gap-2 @2xl:flex-row @2xl:flex-wrap @2xl:items-center @2xl:justify-between",
             selecting && "invisible",
           )}
           inert={selecting}
         >
           {lead}
-          {search != null && <div className="wide-slot @4xl:order-last @4xl:ml-auto">{search}</div>}
+          {search != null && <div className="wide-slot @2xl:order-last @2xl:ml-auto">{search}</div>}
           {hasFilterControls && (
             <Button
               type="button"
@@ -842,7 +842,7 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
           )}
           <div
             id={filtersId}
-            className={cn("flex flex-col gap-2 @4xl:contents", !filtersOpen && "wide-only")}
+            className={cn("flex flex-col gap-2 @2xl:contents", !filtersOpen && "wide-only")}
           >
             {leadingActions}
 
