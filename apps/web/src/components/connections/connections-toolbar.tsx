@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** The Connections page's controls: what to show and whose (`tabs`), and its `?q=` search. */
+/** The Connections and Workspace Skills pages' controls: whose (`tabs`), and the `?q=` search. */
 export type ConnectionsToolbarParts = { tabs: ReactNode; search: ReactNode };
 
 /** Tabs on the left, search on the right, matching a data table's toolbar line. */

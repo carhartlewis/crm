@@ -7,7 +7,6 @@ describe("normalizeOrder", () => {
       "workflows",
       "companies",
       "contacts",
-      "connections",
     ]);
   });
 
@@ -16,7 +15,6 @@ describe("normalizeOrder", () => {
       "contacts",
       "companies",
       "workflows",
-      "connections",
     ]);
   });
 });

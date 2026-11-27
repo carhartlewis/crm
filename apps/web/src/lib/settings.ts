@@ -1,5 +1,7 @@
 import book from "@carbon/icons/es/book/16.js";
 import building from "@carbon/icons/es/building/16.js";
+import plug from "@carbon/icons/es/plug/16.js";
+import toolKit from "@carbon/icons/es/tool-kit/16.js";
 import user from "@carbon/icons/es/user/16.js";
 import { carbonIcon } from "@crm/ui/components/icon";
 
@@ -14,11 +16,15 @@ export const settingsGroups = [
     pages: [
       { to: "/settings", label: "General", icon: carbonIcon(building) },
       { to: "/settings/memory", label: "Workspace Memory", icon: carbonIcon(book) },
+      { to: "/settings/skills", label: "Workspace Skills", icon: carbonIcon(toolKit) },
     ],
   },
   {
     label: "Account",
-    pages: [{ to: "/settings/account", label: "Profile", icon: carbonIcon(user) }],
+    pages: [
+      { to: "/settings/account", label: "Profile", icon: carbonIcon(user) },
+      { to: "/settings/connections", label: "Connections", icon: carbonIcon(plug) },
+    ],
   },
 ] as const;
 

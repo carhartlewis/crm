@@ -97,7 +97,7 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
         mcp: {
           resource: gateway,
           loginPage: new URL("/sign-in", config.webOrigin).href,
-          consentPage: new URL("/connections", config.webOrigin).href,
+          consentPage: new URL("/settings/connections", config.webOrigin).href,
           agentCallbackPrefix,
         },
         // Researches the new workspace's website into its memory (ADR 0014).

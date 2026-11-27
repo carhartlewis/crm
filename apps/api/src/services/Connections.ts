@@ -642,7 +642,7 @@ export class Connections extends Context.Service<Connections, ConnectionsService
         kv,
         cipher: secretCipher(Redacted.value(config.authSecret)),
         oauth,
-        page: new URL("/connections", config.webOrigin),
+        page: new URL("/settings/connections", config.webOrigin),
         now: () => new Date(),
         state: () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"),
         logo: (website) => images.logo(website),

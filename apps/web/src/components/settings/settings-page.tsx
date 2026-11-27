@@ -13,12 +13,15 @@ export function SettingsPage({
   title,
   actions,
   fill = false,
+  wide = false,
   children,
 }: {
   title: string;
   actions?: ReactNode;
   /** The whole window below the title bar, for the memory graph; otherwise a readable column. */
   fill?: boolean;
+  /** The page's full width, scrolling, for card grids; otherwise a readable column. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -34,7 +37,9 @@ export function SettingsPage({
           className={
             fill
               ? "flex min-h-0 w-full flex-1 animate-enter flex-col"
-              : "mx-auto flex w-full max-w-2xl animate-enter flex-col gap-8"
+              : wide
+                ? "flex w-full animate-enter flex-col gap-6"
+                : "mx-auto flex w-full max-w-2xl animate-enter flex-col gap-8"
           }
         >
           {children}

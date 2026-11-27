@@ -1,6 +1,5 @@
 import building from "@carbon/icons/es/building/16.js";
 import flow from "@carbon/icons/es/flow/16.js";
-import plug from "@carbon/icons/es/plug/16.js";
 import userMultiple from "@carbon/icons/es/user--multiple/16.js";
 import { carbonIcon } from "@crm/ui/components/icon";
 
@@ -26,13 +25,6 @@ export const pages = [
     to: "/workflows",
     icon: carbonIcon(flow),
     description: "Automations that run when something in your CRM changes.",
-  },
-  {
-    id: "connections",
-    label: "Connections",
-    to: "/connections",
-    icon: carbonIcon(plug),
-    description: "Email, calendar and the other tools that keep your CRM current.",
   },
 ] as const;
 
