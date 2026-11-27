@@ -460,7 +460,6 @@ function FacetSubmenu({
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent
         className={cn("max-h-72 min-w-52 overflow-hidden", facet.searchable && "p-0")}
-        sideOffset={4}
       >
         {facet.searchable ? (
           <Command shouldFilter={facet.onSearchChange === undefined} className="max-h-72">
