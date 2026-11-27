@@ -14,6 +14,13 @@ describe("namespaces", () => {
     expect(memoryNamespace("crm1", "ws1", { type: "company", companyId: "c-1" })).toBe(
       "crm1_ws_ws1_co_c-1",
     );
+    // Prefixed company ids (ADR 0016) name a memory too.
+    expect(
+      memoryNamespace("crm1", "ws1", {
+        type: "company",
+        companyId: "com_0123456789ABCDEFGHIJKLMN",
+      }),
+    ).toBe("crm1_ws_ws1_co_com_0123456789ABCDEFGHIJKLMN");
     expect(() => memoryNamespace("crm1", "ws_1/../x", { type: "workspace" })).toThrow();
     expect(() => memoryNamespace("CRM", "ws1", { type: "workspace" })).toThrow();
     expect(await memoryPrefix("https://a.test")).toMatch(/^crm[0-9a-f]{12}$/);

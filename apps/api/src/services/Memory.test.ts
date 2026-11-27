@@ -52,9 +52,19 @@ function setup(options: { store?: boolean } = {}) {
         { id: "ws2", name: "Other", website: "https://other.test" },
       ],
       companies: [
-        { id: "c-acme", workspaceId: "ws1", name: "Acme", domain: "acme.test" },
-        { id: "c-beta", workspaceId: "ws1", name: "Beta Labs", domain: null },
-        { id: "c-other", workspaceId: "ws2", name: "Acme", domain: "acme.test" },
+        {
+          id: "com_acme00000000000000000000",
+          workspaceId: "ws1",
+          name: "Acme",
+          domain: "acme.test",
+        },
+        { id: "com_beta00000000000000000000", workspaceId: "ws1", name: "Beta Labs", domain: null },
+        {
+          id: "com_other0000000000000000000",
+          workspaceId: "ws2",
+          name: "Acme",
+          domain: "acme.test",
+        },
       ],
       users: { alice: "Alice" },
     }),
@@ -87,12 +97,14 @@ describe("website research", () => {
   test("a company is researched into its own namespace, only when it has a domain", async () => {
     const { memory, store, researched } = setup();
 
-    await memory.researchCompany("ws1", "c-acme");
-    await memory.researchCompany("ws1", "c-beta");
+    await memory.researchCompany("ws1", "com_acme00000000000000000000");
+    await memory.researchCompany("ws1", "com_beta00000000000000000000");
 
     expect(researched).toEqual(["acme.test"]);
-    expect(store.sources(ns("ws1", "c-acme"))).toHaveLength(1);
-    expect(store.context(ns("ws1", "c-acme"))).toContain("that Roadrunner Inc tracks");
+    expect(store.sources(ns("ws1", "com_acme00000000000000000000"))).toHaveLength(1);
+    expect(store.context(ns("ws1", "com_acme00000000000000000000"))).toContain(
+      "that Roadrunner Inc tracks",
+    );
   });
 
   test("nothing is written when research finds nothing", async () => {
@@ -138,12 +150,16 @@ describe("members", () => {
 
     expect(outsider).toBeInstanceOf(NoActiveWorkspace);
 
-    const foreign = await Effect.runPromise(Effect.flip(memory.company(alice, "c-other")));
+    const foreign = await Effect.runPromise(
+      Effect.flip(memory.company(alice, "com_other0000000000000000000")),
+    );
 
     expect(foreign).toBeInstanceOf(NotFound);
 
     const note = await Effect.runPromise(
-      Effect.flip(memory.addNote(alice, { companyId: "c-other", text: "Mine now" })),
+      Effect.flip(
+        memory.addNote(alice, { companyId: "com_other0000000000000000000", text: "Mine now" }),
+      ),
     );
 
     expect(note).toBeInstanceOf(NotFound);
@@ -182,12 +198,16 @@ describe("the agent", () => {
     await memory.agent.remember(caller, { kind: "agent_fact", text: "We sell anvils." });
     await memory.agent.remember(caller, {
       kind: "agent_fact",
-      companyId: "c-acme",
+      companyId: "com_acme00000000000000000000",
       text: "Acme renews in March.",
     });
     await memory.agent.remember(
       { userId: "mallory", workspaceId: "ws2" },
-      { kind: "agent_fact", companyId: "c-other", text: "Acme owes us money." },
+      {
+        kind: "agent_fact",
+        companyId: "com_other0000000000000000000",
+        text: "Acme owes us money.",
+      },
     );
 
     const result = await memory.agent.recall(caller, "When does Acme renew?");
@@ -206,13 +226,13 @@ describe("the agent", () => {
 
     await memory.agent.remember(caller, {
       kind: "agent_fact",
-      companyId: "c-acme",
+      companyId: "com_acme00000000000000000000",
       text: "Acme's champion is Wile.",
     });
 
     const [old] = await (async () => {
       const result = await memory.agent.search(caller, {
-        companyId: "c-acme",
+        companyId: "com_acme00000000000000000000",
         query: "Acme champion Wile",
       });
 
@@ -221,12 +241,14 @@ describe("the agent", () => {
 
     await memory.agent.remember(caller, {
       kind: "agent_fact",
-      companyId: "c-acme",
+      companyId: "com_acme00000000000000000000",
       text: "Acme's champion is now Road.",
       replaces: old?.factId,
     });
 
-    const knowledge = await Effect.runPromise(memory.company(alice, "c-acme"));
+    const knowledge = await Effect.runPromise(
+      memory.company(alice, "com_acme00000000000000000000"),
+    );
 
     expect(knowledge.facts.map((fact) => fact.text)).toEqual(["Acme's champion is now Road."]);
   });
@@ -254,17 +276,25 @@ describe("the agent", () => {
     ).toMatchObject({ ok: false, status: 403 });
 
     expect(
-      await memory.agent.remember(caller, { kind: "email", companyId: "c-other", text: "x" }),
+      await memory.agent.remember(caller, {
+        kind: "email",
+        companyId: "com_other0000000000000000000",
+        text: "x",
+      }),
     ).toMatchObject({ ok: false, status: 404 });
   });
 
   test("a removed company's memory is deleted", async () => {
     const { memory, store } = setup();
 
-    await memory.agent.remember(caller, { kind: "agent_fact", companyId: "c-acme", text: "x" });
-    await memory.companyRemoved("ws1", "c-acme");
+    await memory.agent.remember(caller, {
+      kind: "agent_fact",
+      companyId: "com_acme00000000000000000000",
+      text: "x",
+    });
+    await memory.companyRemoved("ws1", "com_acme00000000000000000000");
 
-    expect(store.namespaces()).not.toContain(ns("ws1", "c-acme"));
+    expect(store.namespaces()).not.toContain(ns("ws1", "com_acme00000000000000000000"));
   });
 });
 
@@ -296,7 +326,7 @@ describe("the memory graph", () => {
     const { memory } = setup();
 
     const error = await Effect.runPromise(
-      Effect.flip(memory.graph(alice, { companyId: "c-other" })),
+      Effect.flip(memory.graph(alice, { companyId: "com_other0000000000000000000" })),
     );
 
     expect(error).toBeInstanceOf(NotFound);

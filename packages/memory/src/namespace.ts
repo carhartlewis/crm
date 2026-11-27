@@ -4,7 +4,8 @@ const NAMESPACE = /^[a-zA-Z0-9_:-]{1,100}$/;
 
 const PREFIX = /^[a-z0-9]{1,16}$/;
 
-const ID = /^[a-zA-Z0-9-]{1,40}$/;
+/** A workspace or record id: letters, digits, `-` (UUIDs) and `_` (prefixed ids, `com_…`). */
+const ID = /^[a-zA-Z0-9_-]{1,40}$/;
 
 /**
  * The store namespace for a subject. The prefix keeps environments that share one Supermemory

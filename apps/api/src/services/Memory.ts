@@ -8,6 +8,7 @@ import {
   NotFound,
   UpstreamUnavailable,
 } from "@crm/core/api";
+import { isCompanyId } from "@crm/core/company";
 import { MAX_NOTE_CHARACTERS, memoryNoteError } from "@crm/core/memory";
 import { createContextDev, type CompanyResearcher } from "@crm/core/brand";
 import type { Db } from "@crm/core/db";
@@ -200,6 +201,7 @@ const unavailable = () =>
 const memoryOff = () =>
   new UpstreamUnavailable({ message: "Memory isn't set up on this server (SUPERMEMORY_API_KEY)." });
 
+/** A chat session id from the agent. Company ids are checked with `isCompanyId`. */
 const SAFE_ID = /^[a-zA-Z0-9-]{1,64}$/;
 
 function subjectOf(target: Target): MemorySubject {
@@ -262,7 +264,7 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
       const { companyId } = input;
 
-      if (!SAFE_ID.test(companyId)) return yield* Effect.fail(companyNotFound());
+      if (!isCompanyId(companyId)) return yield* Effect.fail(companyNotFound());
 
       const company = yield* Effect.promise(() => directory.company(workspaceId, companyId));
 
@@ -438,7 +440,7 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
     if (!input.companyId) return true;
 
     return (
-      SAFE_ID.test(input.companyId) &&
+      isCompanyId(input.companyId) &&
       (await directory.company(caller.workspaceId, input.companyId)) !== null
     );
   };
@@ -580,7 +582,7 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
     researchCompany,
 
     async companyRemoved(workspaceId, companyId) {
-      if (!store || !SAFE_ID.test(companyId)) return;
+      if (!store || !isCompanyId(companyId)) return;
 
       try {
         await store.deleteNamespace(namespace(workspaceId, { type: "company", companyId }));
