@@ -87,6 +87,9 @@ const SkillsHandlers = HttpApiBuilder.group(CrmApi, "skills", (handlers) =>
 
     return handlers
       .handle("list", () => Effect.flatMap(actor, skills.list))
+      .handle("create", ({ payload }) =>
+        Effect.flatMap(actor, (who) => skills.create(who, payload)),
+      )
       .handle("discover", ({ query }) =>
         Effect.flatMap(actor, (who) => skills.discover(who, query.q)),
       )

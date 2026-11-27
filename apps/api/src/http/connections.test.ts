@@ -196,7 +196,11 @@ const app = HttpRouter.toWebHandler(
       FakeElectric,
       Layer.succeed(
         Skills,
-        makeSkills({ store: createMemorySkillStore([]).store, now: () => new Date() }),
+        makeSkills({
+          store: createMemorySkillStore([]).store,
+          kv: createMemoryKv(),
+          now: () => new Date(),
+        }),
       ),
       HttpServer.layerServices,
     ]),

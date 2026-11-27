@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { isSkillName, toSkillName } from "./skills.ts";
 import {
+  parseSkillsShLeaderboard,
   fetchSkillsShSkill,
   isSkillsShId,
   parseSkillMarkdown,
@@ -135,5 +136,39 @@ describe("names and ids", () => {
     expect(isSkillsShId("open.feishu.cn/lark-event")).toBe(true);
     expect(isSkillsShId("single")).toBe(false);
     expect(isSkillsShId("a/../b")).toBe(false);
+  });
+});
+
+/** One leaderboard entry as the page embeds it (JSON escaped inside a script). */
+const entry = (source: string, skillId: string, installs: number) =>
+  `{\\"source\\":\\"${source}\\",\\"skillId\\":\\"${skillId}\\",\\"name\\":\\"${skillId}\\",\\"installs\\":${installs}}`;
+
+describe("parseSkillsShLeaderboard", () => {
+  test("reads ranked entries from the page, once each, up to the limit", () => {
+    const html = `<script>self.__next_f.push([1,"{\\"initialSkills\\":[${[
+      entry("vercel-labs/skills", "find-skills", 4558137),
+      entry("acme/skills", "deep-research", 12),
+      entry("vercel-labs/skills", "find-skills", 4558137),
+      entry("acme/skills", "notes", 3),
+    ].join(",")}]}"])</script>`;
+
+    expect(parseSkillsShLeaderboard(html, 2)).toEqual([
+      {
+        id: "vercel-labs/skills/find-skills",
+        name: "find-skills",
+        source: "vercel-labs/skills",
+        installs: 4558137,
+      },
+      {
+        id: "acme/skills/deep-research",
+        name: "deep-research",
+        source: "acme/skills",
+        installs: 12,
+      },
+    ]);
+  });
+
+  test("returns nothing when the page changes", () => {
+    expect(parseSkillsShLeaderboard("<html>new design</html>")).toEqual([]);
   });
 });

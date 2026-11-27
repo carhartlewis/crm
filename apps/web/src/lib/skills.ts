@@ -24,17 +24,23 @@ export const skillQuery = (userId: string, workspaceId: string, id: string) =>
     queryFn: () => request<SkillDetail>(`/api/skills/${encodeURIComponent(id)}`),
   });
 
-/** skills.sh search. Results change slowly, so they stay fresh for a minute. */
+/** Skills to add: the most installed ones, or search results. Fresh for a minute. */
 export const discoverQuery = (userId: string, workspaceId: string, query: string) =>
   queryOptions({
     queryKey: skillKeys.discover(userId, workspaceId, query),
     queryFn: () =>
       request<readonly SkillsShResult[]>(`/api/skills/discover?q=${encodeURIComponent(query)}`),
-    enabled: query.length >= 2,
     staleTime: 60_000,
   });
 
 const refresh = (client: QueryClient) => client.invalidateQueries({ queryKey: skillKeys.all });
+
+export const createSkillMutation = mutationOptions({
+  mutationKey: [...skillKeys.all, "create"],
+  mutationFn: (skill: { name: string; description: string; content: string }) =>
+    request<SkillSummary>("/api/skills", { method: "POST", body: JSON.stringify(skill) }),
+  onSettled: (_data, _error, _variables, _result, { client }) => refresh(client),
+});
 
 export const installSkillMutation = mutationOptions({
   mutationKey: [...skillKeys.all, "install"],

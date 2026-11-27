@@ -1,11 +1,30 @@
-import { integrationById } from "@crm/integrations";
+import add from "@carbon/icons/es/add/16.js";
+import chevronDown from "@carbon/icons/es/chevron--down/16.js";
+import edit from "@carbon/icons/es/edit/16.js";
+import upload from "@carbon/icons/es/upload/16.js";
+import { integrationById, parseSkillMarkdown, toSkillName } from "@crm/integrations";
+import { Button } from "@crm/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@crm/ui/components/dropdown-menu";
+import { carbonIcon } from "@crm/ui/components/icon";
 import { Separator } from "@crm/ui/components/separator";
 import { Tabs, TabsList, TabsTrigger } from "@crm/ui/components/tabs";
 import { ListSearch } from "@crm/ui/patterns/data-table/list-search";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link, useLocation } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { ConnectorsPanel } from "../../../components/connections/connectors-panel.tsx";
+import {
+  CreateSkillSheet,
+  EMPTY_SKILL,
+  type SkillDraft,
+} from "../../../components/connections/create-skill-sheet.tsx";
 import { SkillsPanel } from "../../../components/connections/skills-panel.tsx";
 import { PageLayout } from "../../../components/shell/page.tsx";
 import { connectionsQuery, outcomeMessage } from "../../../lib/connections.ts";
@@ -16,14 +35,34 @@ export const Route = createLazyFileRoute("/_authed/_workspace/connections")({
   component: Connections,
 });
 
+const AddIcon = carbonIcon(add);
+const ChevronIcon = carbonIcon(chevronDown);
+const EditIcon = carbonIcon(edit);
+const UploadIcon = carbonIcon(upload);
+
 const TABS = ["connectors", "skills"] as const;
+
+const ADD_KINDS = ["skill"] as const;
+
+/** A SKILL.md, read into the new-skill form for review. */
+async function draftFromFile(file: File): Promise<SkillDraft> {
+  const { fields, body } = parseSkillMarkdown(await file.text());
+  const fallbackName = file.name.replace(/\.md$/i, "").replace(/^skill$/i, "");
+
+  return {
+    name: toSkillName(fields.get("name") ?? fallbackName),
+    description: fields.get("description") ?? "",
+    content: body,
+  };
+}
 
 const VIEWS = ["yours", "discover"] as const;
 
 /**
  * Connectors and skills, with one toolbar: what to show, whose, and a search. The search is the
- * data table's `ListSearch` (`?q=`); local lists filter on every keystroke, and skills.sh is
- * searched with the URL's value, which follows the field after a pause in typing.
+ * data table's `ListSearch` (nuqs, `?q=`). Local lists filter on every keystroke. Discover
+ * searches with the URL's value instead: nuqs writes it after a pause in typing, so a search
+ * doesn't go out per keystroke.
  */
 function Connections() {
   const { session } = Route.useRouteContext();
@@ -32,6 +71,20 @@ function Connections() {
   const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(TABS).withDefault("connectors"));
   const [view, setView] = useQueryState("view", parseAsStringLiteral(VIEWS).withDefault("yours"));
   const [query] = useQueryState("q", parseAsString.withDefault(""));
+  const [adding, setAdding] = useQueryState("add", parseAsStringLiteral(ADD_KINDS));
+  const [, setOpenSkill] = useQueryState("skill", parseAsString);
+  // An uploaded file's contents, until the form saves or closes; not linkable, so not in the URL.
+  const [draft, setDraft] = useState<SkillDraft>(EMPTY_SKILL);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function openDraft(file: File) {
+    try {
+      setDraft(await draftFromFile(file));
+      await setAdding("skill");
+    } catch {
+      toast.error("That file could not be read.");
+    }
+  }
 
   const settledQuery = useLocation({
     select: (location) => new URLSearchParams(location.searchStr).get("q") ?? "",
@@ -72,15 +125,49 @@ function Connections() {
           </Tabs>
           <div className="min-w-48 flex-1 sm:max-w-80">
             <ListSearch
-              placeholder={
-                tab === "connectors"
-                  ? "Search connectors…"
-                  : view === "discover"
-                    ? "Search skills.sh…"
-                    : "Search skills…"
-              }
+              placeholder={tab === "connectors" ? "Search connectors…" : "Search skills…"}
             />
           </div>
+          {tab === "skills" ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" className="ml-auto" />}>
+                <AddIcon />
+                Add
+                <ChevronIcon />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setDraft(EMPTY_SKILL);
+                    void setAdding("skill");
+                  }}
+                >
+                  <EditIcon />
+                  Create a skill
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => fileInput.current?.click()}>
+                  <UploadIcon />
+                  Upload a SKILL.md
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".md,text/markdown"
+            className="hidden"
+            aria-label="Upload a SKILL.md"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+
+              event.target.value = "";
+
+              if (!file) return;
+
+              void openDraft(file);
+            }}
+          />
         </div>
         {tab === "connectors" ? (
           <ConnectorsPanel
@@ -101,6 +188,19 @@ function Connections() {
           />
         )}
       </div>
+      {adding === "skill" ? (
+        <CreateSkillSheet
+          key={`${draft.name}:${draft.content.length}`}
+          initial={draft}
+          onClose={() => void setAdding(null)}
+          onCreated={(id) => {
+            void setAdding(null);
+            void setTab("skills");
+            void setView("yours");
+            void setOpenSkill(id);
+          }}
+        />
+      ) : null}
     </PageLayout>
   );
 }

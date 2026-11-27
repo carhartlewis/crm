@@ -238,6 +238,16 @@ export class SkillsApi extends HttpApiGroup.make("skills")
       success: Schema.Array(SkillsShResult),
       error: [...SkillErrors, UpstreamUnavailable],
     }),
+    /** A skill written (or uploaded) in the CRM. It starts enabled: its author has read it. */
+    HttpApiEndpoint.post("create", "/", {
+      payload: Schema.Struct({
+        name: Schema.String,
+        description: Schema.String,
+        content: Schema.String,
+      }),
+      success: SkillSummary,
+      error: [...SkillErrors, Invalid],
+    }),
     /** Copies a skill from skills.sh into the workspace, disabled until someone enables it. */
     HttpApiEndpoint.post("install", "/install", {
       payload: Schema.Struct({ sourceId: Schema.String }),

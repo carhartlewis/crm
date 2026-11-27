@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { SKILL_FILES_MAX, SKILL_SIZE_MAX, toSkillName } from "./skills.ts";
+import { parseSkillMarkdown, SKILL_FILES_MAX, SKILL_SIZE_MAX, toSkillName } from "./skills.ts";
+
+export { parseSkillMarkdown };
 
 /**
  * Server-only client for skills.sh, the public skills directory. Search returns ids; a skill's
@@ -90,45 +92,6 @@ function isSafePath(path: string) {
   );
 }
 
-/**
- * Splits YAML frontmatter from a SKILL.md and reads `name` and `description`. Handles plain,
- * quoted and block (`|`, `>`) scalars, which is all SKILL.md frontmatter uses in practice.
- */
-export function parseSkillMarkdown(markdown: string) {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(markdown);
-
-  if (!match) return { fields: new Map<string, string>(), body: markdown.trim() };
-
-  const lines = (match[1] ?? "").split(/\r?\n/);
-  const fields = new Map<string, string>();
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const field = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(lines[index] ?? "");
-
-    if (!field) continue;
-
-    const key = field[1] ?? "";
-    let value = (field[2] ?? "").trim();
-
-    if (value === "|" || value === ">" || value === "|-" || value === ">-") {
-      const block: string[] = [];
-
-      while (index + 1 < lines.length && /^(\s+|$)/.test(lines[index + 1] ?? "")) {
-        index += 1;
-        block.push((lines[index] ?? "").trim());
-      }
-
-      value = value.startsWith("|") ? block.join("\n").trim() : block.join(" ").trim();
-    } else if (/^(["']).*\1$/.test(value)) {
-      value = value.slice(1, -1);
-    }
-
-    fields.set(key, value);
-  }
-
-  return { fields, body: markdown.slice(match[0].length).trim() };
-}
-
 /** Fetches a skill's package from skills.sh and checks it against the limits. */
 export async function fetchSkillsShSkill(
   id: string,
@@ -179,4 +142,51 @@ export async function fetchSkillsShSkill(
     content: body,
     files: Object.fromEntries(others.map((file) => [file.path, file.content])),
   };
+}
+
+const HOME_URL = "https://skills.sh/";
+
+/**
+ * The all-time leaderboard embedded in the skills.sh home page (Next.js flight data, JSON
+ * escaped inside a script). skills.sh has no listing API, so this is best effort: entries are
+ * validated one by one, and a changed page yields an empty list, never an error.
+ */
+const LEADERBOARD_ENTRY =
+  /\\"source\\":\\"([^"\\]+)\\",\\"skillId\\":\\"([^"\\]+)\\",\\"name\\":\\"([^"\\]+)\\",\\"installs\\":(\d+)/g;
+
+export function parseSkillsShLeaderboard(html: string, limit = 30): readonly SkillsShResult[] {
+  const seen = new Set<string>();
+  const results: SkillsShResult[] = [];
+
+  for (const [, source = "", skillId = "", name = "", installs = "0"] of html.matchAll(
+    LEADERBOARD_ENTRY,
+  )) {
+    const id = `${source}/${skillId}`;
+
+    if (results.length >= limit) break;
+
+    if (seen.has(id) || !isSkillsShId(id)) continue;
+
+    seen.add(id);
+    results.push({ id, name, source, installs: Number(installs) });
+  }
+
+  return results;
+}
+
+/** The most installed skills on skills.sh. Empty when the page can't be read. */
+export async function topSkillsSh({
+  fetch: fetchFn = fetch,
+  limit = 30,
+}: {
+  fetch?: Fetch;
+  limit?: number;
+} = {}): Promise<readonly SkillsShResult[]> {
+  try {
+    const response = await fetchFn(HOME_URL, { headers: { accept: "text/html" } });
+
+    return response.ok ? parseSkillsShLeaderboard(await response.text(), limit) : [];
+  } catch {
+    return [];
+  }
 }

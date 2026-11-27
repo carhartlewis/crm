@@ -8,15 +8,20 @@ import {
   UpstreamUnavailable,
 } from "@crm/core/api";
 import type { Db } from "@crm/core/db";
+import { skillDescriptionError, skillInstructionsError, skillNameError } from "@crm/integrations";
 import {
   type Fetch,
   fetchSkillsShSkill,
   isSkillsShId,
   type SkillPackage,
   searchSkillsSh,
+  type SkillsShResult as SkillsShEntry,
+  topSkillsSh,
 } from "@crm/integrations/skills-sh";
+import { createPreloader, type Kv as KvStore } from "@crm/core/kv";
 import { Context, Effect, Layer, Schema } from "effect";
 import { Database } from "./Database.ts";
+import { Kv } from "./Kv.ts";
 
 type Owner = { readonly workspaceId: string; readonly userId: string };
 
@@ -46,15 +51,17 @@ export interface SkillStore {
   isMember(owner: Owner): Promise<boolean>;
   list(workspaceId: string): Promise<readonly SkillRecord[]>;
   find(workspaceId: string, id: string): Promise<SkillRecord | null>;
-  /** `false` when the workspace already has a skill with this name. */
-  insert(
-    owner: Owner,
-    skill: SkillPackage & { sourceId: string },
-    now: Date,
-  ): Promise<string | null>;
+  /** The new skill's id; null when the workspace already has a skill with this name. */
+  insert(owner: Owner, skill: NewSkill, now: Date): Promise<string | null>;
   setEnabled(workspaceId: string, id: string, enabled: boolean, now: Date): Promise<boolean>;
   remove(workspaceId: string, id: string): Promise<boolean>;
 }
+
+export type NewSkill = SkillPackage & {
+  readonly source: "skills.sh" | "custom";
+  readonly sourceId: string | null;
+  readonly enabled: boolean;
+};
 
 export class SkillStoreError extends Schema.TaggedError<SkillStoreError>()("SkillStoreError", {
   cause: Schema.Defect(),
@@ -74,6 +81,10 @@ export interface SkillsService {
     actor: SkillActor,
     query: string,
   ) => Effect.Effect<readonly SkillsShResult[], NoActiveWorkspace | UpstreamUnavailable>;
+  readonly create: (
+    actor: SkillActor,
+    input: { name: string; description: string; content: string },
+  ) => Effect.Effect<SkillSummary, NoActiveWorkspace | Invalid>;
   readonly install: (
     actor: SkillActor,
     sourceId: string,
@@ -97,6 +108,8 @@ export interface SkillsService {
 
 export interface SkillsDependencies {
   readonly store: SkillStore;
+  /** Caches the skills.sh leaderboard shown before anyone searches. */
+  readonly kv: KvStore;
   readonly fetch?: Fetch;
   readonly now: () => Date;
 }
@@ -139,6 +152,17 @@ function toDetail(record: SkillRecord): SkillDetail {
 export function makeSkills(deps: SkillsDependencies): SkillsService {
   const { store } = deps;
   const upstream = deps.fetch ? { fetch: deps.fetch } : {};
+  const preload = createPreloader(deps.kv);
+
+  /** The skills.sh leaderboard, read at most once an hour. */
+  const top = async (): Promise<readonly SkillsShEntry[]> => {
+    const cached = await preload("skills:top", 60 * 60, async () =>
+      JSON.stringify(await topSkillsSh(upstream)),
+    );
+
+    // SAFETY: only `top` writes this key, with `topSkillsSh`'s validated result.
+    return JSON.parse(cached) as readonly SkillsShEntry[];
+  };
 
   const owner = Effect.fn("Skills.owner")(function* (actor: SkillActor) {
     const workspaceId = actor.activeWorkspaceId;
@@ -173,17 +197,15 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
       const scope = yield* owner(actor);
       const text = query.trim();
 
-      if (text.length < 2) return [];
-
       const [results, installed] = yield* Effect.all([
         Effect.tryPromise({
-          try: () => searchSkillsSh(text, upstream),
+          // Before a real search (it needs 2 characters), show the most installed skills.
+          try: () => (text.length < 2 ? top() : searchSkillsSh(text, upstream)),
           catch: (cause) => cause,
         }).pipe(
           Effect.tapError((cause) => Effect.logWarning("skills: skills.sh search failed", cause)),
           Effect.mapError(
-            () =>
-              new UpstreamUnavailable({ message: "skills.sh could not be reached. Try again." }),
+            () => new UpstreamUnavailable({ message: "Skills could not be loaded. Try again." }),
           ),
         ),
         run("list", () => store.list(scope.workspaceId)),
@@ -200,6 +222,40 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
       }));
     }),
 
+    create: Effect.fn("Skills.create")(function* (actor, input) {
+      const scope = yield* owner(actor);
+
+      const error =
+        skillNameError(input.name) ??
+        skillDescriptionError(input.description) ??
+        skillInstructionsError(input.content);
+
+      if (error) return yield* new Invalid({ message: error });
+
+      const name = input.name.trim();
+
+      const id = yield* run("insert", () =>
+        store.insert(
+          scope,
+          {
+            name,
+            description: input.description.trim(),
+            content: input.content.trim(),
+            files: {},
+            source: "custom",
+            sourceId: null,
+            enabled: true,
+          },
+          deps.now(),
+        ),
+      );
+
+      if (!id)
+        return yield* new Invalid({ message: `This workspace already has a skill named ${name}` });
+
+      return toSummary(yield* found(scope.workspaceId, id).pipe(Effect.orDie));
+    }),
+
     install: Effect.fn("Skills.install")(function* (actor, sourceId) {
       const scope = yield* owner(actor);
 
@@ -214,12 +270,16 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
         Effect.mapError((cause) =>
           cause instanceof Error && cause.name === "SkillsShError"
             ? new Invalid({ message: cause.message })
-            : new UpstreamUnavailable({ message: "skills.sh could not be reached. Try again." }),
+            : new UpstreamUnavailable({ message: "Skills could not be loaded. Try again." }),
         ),
       );
 
       const id = yield* run("insert", () =>
-        store.insert(scope, { ...skill, sourceId }, deps.now()),
+        store.insert(
+          scope,
+          { ...skill, source: "skills.sh", sourceId, enabled: false },
+          deps.now(),
+        ),
       );
 
       if (!id) {
@@ -332,9 +392,9 @@ export function prismaSkillStore(db: Db): SkillStore {
         description: skill.description,
         content: skill.content,
         files: skill.files,
-        source: "skills.sh",
+        source: skill.source,
         sourceId: skill.sourceId,
-        enabled: false,
+        enabled: skill.enabled,
         addedById: userId,
         createdAt: now,
         updatedAt: now,
@@ -352,7 +412,11 @@ export class Skills extends Context.Service<Skills, SkillsService>()("@crm/api/s
   static readonly layer = Layer.effect(
     Skills,
     Effect.gen(function* () {
-      return makeSkills({ store: prismaSkillStore(yield* Database), now: () => new Date() });
+      return makeSkills({
+        store: prismaSkillStore(yield* Database),
+        kv: yield* Kv,
+        now: () => new Date(),
+      });
     }),
-  ).pipe(Layer.provide(Database.layer));
+  ).pipe(Layer.provide([Database.layer, Kv.layer]));
 }

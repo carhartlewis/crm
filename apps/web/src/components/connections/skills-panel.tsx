@@ -1,9 +1,6 @@
 import add from "@carbon/icons/es/add/16.js";
-import document from "@carbon/icons/es/document/16.js";
-import launch from "@carbon/icons/es/launch/16.js";
 import overflow from "@carbon/icons/es/overflow-menu--horizontal/16.js";
 import type { SkillsShResult, SkillSummary } from "@crm/core/api";
-import { skillsShUrl } from "@crm/integrations";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import {
@@ -36,8 +33,6 @@ import {
 import { SectionHeading } from "./connectors-panel.tsx";
 
 const AddIcon = carbonIcon(add);
-const SkillIcon = carbonIcon(document);
-const LaunchIcon = carbonIcon(launch);
 const MoreIcon = carbonIcon(overflow);
 
 const onError = (error: Error) => toast.error(error.message);
@@ -100,12 +95,8 @@ function YourSkills({
   return (
     <section className="flex flex-col gap-2">
       <SectionHeading count={shown.length}>Shared in this workspace</SectionHeading>
-      {shown.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {needle
-            ? `No skills match “${query.trim()}”.`
-            : "No skills yet. Skills teach the assistant how your workspace works. Find one in Discover."}
-        </p>
+      {shown.length === 0 && needle ? (
+        <p className="text-sm text-muted-foreground">No skills match “{query.trim()}”.</p>
       ) : (
         <ul className="flex flex-col divide-y divide-border">
           {shown.map((skill) => (
@@ -114,14 +105,6 @@ function YourSkills({
         </ul>
       )}
     </section>
-  );
-}
-
-function SkillTile() {
-  return (
-    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground ring-1 ring-foreground/10">
-      <SkillIcon />
-    </div>
   );
 }
 
@@ -139,9 +122,9 @@ function SkillRow({ skill, onOpen }: { skill: SkillSummary; onOpen: (id: string)
       <button
         type="button"
         onClick={() => onOpen(skill.id)}
+        aria-label={`Read ${skill.name}`}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
-        <SkillTile />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center gap-2 font-medium">
             {skill.name}
@@ -201,15 +184,12 @@ function DiscoverSkills({
 
   return (
     <section className="flex flex-col gap-2">
-      <SectionHeading count={found.length}>From skills.sh</SectionHeading>
+      <SectionHeading count={found.length}>{text ? "Results" : "Top skills"}</SectionHeading>
       {results.isError ? <p className="text-sm text-destructive">{results.error.message}</p> : null}
-      {text.length < 2 ? (
+      {results.isSuccess && found.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Search skills.sh for skills to share with your workspace.
+          {text ? `No skills match “${text}”.` : "No skills to show right now."}
         </p>
-      ) : null}
-      {text.length >= 2 && results.isSuccess && found.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No skills on skills.sh match “{text}”.</p>
       ) : null}
       <ul className="flex flex-col divide-y divide-border">
         {found.map((result) => (
@@ -232,28 +212,12 @@ function DiscoverRow({ result, onOpen }: { result: SkillsShResult; onOpen: (id: 
 
   return (
     <li className="flex items-center gap-3 py-3">
-      <SkillTile />
       <span className="flex min-w-0 flex-1 flex-col select-none">
         <span className="font-medium">{result.name}</span>
         <span className="truncate text-sm text-muted-foreground">
           from {result.source} · {result.installs.toLocaleString()} installs
         </span>
       </span>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={`${result.name} on skills.sh`}
-        render={
-          <a
-            href={skillsShUrl(result.id)}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`${result.name} on skills.sh`}
-          />
-        }
-      >
-        <LaunchIcon />
-      </Button>
       {result.installed ? (
         <Badge variant="secondary">Added</Badge>
       ) : (
@@ -288,18 +252,9 @@ function SkillSheet({ scope, id, onClose }: { scope: Scope; id: string; onClose:
         {detail ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
             <p className="text-sm text-muted-foreground select-none">
-              {detail.sourceId ? (
-                <a
-                  className="underline underline-offset-4"
-                  href={skillsShUrl(detail.sourceId)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {detail.sourceId}
-                </a>
-              ) : (
-                "Written in this workspace"
-              )}
+              {detail.sourceId
+                ? `from ${detail.sourceId.split("/").slice(0, -1).join("/")}`
+                : "Written in this workspace"}
               {detail.files.length === 1 ? " · 1 more file" : ""}
               {detail.files.length > 1 ? ` · ${detail.files.length} more files` : ""}
             </p>

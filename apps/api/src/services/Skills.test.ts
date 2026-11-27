@@ -1,3 +1,4 @@
+import { createMemoryKv } from "@crm/core/kv";
 import { describe, expect, test } from "bun:test";
 import type { Fetch } from "@crm/integrations/skills-sh";
 import { Effect, Exit } from "effect";
@@ -14,6 +15,13 @@ const skillMarkdown =
 /** skills.sh: one searchable skill, and its package. */
 const skillsSh: Fetch = async (url) => {
   const target = new URL(url);
+
+  if (target.pathname === "/") {
+    // The home page's embedded leaderboard (JSON escaped inside a script).
+    return new Response(
+      String.raw`<script>{\"source\":\"acme/skills\",\"skillId\":\"deep-research\",\"name\":\"deep-research\",\"installs\":42}</script>`,
+    );
+  }
 
   if (target.pathname === "/api/search") {
     return Response.json({
@@ -46,6 +54,7 @@ function setup() {
 
   const skills = makeSkills({
     store: memory.store,
+    kv: createMemoryKv(),
     fetch: skillsSh,
     now: () => new Date("2026-11-27T10:00:00Z"),
   });
@@ -101,7 +110,20 @@ describe("workspace skills", () => {
     await run(skills.install(alice, "acme/skills/deep-research"));
 
     expect((await run(skills.discover(alice, "research")))[0]?.installed).toBe(true);
-    expect(await run(skills.discover(alice, "r"))).toEqual([]);
+  });
+
+  test("before a search, discover shows the most installed skills", async () => {
+    const { skills } = setup();
+
+    expect(await run(skills.discover(alice, ""))).toEqual([
+      {
+        id: "acme/skills/deep-research",
+        name: "deep-research",
+        source: "acme/skills",
+        installs: 42,
+        installed: false,
+      },
+    ]);
   });
 
   test("refuses non-members, a second copy, unknown ids and bad skills.sh ids", async () => {
@@ -128,6 +150,32 @@ describe("workspace skills", () => {
       expect.stringContaining("NotFound"),
       expect.stringContaining("NotFound"),
     ]);
+  });
+
+  test("a member can write a skill; it starts enabled and the rules apply", async () => {
+    const { skills } = setup();
+
+    const written = await run(
+      skills.create(alice, {
+        name: "deal-review",
+        description: "Review a deal before the forecast call.",
+        content: "Check the stage, the amount and the next step.",
+      }),
+    );
+
+    expect(written).toMatchObject({ name: "deal-review", source: "custom", enabled: true });
+    expect(await skills.forAgent({ workspaceId: "ws_a", userId: "user_2" })).toHaveLength(1);
+
+    const invalid = await Effect.runPromiseExit(
+      skills.create(alice, { name: "Deal Review", description: "x", content: "y" }),
+    );
+
+    const duplicate = await Effect.runPromiseExit(
+      skills.create(bob, { name: "deal-review", description: "x", content: "y" }),
+    );
+
+    expect(Exit.isFailure(invalid) && invalid.cause.toString()).toContain("lowercase");
+    expect(Exit.isFailure(duplicate) && duplicate.cause.toString()).toContain("already has");
   });
 
   test("removing deletes it for everyone", async () => {
