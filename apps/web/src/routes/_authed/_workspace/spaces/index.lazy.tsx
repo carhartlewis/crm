@@ -9,7 +9,7 @@ import {
 } from "@crm/ui/patterns/page-shell";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { spaceColor } from "../../../../components/chat/chat-menu.tsx";
-import { SpaceActions } from "../../../../components/chat/space-actions.tsx";
+import { SpacePinButton } from "../../../../components/chat/space-actions.tsx";
 import { useChats } from "../../../../components/chat/use-chats.ts";
 import { WorkspacePageHeader } from "../../../../components/shell/page-header.tsx";
 import { useCreateSheet } from "../../../../lib/create-sheet.ts";
@@ -81,7 +81,7 @@ function SpacesList({ userId, workspaceId }: { userId: string; workspaceId: stri
                     </span>
                   </span>
                 </Link>
-                <SpaceActions space={space} api={api} userId={userId} workspaceId={workspaceId} />
+                <SpacePinButton space={space} api={api} />
               </li>
             );
           })}

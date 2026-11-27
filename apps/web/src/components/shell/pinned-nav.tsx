@@ -19,7 +19,8 @@ import { reorderable } from "./reorder.ts";
  * chat nav (pinned chats and spaces too) has loaded. Drag to reorder, ⌥1–⌥9 to open.
  */
 export function PinnedNav({ userId, workspaceId }: { userId: string; workspaceId: string }) {
-  const order = usePinnedOrder(userId);
+  // Numbered as Pinned is: pages and chats; pinned spaces have their own group.
+  const order = usePinnedOrder(userId).filter((key) => !key.startsWith("space:"));
 
   const activeId = useRouterState({
     select: (state) => pageForPath(state.location.pathname)?.id,

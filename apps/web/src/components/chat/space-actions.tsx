@@ -35,17 +35,11 @@ export interface SpaceActionsProps {
   readonly api: ChatsApi;
   readonly userId: string;
   readonly workspaceId: string;
-  /** The space's own page also offers Edit and Delete. */
-  readonly full?: boolean;
 }
 
-/** Pin, Join or Leave, and (on the space's page) Edit and Delete (ADR 0020). */
-export function SpaceActions({ space, api, userId, workspaceId, full = false }: SpaceActionsProps) {
+function useSpaceMutations({ space, api, userId, workspaceId }: SpaceActionsProps) {
   const navigate = useNavigate();
-  const [editing, setEditing] = useState(false);
   const key = pinKey("space", space.id);
-  const pinned = api.layout.pinned.includes(key);
-  const joined = api.joinedSpaceIds.has(space.id);
   const membership = { workspaceId, userId, spaceId: space.id };
 
   const join = useMutation({
@@ -77,76 +71,103 @@ export function SpaceActions({ space, api, userId, workspaceId, full = false }: 
     onError: (error) => toast.error(error.message),
   });
 
+  return {
+    key,
+    pinned: api.layout.pinned.includes(key),
+    joined: api.joinedSpaceIds.has(space.id),
+    join: () => join.mutate(membership),
+    joining: join.isPending,
+    leave: () => leave.mutate(membership),
+    update,
+    remove: () => remove.mutate({ workspaceId, id: space.id }),
+  };
+}
+
+/** The pin icon on a space's row in the Spaces list (ADR 0020). */
+export function SpacePinButton({ space, api }: Pick<SpaceActionsProps, "space" | "api">) {
+  const key = pinKey("space", space.id);
+  const pinned = api.layout.pinned.includes(key);
+
   return (
-    <div className="flex shrink-0 items-center gap-1">
-      <Tooltip>
-        <TooltipTrigger
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={pinned ? `Unpin ${space.name}` : `Pin ${space.name}`}
+            aria-pressed={pinned}
+            onClick={() => api.togglePin(key)}
+          >
+            {pinned ? <PinnedIcon /> : <PinIcon />}
+          </Button>
+        }
+      />
+      <TooltipContent>{pinned ? "Unpin" : "Pin to the sidebar"}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Join, for the body of a space's page while you aren't a member. */
+export function JoinSpaceButton(props: SpaceActionsProps) {
+  const actions = useSpaceMutations(props);
+
+  return (
+    <Button size="sm" loading={actions.joining} onClick={actions.join}>
+      Join space
+    </Button>
+  );
+}
+
+/** A space's `…` menu in its page header: Pin, Join or Leave, Edit and Delete. */
+export function SpaceMenu(props: SpaceActionsProps) {
+  const { space, api, userId, workspaceId } = props;
+  const actions = useSpaceMutations(props);
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
           render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={pinned ? `Unpin ${space.name}` : `Pin ${space.name}`}
-              aria-pressed={pinned}
-              onClick={() => api.togglePin(key)}
-            >
-              {pinned ? <PinnedIcon /> : <PinIcon />}
+            <Button variant="ghost" size="icon-sm" aria-label={`${space.name} options`}>
+              <MenuIcon />
             </Button>
           }
         />
-        <TooltipContent>{pinned ? "Unpin" : "Pin to the sidebar"}</TooltipContent>
-      </Tooltip>
-      {joined ? (
-        <Button
-          variant="outline"
-          size="sm"
-          loading={leave.isPending}
-          onClick={() => leave.mutate(membership)}
-        >
-          Leave
-        </Button>
-      ) : (
-        <Button size="sm" loading={join.isPending} onClick={() => join.mutate(membership)}>
-          Join
-        </Button>
-      )}
-      {full && (
-        <>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon-sm" aria-label={`${space.name} options`}>
-                  <MenuIcon />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setEditing(true)}>Edit…</DropdownMenuItem>
-              {/* The server also lets workspace admins delete; it refuses anyone else. */}
-              {space.created_by_id === userId && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => remove.mutate({ workspaceId, id: space.id })}
-                  >
-                    Delete space
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <SpaceSheet
-            open={editing}
-            onOpenChange={setEditing}
-            initial={{
-              name: space.name,
-              description: space.description,
-              color: isSpaceColor(space.color) ? space.color : "blue",
-            }}
-            onSave={(input) => update.mutateAsync({ workspaceId, id: space.id, ...input })}
-          />
-        </>
-      )}
-    </div>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => api.togglePin(actions.key)}>
+            {actions.pinned ? "Unpin" : "Pin to the sidebar"}
+          </DropdownMenuItem>
+          {actions.joined ? (
+            <DropdownMenuItem onClick={actions.leave}>Leave space</DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={actions.join}>Join space</DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={() => setEditing(true)}>Edit…</DropdownMenuItem>
+          {/* The server also lets workspace admins delete; it refuses anyone else. */}
+          {space.created_by_id === userId && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={actions.remove}>
+                Delete space
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <SpaceSheet
+        open={editing}
+        onOpenChange={setEditing}
+        initial={{
+          name: space.name,
+          description: space.description,
+          color: isSpaceColor(space.color) ? space.color : "blue",
+        }}
+        onSave={async (input) => {
+          await actions.update.mutateAsync({ workspaceId, id: space.id, ...input });
+        }}
+      />
+    </>
   );
 }

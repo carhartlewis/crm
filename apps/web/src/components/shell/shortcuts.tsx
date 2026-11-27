@@ -22,7 +22,8 @@ export function Shortcuts({
 }) {
   const router = useRouter();
   const { toggleSidebar } = useSidebar();
-  const order = usePinnedOrder(userId);
+  // ⌥1–⌥9 follow the Pinned group: pages and chats. Pinned spaces have their own group.
+  const order = usePinnedOrder(userId).filter((key) => !key.startsWith("space:"));
   const [, setCreate] = useCreateSheet();
 
   const pinned = order.flatMap((_, index) => {

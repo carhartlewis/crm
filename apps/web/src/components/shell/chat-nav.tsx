@@ -4,7 +4,7 @@ import folderIcon from "@carbon/icons/es/folder/16.js";
 import logout from "@carbon/icons/es/logout/16.js";
 import pinGlyph from "@carbon/icons/es/pin/16.js";
 import pinFilled from "@carbon/icons/es/pin--filled/16.js";
-import { chatTitleError, folderNameError, parsePinKey, pinKey } from "@crm/core/chat";
+import { chatTitleError, folderNameError, parsePinKey, type PinKind, pinKey } from "@crm/core/chat";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,7 +75,8 @@ export default function ChatNav({ userId, workspaceId }: NavProps) {
 
   return (
     <div>
-      <PinnedGroup {...rowProps} />
+      <PinGroup label="Pinned" kinds={["page", "chat"]} {...rowProps} />
+      <PinGroup label="Spaces" kinds={["space"]} {...rowProps} />
       <FoldersGroup {...rowProps} />
       <RecentsGroup {...rowProps} />
       {dialog && (
@@ -97,12 +98,22 @@ interface RowProps extends NavProps {
 }
 
 /** Pinned: drag to reorder (a haptic tick per slot), ⌥1–⌥9 to open the first nine. */
-function PinnedGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps) {
+interface PinGroupProps extends RowProps {
+  readonly label: string;
+  /** Which pins this group shows: pages and chats in Pinned, spaces in Spaces. */
+  readonly kinds: readonly PinKind[];
+}
+
+/**
+ * A group of pins in the user's one pinned order: Pinned (pages and chats, ⌥1–⌥9) or Spaces
+ * (pinned spaces). Drag to reorder within the group, a haptic tick per slot.
+ */
+function PinGroup({ label, kinds, api, userId, workspaceId, pathname, onRequest }: PinGroupProps) {
   // Pins whose chat or space is gone (deleted, or not synced yet) are skipped, not shown empty.
   const visible = api.layout.pinned.flatMap((key, index) => {
     const entry = parsePinKey(key);
 
-    if (!entry) return [];
+    if (!entry || !kinds.includes(entry.kind)) return [];
 
     if (entry.kind === "page") return isPageId(entry.id) ? [{ key, index, pin: entry }] : [];
 
@@ -132,12 +143,17 @@ function PinnedGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps
     [workspaceId, userId],
   );
 
+  if (visible.length === 0) return null;
+
+  // ⌥1–⌥9 open Pinned's items; pinned spaces have no hotkeys.
+  const hotkeys = kinds.includes("page");
+
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Pinned</SidebarGroupLabel>
-      <SidebarMenu ref={listRef} aria-label="Pinned">
+      <SidebarGroupLabel>{label}</SidebarGroupLabel>
+      <SidebarMenu ref={listRef} aria-label={label}>
         {visible.map(({ key, index: pinIndex, pin: item }, index) => {
-          const shortcut = pinnedShortcut(index);
+          const shortcut = hotkeys ? pinnedShortcut(index) : undefined;
 
           if (item.kind === "page" && isPageId(item.id)) {
             return (
@@ -161,7 +177,7 @@ function PinnedGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps
                 key={key}
                 chat={chat}
                 icon={<PinIcon />}
-                shortcutIndex={index}
+                shortcutIndex={hotkeys ? index : undefined}
                 pinIndex={pinIndex}
                 api={api}
                 userId={userId}
@@ -178,7 +194,7 @@ function PinnedGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps
             <SpaceRow
               key={key}
               space={space}
-              shortcutIndex={index}
+              shortcutIndex={hotkeys ? index : undefined}
               pinIndex={pinIndex}
               api={api}
               userId={userId}

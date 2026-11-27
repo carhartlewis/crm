@@ -1,4 +1,6 @@
+import edit from "@carbon/icons/es/edit/16.js";
 import { Button } from "@crm/ui/components/button";
+import { carbonIcon } from "@crm/ui/components/icon";
 import { Card, CardDescription, CardHeader, CardTitle } from "@crm/ui/components/card";
 import { SpaceDot } from "@crm/ui/components/space-dot";
 import { FormattedDate } from "@crm/ui/patterns/formatted-date";
@@ -11,9 +13,11 @@ import {
 } from "@crm/ui/patterns/page-shell";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { spaceColor } from "../../../../components/chat/chat-menu.tsx";
-import { SpaceActions } from "../../../../components/chat/space-actions.tsx";
+import { JoinSpaceButton, SpaceMenu } from "../../../../components/chat/space-actions.tsx";
 import { useChats } from "../../../../components/chat/use-chats.ts";
 import { WorkspacePageHeader } from "../../../../components/shell/page-header.tsx";
+
+const EditIcon = carbonIcon(edit);
 
 export const Route = createLazyFileRoute("/_authed/_workspace/spaces/$spaceId")({
   component: SpacePage,
@@ -78,12 +82,11 @@ function SpaceView({
               variant="outline"
               render={<Link to="/" search={isPrivate ? {} : { space: spaceId }} />}
             >
+              <EditIcon />
               New chat
             </Button>
           )}
-          {space && (
-            <SpaceActions space={space} api={api} userId={userId} workspaceId={workspaceId} full />
-          )}
+          {space && <SpaceMenu space={space} api={api} userId={userId} workspaceId={workspaceId} />}
         </PageShellActions>
       </WorkspacePageHeader>
       <PageShellContent>
@@ -95,10 +98,13 @@ function SpaceView({
                 .join(" · ")}
             </p>
           )}
-          {!joined && (
-            <p className="text-sm text-pretty text-muted-foreground">
-              Join this space to see its chats and start new ones in it.
-            </p>
+          {!joined && space && (
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-sm text-pretty text-muted-foreground">
+                Join this space to see its chats and start new ones in it.
+              </p>
+              <JoinSpaceButton space={space} api={api} userId={userId} workspaceId={workspaceId} />
+            </div>
           )}
           {joined && api.isReady && chats.length === 0 && (
             <p className="text-sm text-pretty text-muted-foreground">

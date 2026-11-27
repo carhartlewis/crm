@@ -141,7 +141,8 @@ export default function CommandPalette({
   const { toggleSidebar } = useSidebar();
   const { setTheme } = useTheme();
   const [, setCreate] = useCreateSheet();
-  const order = usePinnedOrder(userId);
+  // The same numbering as ⌥1–⌥9: Pinned's pages and chats, not pinned spaces.
+  const order = usePinnedOrder(userId).filter((key) => !key.startsWith("space:"));
   const current = useRouterState({ select: (state) => pageForPath(state.location.pathname) });
   const { data: session } = useQuery(sessionQuery);
 
