@@ -47,3 +47,8 @@ body[data-reordering] [data-slot="preview-card-content"] {
 [data-drop-mark="after"]::before {
   bottom: -1px;
 }
+
+/* A closed sidebar section (components/shell/nav-section.tsx) keeps only the row you are on. */
+[data-section-closed] [data-sidebar="menu-item"]:not(:has([data-active])) {
+  display: none;
+}
