@@ -1,8 +1,10 @@
 ---
-description: Use when asked to research, enrich or fill in a company in the CRM (the company sheet's Research button).
+description: Use when asked to research, enrich or fill in a company in the CRM (the company sheet's Research button, or a background research run when a company is added).
 ---
 
 # Research a company and fill its profile
+
+Fill as much as sources support, without asking the member.
 
 1. Read the company (`connections__crm__get_company`). Call `connections__crm__set_enrichment_status`
    with `running`.

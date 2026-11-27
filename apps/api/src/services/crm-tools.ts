@@ -243,6 +243,40 @@ function webTools(web: WebReader): readonly LocalTool[] {
     ),
     tool(
       {
+        name: "lookup_person",
+        description:
+          "Find a person's public profile: name, photo, title and employer, location, past roles, bio and social links, with `score`, how sure the match is (0–100). Pass a work email (best), their LinkedIn or other profile URLs, or first and last name with their company. Weak matches come back too: check the score and that the employer matches before you use it. Free email addresses (gmail and friends) can't be looked up.",
+        readOnly: true,
+        input: Schema.Struct({
+          email: Text("A work email."),
+          profile_urls: Schema.optional(Schema.Array(Schema.String)).annotate({
+            description: "Their profile pages, such as a LinkedIn /in/ URL.",
+          }),
+          first_name: Text("Their first name."),
+          last_name: Text("Their last name."),
+          company_name: Text("Where they work."),
+          company_domain: Text("Their company's website domain, such as acme.com."),
+        }),
+      },
+      async (input) => {
+        const person = await web.findPerson({
+          email: input.email,
+          profileUrls: input.profile_urls,
+          firstName: input.first_name,
+          lastName: input.last_name,
+          companyName: input.company_name,
+          companyDomain: input.company_domain,
+        });
+
+        return person
+          ? answer(person)
+          : refuse(
+              "No match. Pass a work email, a profile URL, or a first and last name with their company.",
+            );
+      },
+    ),
+    tool(
+      {
         name: "read_web_page",
         description:
           "Read one web page as clean Markdown (it is rendered first, so pages that need JavaScript work too): a company's pricing, about, careers or blog page, a news article, a document. Long pages are cut.",

@@ -14,6 +14,7 @@ import {
 import { createId, ID_PREFIXES } from "@crm/core/ids";
 import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 import { createCollection, createOptimisticAction } from "@tanstack/react-db";
+import { mutationOptions } from "@tanstack/react-query";
 import {
   checkedTxid,
   isoTimestamp,
@@ -448,3 +449,26 @@ export async function reorderFieldOptions(
 
   await fieldOptionsCollection(workspaceId).utils.awaitTxId(txid);
 }
+
+/**
+ * "Fill the rest" (ADR 0025): the agent fills the field on every record without a value, in the
+ * background. Values arrive through sync; `queued` is false when the workspace is at its limit.
+ */
+export const fillFieldMutation = mutationOptions({
+  mutationFn: async (fieldId: string) => {
+    const response = await fetch(`${fieldPath(fieldId)}/fill`, {
+      method: "POST",
+      credentials: "same-origin",
+    });
+
+    const result: { queued?: unknown; message?: unknown } = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const message = String(result.message ?? "");
+
+      throw new Error(message === result.message ? message : "Your agents couldn't start");
+    }
+
+    return result.queued === true;
+  },
+});

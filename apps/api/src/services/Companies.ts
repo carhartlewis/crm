@@ -8,6 +8,7 @@ import {
 } from "./companies-rules.ts";
 import { Database } from "./Database.ts";
 import { Images } from "./Images.ts";
+import { Research } from "./Research.ts";
 import { Memory } from "./Memory.ts";
 import { Postgres } from "./Postgres.ts";
 import { prismaRecordStore, type RecordPatch, type RecordStore } from "./record-store.ts";
@@ -57,6 +58,8 @@ export interface CompaniesService {
 
 /** Work that follows a committed write, off the request path. */
 export interface CompanyEvents {
+  /** A company was added: the agent researches it in the background (ADR 0025). */
+  readonly created?: (actor: Actor, companyId: string) => void;
   /** A company was created with a domain, or its domain changed (memory research, ADR 0014). */
   readonly researched?: (workspaceId: string, companyId: string) => void;
   /** Its domain was set or changed: copy its logo (`ImageCache.logo`). `null` clears it. */
@@ -121,6 +124,8 @@ export function makeCompanies(store: RecordStore, events: CompanyEvents = {}): C
       }).pipe(
         Effect.tap(() =>
           Effect.sync(() => {
+            events.created?.(actor, id);
+
             if (domain && actor.activeWorkspaceId) {
               events.researched?.(actor.activeWorkspaceId, id);
               events.domainChanged?.(actor.activeWorkspaceId, id, domain);
@@ -311,6 +316,7 @@ export class Companies extends Context.Service<Companies, CompaniesService>()(
     Effect.gen(function* () {
       const memory = yield* Memory;
       const images = yield* Images;
+      const research = yield* Research;
       const store = prismaRecordStore(yield* Database);
       const pool = yield* Postgres;
 
@@ -325,11 +331,14 @@ export class Companies extends Context.Service<Companies, CompaniesService>()(
       );
 
       return makeCompanies(store, {
+        created: (actor, id) => research.start(actor, "company", id),
         researched: (workspaceId, id) => void memory.researchCompany(workspaceId, id),
         domainChanged: (workspaceId, id, domain) =>
           void copyCompanyLogo(store, images.logo, workspaceId, id, domain),
         removed: (workspaceId, id) => void memory.companyRemoved(workspaceId, id),
       });
     }),
-  ).pipe(Layer.provide([Database.layer, Memory.layer, Images.layer, Postgres.layer]));
+  ).pipe(
+    Layer.provide([Database.layer, Memory.layer, Images.layer, Postgres.layer, Research.layer]),
+  );
 }

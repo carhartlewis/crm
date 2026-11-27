@@ -10,8 +10,9 @@ import { VisuallyHidden } from "@crm/ui/patterns/visually-hidden";
 import type * as React from "react";
 import { observeReflow } from "@crm/ui/lib/reflow";
 
-// Every page shares one column width (standard) unless it fills the window (full).
-export type PageWidth = "standard" | "full";
+// Every page shares one column width (standard) unless it fills the window (full). Settings
+// forms read in a narrower centred column (narrow); its title bar keeps to the same column.
+export type PageWidth = "standard" | "narrow" | "full";
 
 function PageShell({
   className,
@@ -64,7 +65,7 @@ function PageShellHeader({
       {...props}
     >
       {leading}
-      <div className="mx-auto grid min-h-11 w-full min-w-0 flex-1 grid-cols-page-header items-center gap-x-3 py-2 group-data-[width=standard]/page-shell:max-w-360 sm:gap-x-4">
+      <div className="mx-auto grid min-h-11 w-full min-w-0 flex-1 grid-cols-page-header items-center gap-x-3 py-2 group-data-[width=standard]/page-shell:max-w-360 group-data-[width=narrow]/page-shell:max-w-2xl sm:gap-x-4">
         {children}
       </div>
     </header>
@@ -107,7 +108,7 @@ function PageShellContent({ className, children, ...props }: React.ComponentProp
   return (
     <div
       className={cn(
-        "@container/page-content mx-auto flex w-full flex-1 flex-col gap-6 pt-5 group-data-[width=standard]/page-shell:max-w-360",
+        "@container/page-content mx-auto flex w-full flex-1 flex-col gap-6 pt-5 group-data-[width=standard]/page-shell:max-w-360 group-data-[width=narrow]/page-shell:max-w-2xl",
         className,
       )}
       data-slot="page-shell-content"

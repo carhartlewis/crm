@@ -1,13 +1,14 @@
 import { CONTACT_FACT_FIELDS, FACT_BANDS } from "@crm/core/records";
 import type { LocalTool } from "@crm/integrations/gateway";
-import { Schema } from "effect";
+import type { FactOutcome } from "@crm/core/records";
+import { Effect, Schema } from "effect";
 import { run, tool } from "./crm-tools.ts";
 import type { IntelService } from "./Intel.ts";
 import type { AgentCaller } from "./Memory.ts";
 
 /**
  * The agent's research and sync tools (ADR 0024): it judges, the CRM stores. Research marks a
- * record's enrichment state, proposes contact facts a member accepts or dismisses, and writes a
+ * record's enrichment state, records contact facts (filled at once, ADR 0025), and writes a
  * contact brief; mail and calendar sync logs one activity per thread or event.
  */
 
@@ -23,6 +24,14 @@ const Links = {
     "The company, from crm__list_companies (com_…). Filled from the contact or deal when left out.",
   ),
   deal_id: Text("The deal it is about, from crm__list_deals (del_…), when there is one."),
+};
+
+/** What the agent is told about each outcome, so it can say what it filled. */
+const OUTCOME_NOTES: Record<FactOutcome, string> = {
+  applied: "Saved on the contact.",
+  proposed: "A member typed a different value; it waits on the contact's sheet for them.",
+  kept: "A member's own value stays; nothing was changed.",
+  too_unsure: "Not saved: below 0.6 is too unsure.",
 };
 
 const FIELD_HELP = CONTACT_FACT_FIELDS.map((field) => field.column).join(", ");
@@ -55,8 +64,8 @@ export function intelTools(intel: IntelService, caller: AgentCaller): readonly L
     ),
     tool(
       {
-        name: "propose_contact_fact",
-        description: `Propose a value for one of a contact's fields (${FIELD_HELP}), with how sure you are. A member accepts or dismisses it on the contact's sheet; nothing changes until then. A new proposal replaces your older one for the same field. Only propose what a source says; give that page as \`source_url\` and quote it in \`evidence\`.`,
+        name: "record_contact_fact",
+        description: `Record a value you found for one of a contact's fields (${FIELD_HELP}), with how sure you are. It fills the contact at once when you are sure (score 0.6 or more), the field is empty, or it replaces a value you wrote before. A value a member typed stays unless the evidence shows a real change; only then may a member be asked. Only record what a source says: give the page as \`source_url\` and quote it in \`evidence\`. For \`image_url\`, pass the \`avatar_url\` that crm__lookup_person returned; it is copied into the CRM.`,
         readOnly: false,
         input: Schema.Struct({
           contact_id: Schema.String.annotate({ description: "A contact id (ctc_…)." }),
@@ -64,7 +73,10 @@ export function intelTools(intel: IntelService, caller: AgentCaller): readonly L
           value: Schema.String.annotate({
             description: "The value; full URLs for profile links.",
           }),
-          score: Schema.Number.annotate({ description: "How sure you are, from 0 to 1." }),
+          score: Schema.Number.annotate({
+            description:
+              "How sure you are, from 0 to 1: 0.9+ for their own profile or a match score of 90+, 0.6–0.9 for a good indirect source. Below 0.6 nothing is saved.",
+          }),
           band: Schema.optional(Schema.Literals(FACT_BANDS)).annotate({
             description:
               "verified (a primary source such as their own profile), probable or possible. From the score when left out.",
@@ -77,15 +89,17 @@ export function intelTools(intel: IntelService, caller: AgentCaller): readonly L
       },
       (input) =>
         run(
-          intel.proposeFact(actor, {
-            contactId: input.contact_id,
-            field: input.field,
-            value: input.value,
-            score: input.score,
-            band: input.band,
-            evidence: input.evidence,
-            sourceUrl: input.source_url,
-          }),
+          intel
+            .recordFact(actor, {
+              contactId: input.contact_id,
+              field: input.field,
+              value: input.value,
+              score: input.score,
+              band: input.band,
+              evidence: input.evidence,
+              sourceUrl: input.source_url,
+            })
+            .pipe(Effect.map(({ id, outcome }) => ({ id, outcome, note: OUTCOME_NOTES[outcome] }))),
         ),
     ),
     tool(

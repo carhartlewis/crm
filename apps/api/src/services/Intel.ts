@@ -1,11 +1,17 @@
 import { Invalid, NoActiveWorkspace, NotFound } from "@crm/core/api";
 import type { Db } from "@crm/core/db";
 import { createId, ID_PREFIXES } from "@crm/core/ids";
+import { PERSON_PHOTO_PATTERN } from "@crm/core/brand";
 import {
   bandFor,
   type BriefSections,
   type ContactFactField,
   type FactDecision,
+  type FactJudgement,
+  type FactOutcome,
+  factOutcome,
+  needsJudgement,
+  sameFactValue,
   isContactFactField,
   isContactFactId,
   isContactId,
@@ -17,17 +23,22 @@ import {
   optionalUrl,
 } from "@crm/core/records";
 import { isCompanyId } from "@crm/core/company";
-import { Context, Effect, Layer, Schema } from "effect";
+import { gatewayJev } from "@crm/memory/jev-gateway";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import { authorizeWorkspace } from "./companies-rules.ts";
+import { AppConfig } from "../config.ts";
 import { Database } from "./Database.ts";
+import { jevFactJudge } from "./fact-judge.ts";
+import { Images } from "./Images.ts";
 import type { JsonValue } from "./record-store.ts";
 import { type DbTx, transactWithTxid } from "./txid.ts";
 
 /**
  * What the agent learns about records (ADR 0024), stored as it writes it through `crm__` tools:
- * enrichment state, proposed contact facts, contact briefs, and email and meeting activity from
- * the member's connected apps. The API judges nothing here; it checks membership, references and
- * shapes, and keeps every write in one transaction with its txid.
+ * enrichment state, contact facts, contact briefs, and email and meeting activity from the
+ * member's connected apps. It checks membership, references and shapes, and keeps every write in
+ * one transaction with its txid. The agent judges what is true; the shared fact rules
+ * (`factOutcome`, ADR 0025) decide whether a fact fills the contact or waits for a member.
  */
 
 export type EnrichedTable = "company" | "contact";
@@ -104,6 +115,25 @@ export interface IntelTx {
   fact(workspaceId: string, id: string): Promise<FactRow | null>;
   /** The ids of a contact's facts for one field in one status. */
   factIds(workspaceId: string, contactId: string, field: string, status: string): Promise<string[]>;
+  /** The values of a contact's facts for one field in one status. */
+  factValues(
+    workspaceId: string,
+    contactId: string,
+    field: string,
+    status: string,
+  ): Promise<string[]>;
+  /** A contact's value for one fact field; null when empty or the contact is missing. */
+  contactValue(
+    workspaceId: string,
+    contactId: string,
+    field: ContactFactField,
+  ): Promise<string | null>;
+  setContactValue(
+    workspaceId: string,
+    contactId: string,
+    field: ContactFactField,
+    value: string,
+  ): Promise<void>;
   insertFact(row: FactRow): Promise<void>;
   updateFact(workspaceId: string, id: string, patch: FactPatch): Promise<void>;
   putBrief(row: BriefRow): Promise<void>;
@@ -196,10 +226,40 @@ export interface MeetingInput {
 
 type Write<A> = Effect.Effect<A & { readonly txid: number }, Failure>;
 
+/** Jev's reading of a new value against a member's own (see `FactJudgement`). */
+export type FactJudge = (input: {
+  field: string;
+  current: string;
+  proposed: string;
+  evidence: readonly string[];
+}) => Promise<FactJudgement>;
+
+/** Copies a person photo from context.dev into storage for a contact; null when it can't. */
+export type ContactPhotos = (contactId: string, source: string) => Promise<string | null>;
+
+export interface IntelDependencies {
+  readonly now?: () => Date;
+  readonly judge?: FactJudge | null;
+  readonly photos?: ContactPhotos | null;
+}
+
+export interface RecordedFact {
+  /** The stored fact, or null when it was not stored (`kept` or `too_unsure`). */
+  readonly id: string | null;
+  readonly outcome: FactOutcome;
+  readonly txid: number | null;
+}
+
 export interface IntelService {
   readonly setEnrichment: (actor: IntelActor, input: EnrichmentInput) => Write<object>;
-  /** Proposes a fact; older proposals for the same field are superseded. */
-  readonly proposeFact: (actor: IntelActor, input: FactInput) => Write<{ id: string }>;
+  /**
+   * Records a fact the agent found. It fills the contact at once unless it would replace a
+   * member's own value; older proposals for the same field are superseded.
+   */
+  readonly recordFact: (
+    actor: IntelActor,
+    input: FactInput,
+  ) => Effect.Effect<RecordedFact, Failure>;
   /** A member applies or dismisses a proposed fact. */
   readonly decideFact: (actor: IntelActor, id: string, status: string) => Write<object>;
   readonly writeBrief: (actor: IntelActor, input: BriefInput) => Write<object>;
@@ -344,7 +404,9 @@ const short = (value: string | null | undefined) =>
 const ref = (row: { companyId?: string | null; lastActivityAt: Date | null } | null) =>
   row ? { companyId: row.companyId ?? null, lastActivityAt: row.lastActivityAt } : null;
 
-export function makeIntel(store: IntelStore, now = () => new Date()): IntelService {
+export function makeIntel(store: IntelStore, deps: IntelDependencies = {}): IntelService {
+  const now = deps.now ?? (() => new Date());
+
   /** Membership, the write and the txid in one transaction. */
   const write = <A extends object>(
     actor: IntelActor,
@@ -448,12 +510,12 @@ export function makeIntel(store: IntelStore, now = () => new Date()): IntelServi
       });
     },
 
-    proposeFact: (actor, input) => {
+    recordFact: (actor, input) => {
       if (!isContactId(input.contactId)) {
         return Effect.fail(new NotFound({ message: "Contact not found" }));
       }
 
-      if (!isContactFactField(input.field)) return reject("That field can't take a suggestion");
+      if (!isContactFactField(input.field)) return reject("That field can't take a fact");
 
       const field: ContactFactField = input.field;
       const value = text(input.value, field.endsWith("_url") ? 500 : 200);
@@ -465,6 +527,10 @@ export function makeIntel(store: IntelStore, now = () => new Date()): IntelServi
       if (!factValue) return reject("Give the value");
 
       if (field.endsWith("_url") && !optionalUrl(factValue).ok) return reject("Give a full URL");
+
+      if (field === "image_url" && !PERSON_PHOTO_PATTERN.test(factValue)) {
+        return reject("A photo must be the avatar_url crm__lookup_person returned");
+      }
 
       if (!Number.isFinite(input.score) || input.score < 0 || input.score > 1) {
         return reject("Score is between 0 and 1");
@@ -479,35 +545,126 @@ export function makeIntel(store: IntelStore, now = () => new Date()): IntelServi
       if (!source.ok) return reject(source.message);
 
       const evidence = (input.evidence ?? []).slice(0, 10).map((line) => line.slice(0, 500));
-      const id = createId(ID_PREFIXES.contact_fact);
+      const contactId = input.contactId;
 
-      return write(actor, "propose fact", async (workspaceId, tx) => {
-        if (!(await tx.record("contact", workspaceId, input.contactId))) {
-          return fail(new NotFound({ message: "Contact not found" }));
+      /** The contact's value now, and whether the agent wrote it. */
+      const situation = async (workspaceId: string, tx: IntelTx) => {
+        const current = await tx.contactValue(workspaceId, contactId, field);
+        const applied = await tx.factValues(workspaceId, contactId, field, "applied");
+
+        // A stored photo's URL is ours, not the source's: any applied photo means the agent's.
+        const agentOwned =
+          current !== null &&
+          (field === "image_url"
+            ? applied.length > 0
+            : applied.some((earlier) => sameFactValue(earlier, current)));
+
+        return { current, agentOwned };
+      };
+
+      const read = write(actor, "read fact", async (workspaceId, tx) =>
+        (await tx.record("contact", workspaceId, contactId))
+          ? ok(await situation(workspaceId, tx))
+          : fail(new NotFound({ message: "Contact not found" })),
+      );
+
+      // Jev runs between two transactions, so no transaction waits on the network.
+      const judged = (seen: { current: string | null; agentOwned: boolean }) => {
+        const facts = { score: input.score, value: factValue, ...seen };
+
+        // Two photo URLs say nothing Jev could read.
+        if (!needsJudgement(facts) || !deps.judge || field === "image_url") {
+          return Effect.succeed(facts);
         }
 
-        const older = await tx.factIds(workspaceId, input.contactId, field, "proposed");
+        const judge = deps.judge;
 
-        for (const olderId of older) {
-          // oxlint-disable-next-line no-await-in-loop -- a field has one or two open proposals.
-          await tx.updateFact(workspaceId, olderId, { status: "superseded" });
-        }
+        return Effect.promise(() =>
+          judge({ field, current: seen.current ?? "", proposed: factValue, evidence }).catch(
+            (): FactJudgement => "unsure",
+          ),
+        ).pipe(Effect.map((judgement) => ({ ...facts, judgement })));
+      };
 
-        await tx.insertFact({
-          id,
-          workspaceId,
-          contactId: input.contactId,
-          field,
-          value: factValue,
-          score: input.score,
-          band,
-          evidence,
-          sourceUrl: source.value,
-          status: "proposed",
-        });
+      return read.pipe(
+        Effect.flatMap(judged),
+        Effect.flatMap((facts) => {
+          const decided = factOutcome(facts);
 
-        return ok({ id });
-      });
+          // A member's own photo stays: accepting a photo would store context.dev's URL, a hotlink.
+          const outcome = field === "image_url" && decided === "proposed" ? "kept" : decided;
+
+          if (outcome === "kept" || outcome === "too_unsure") {
+            return Effect.succeed<RecordedFact>({ id: null, outcome, txid: null });
+          }
+
+          // A photo is copied before the write; one that won't copy is not recorded.
+          const stored =
+            field === "image_url" && outcome === "applied"
+              ? Effect.promise(() =>
+                  deps.photos
+                    ? deps.photos(contactId, factValue).catch(() => null)
+                    : Promise.resolve(null),
+                )
+              : Effect.succeed(factValue);
+
+          return stored.pipe(
+            Effect.flatMap((columnValue) => {
+              if (columnValue === null) {
+                return Effect.succeed<RecordedFact>({ id: null, outcome: "kept", txid: null });
+              }
+
+              const id = createId(ID_PREFIXES.contact_fact);
+
+              return write(
+                actor,
+                "record fact",
+                async (
+                  workspaceId,
+                  tx,
+                ): Promise<Outcome<{ id: string | null; outcome: FactOutcome }>> => {
+                  const latest = await situation(workspaceId, tx);
+
+                  // A member who typed a value meanwhile gets the question instead.
+                  const changed = latest.current !== facts.current;
+
+                  const status =
+                    outcome === "applied" && changed && !latest.agentOwned ? "proposed" : outcome;
+
+                  if (status === "proposed" && field === "image_url")
+                    return ok({ id: null, outcome: "kept" });
+
+                  const older = await tx.factIds(workspaceId, contactId, field, "proposed");
+
+                  for (const olderId of older) {
+                    // oxlint-disable-next-line no-await-in-loop -- a field has one or two open proposals.
+                    await tx.updateFact(workspaceId, olderId, { status: "superseded" });
+                  }
+
+                  await tx.insertFact({
+                    id,
+                    workspaceId,
+                    contactId,
+                    field,
+                    value: factValue,
+                    score: input.score,
+                    band,
+                    evidence,
+                    sourceUrl: source.value,
+                    status,
+                  });
+
+                  if (status === "applied") {
+                    await tx.setContactValue(workspaceId, contactId, field, columnValue);
+                  }
+
+                  return ok({ id, outcome: status });
+                },
+              );
+            }),
+          );
+        }),
+      );
     },
 
     decideFact: (actor, id, status) => {
@@ -652,6 +809,17 @@ export function makeIntel(store: IntelStore, now = () => new Date()): IntelServi
   };
 }
 
+/** The Prisma field of each fact column. */
+const CONTACT_COLUMNS = {
+  title: "title",
+  image_url: "imageUrl",
+  seniority: "seniority",
+  function: "function",
+  linkedin_url: "linkedinUrl",
+  twitter_url: "twitterUrl",
+  github_url: "githubUrl",
+} as const satisfies Record<ContactFactField, string>;
+
 function intelTx(tx: DbTx): IntelTx {
   const orm = tx.orm.public;
 
@@ -701,6 +869,21 @@ function intelTx(tx: DbTx): IntelTx {
       (
         await orm.ContactFact.where({ workspaceId, contactId, field, status }).select("id").all()
       ).map((row) => row.id),
+    factValues: async (workspaceId, contactId, field, status) =>
+      (
+        await orm.ContactFact.where({ workspaceId, contactId, field, status }).select("value").all()
+      ).map((row) => row.value),
+    contactValue: async (workspaceId, contactId, field) => {
+      const row = await orm.Contact.where({ id: contactId, workspaceId }).first();
+
+      return row ? row[CONTACT_COLUMNS[field]]?.trim() || null : null;
+    },
+    setContactValue: async (workspaceId, contactId, field, value) => {
+      await orm.Contact.where({ id: contactId, workspaceId }).update({
+        [CONTACT_COLUMNS[field]]: value,
+        updatedAt: new Date(),
+      });
+    },
     insertFact: async (row) => {
       const now = new Date();
 
@@ -755,7 +938,13 @@ export class Intel extends Context.Service<Intel, IntelService>()("@crm/api/serv
   static readonly layer = Layer.effect(
     Intel,
     Effect.gen(function* () {
-      return makeIntel(prismaIntelStore(yield* Database));
+      const config = yield* AppConfig;
+      const images = yield* Images;
+
+      return makeIntel(prismaIntelStore(yield* Database), {
+        judge: Option.isSome(config.aiGatewayApiKey) ? jevFactJudge(gatewayJev()) : null,
+        photos: (contactId, source) => images.contactPhoto(contactId, source),
+      });
     }),
-  ).pipe(Layer.provide(Database.layer));
+  ).pipe(Layer.provide([Database.layer, Images.layer]));
 }

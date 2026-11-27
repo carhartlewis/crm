@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createId } from "@crm/core/ids";
 import { Cause, Effect, Exit, Option, References } from "effect";
-import { type IntelActor, makeIntel } from "./Intel.ts";
+import { type FactJudge, type IntelActor, makeIntel } from "./Intel.ts";
 import { createMemoryIntelStore } from "./intel-store-memory.ts";
 import { intelTools } from "./intel-tools.ts";
 
@@ -9,7 +9,9 @@ const alice: IntelActor = { userId: "user_alice", activeWorkspaceId: "ws_a" };
 const bob: IntelActor = { userId: "user_bob", activeWorkspaceId: "ws_b" };
 const now = new Date("2026-11-26T12:00:00Z");
 
-function setup() {
+const PHOTO = "https://media.brand.dev/pfp/0f8fad5b-d9cb-469f-a165-70867728950e.png";
+
+function setup(judge: FactJudge | null = null) {
   const memory = createMemoryIntelStore(["ws_a:user_alice", "ws_b:user_bob"]);
   const companyId = createId("com");
   const contactId = createId("ctc");
@@ -19,7 +21,14 @@ function setup() {
   memory.seed("contact", { id: contactId, workspaceId: "ws_a", companyId });
   memory.seed("deal", { id: dealId, workspaceId: "ws_a", companyId });
 
-  return { ...memory, intel: makeIntel(memory.store, () => now), companyId, contactId, dealId };
+  const intel = makeIntel(memory.store, {
+    now: () => now,
+    judge,
+    photos: async (id, source) =>
+      source === PHOTO ? `https://store.test/contacts/${id}/photo` : null,
+  });
+
+  return { ...memory, intel, companyId, contactId, dealId };
 }
 
 /** The tag of the failure, or "Success". */
@@ -72,23 +81,90 @@ describe("enrichment status", () => {
 });
 
 describe("contact facts", () => {
-  test("a new proposal supersedes the open one for the same field; bands follow the score", async () => {
+  const sourced = { field: "title", sourceUrl: "https://example.com" };
+
+  test("a sure fact fills an empty field at once; an unsure one is not stored", async () => {
     const env = setup();
-    const fact = { contactId: env.contactId, field: "title", sourceUrl: "https://example.com" };
 
-    const first = await run(
-      env.intel.proposeFact(alice, { ...fact, value: "VP Engineering", score: 0.7 }),
+    const saved = await run(
+      env.intel.recordFact(alice, {
+        contactId: env.contactId,
+        ...sourced,
+        value: "CTO",
+        score: 0.9,
+      }),
     );
 
-    const second = await run(
-      env.intel.proposeFact(alice, { ...fact, value: "CTO", score: 0.9, evidence: ["Bio"] }),
+    expect(saved.outcome).toBe("applied");
+    expect(env.record("contact", env.contactId)?.values?.["title"]).toBe("CTO");
+    expect(env.facts()[0]).toMatchObject({ status: "applied", band: "verified" });
+
+    const unsure = await run(
+      env.intel.recordFact(alice, {
+        contactId: env.contactId,
+        ...sourced,
+        value: "CEO",
+        score: 0.4,
+      }),
     );
 
-    const facts = new Map(env.facts().map((row) => [row.id, row]));
+    expect(unsure).toMatchObject({ id: null, outcome: "too_unsure" });
+    expect(env.record("contact", env.contactId)?.values?.["title"]).toBe("CTO");
+  });
 
-    expect(facts.get(first.id)?.status).toBe("superseded");
-    expect(facts.get(first.id)?.band).toBe("probable");
-    expect(facts.get(second.id)).toMatchObject({ status: "proposed", band: "verified" });
+  test("newer research replaces what the agent wrote", async () => {
+    const env = setup();
+    const fact = { contactId: env.contactId, ...sourced };
+
+    await run(env.intel.recordFact(alice, { ...fact, value: "VP Engineering", score: 0.7 }));
+    await run(env.intel.recordFact(alice, { ...fact, value: "CTO", score: 0.8 }));
+
+    expect(env.record("contact", env.contactId)?.values?.["title"]).toBe("CTO");
+  });
+
+  test("a member's own value stays unless Jev reads a real change", async () => {
+    const asked: string[] = [];
+
+    const judge: FactJudge = async ({ proposed }) => {
+      asked.push(proposed);
+
+      return proposed === "VP of Engineering" ? "same" : proposed === "CTO" ? "update" : "unsure";
+    };
+
+    const env = setup(judge);
+    const fact = { contactId: env.contactId, ...sourced, score: 0.95 };
+
+    env.seed("contact", { id: env.contactId, workspaceId: "ws_a", values: { title: "VP Eng" } });
+
+    expect(
+      (await run(env.intel.recordFact(alice, { ...fact, value: "VP of Engineering" }))).outcome,
+    ).toBe("kept");
+    expect((await run(env.intel.recordFact(alice, { ...fact, value: "Founder" }))).outcome).toBe(
+      "proposed",
+    );
+    expect(env.record("contact", env.contactId)?.values?.["title"]).toBe("VP Eng");
+
+    expect((await run(env.intel.recordFact(alice, { ...fact, value: "CTO" }))).outcome).toBe(
+      "applied",
+    );
+    expect(env.record("contact", env.contactId)?.values?.["title"]).toBe("CTO");
+    expect(asked).toEqual(["VP of Engineering", "Founder", "CTO"]);
+    // The newer fact superseded the open question.
+    expect(env.facts().find((row) => row.value === "Founder")?.status).toBe("superseded");
+  });
+
+  test("a photo is copied into storage; other hosts are refused", async () => {
+    const env = setup();
+    const fact = { contactId: env.contactId, field: "image_url", score: 0.92 };
+
+    await run(env.intel.recordFact(alice, { ...fact, value: PHOTO }));
+
+    expect(env.record("contact", env.contactId)?.values?.["image_url"]).toBe(
+      `https://store.test/contacts/${env.contactId}/photo`,
+    );
+    expect(
+      await outcome(env.intel.recordFact(alice, { ...fact, value: "https://evil.test/a.png" })),
+    ).toBe("Invalid");
   });
 
   test("fields outside the list, bad scores and bad URLs are refused", async () => {
@@ -96,31 +172,39 @@ describe("contact facts", () => {
     const base = { contactId: env.contactId, score: 0.5 };
 
     expect(
-      await outcome(env.intel.proposeFact(alice, { ...base, field: "email", value: "x" })),
+      await outcome(env.intel.recordFact(alice, { ...base, field: "email", value: "x" })),
     ).toBe("Invalid");
     expect(
       await outcome(
-        env.intel.proposeFact(alice, { ...base, field: "title", value: "CTO", score: 2 }),
+        env.intel.recordFact(alice, { ...base, field: "title", value: "CTO", score: 2 }),
       ),
     ).toBe("Invalid");
     expect(
       await outcome(
-        env.intel.proposeFact(alice, { ...base, field: "linkedin_url", value: "not a url" }),
+        env.intel.recordFact(alice, { ...base, field: "linkedin_url", value: "not a url" }),
       ),
     ).toBe("Invalid");
   });
 
   test("a member applies or dismisses a proposal once", async () => {
-    const env = setup();
+    const env = setup(async () => "unsure");
+
+    env.seed("contact", {
+      id: env.contactId,
+      workspaceId: "ws_a",
+      values: { seniority: "Manager" },
+    });
 
     const { id } = await run(
-      env.intel.proposeFact(alice, {
+      env.intel.recordFact(alice, {
         contactId: env.contactId,
         field: "seniority",
         value: "Executive",
-        score: 0.8,
+        score: 0.95,
       }),
     );
+
+    if (!id) throw new Error("expected a proposal");
 
     expect(await outcome(env.intel.decideFact(bob, id, "applied"))).toBe("NotFound");
 
@@ -225,7 +309,7 @@ describe("agent tools", () => {
 
     expect(tools.map((item) => item.tool.name)).toEqual([
       "crm__set_enrichment_status",
-      "crm__propose_contact_fact",
+      "crm__record_contact_fact",
       "crm__write_contact_brief",
       "crm__log_email",
       "crm__log_meeting",

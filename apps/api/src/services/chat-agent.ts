@@ -137,3 +137,28 @@ export function eveChatAgent(agentUrl: URL, secret: string): ChatAgent {
     },
   };
 }
+
+/**
+ * Starts a session on the agent with its first message and returns at once; the turn runs on the
+ * agent. `operationId` makes a retry start it only once (eve's create-once key).
+ */
+export async function startAgentSession(
+  agentUrl: URL,
+  secret: string,
+  caller: AgentCaller,
+  message: string,
+  operationId: string,
+) {
+  const headers = new Headers(callerHeaders(secret, caller));
+
+  headers.set("content-type", "application/json");
+
+  const response = await fetch(new URL("/eve/v1/session", agentUrl.origin), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ message, operationId }),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!response.ok) throw new Error(`agent refused the session: ${response.status}`);
+}

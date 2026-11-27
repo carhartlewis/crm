@@ -22,6 +22,7 @@ import {
 import { type DealBase, dealBase } from "@crm/core/money";
 import { Context, Effect, Layer } from "effect";
 import { Database } from "./Database.ts";
+import { Research } from "./Research.ts";
 import { keepPrimaryContact } from "./primary-contact.ts";
 import { type DealBaseLookup, dealBaseLookup } from "./Money.ts";
 import { pgMoneyStore } from "./money-store.ts";
@@ -178,10 +179,17 @@ const baseFields = (base: DealBase): RecordPatch => ({
   fxRateAt: base.fxRateAt,
 });
 
+/** Work that follows a committed write, off the request path. */
+export interface RecordEvents {
+  /** A contact was added: the agent researches them in the background (ADR 0025). */
+  readonly contactCreated?: (actor: Actor, contactId: string) => void;
+}
+
 export function makeRecords(
   store: RecordStore,
   now = () => new Date(),
   baseFor: DealBaseLookup = reportingOnly,
+  events: RecordEvents = {},
 ): RecordsService {
   const write = writer(store);
 
@@ -235,7 +243,7 @@ export function makeRecords(
         });
 
         return done;
-      });
+      }).pipe(Effect.tap(() => Effect.sync(() => events.contactCreated?.(actor, input.id))));
     },
 
     update: (actor, id, input) => {
@@ -617,8 +625,11 @@ export class Records extends Context.Service<Records, RecordsService>()(
     Records,
     Effect.gen(function* () {
       const rates = dealBaseLookup(pgMoneyStore(yield* Postgres));
+      const research = yield* Research;
 
-      return makeRecords(prismaRecordStore(yield* Database), undefined, rates);
+      return makeRecords(prismaRecordStore(yield* Database), undefined, rates, {
+        contactCreated: (actor, id) => research.start(actor, "contact", id),
+      });
     }),
-  ).pipe(Layer.provide([Database.layer, Postgres.layer]));
+  ).pipe(Layer.provide([Database.layer, Postgres.layer, Research.layer]));
 }

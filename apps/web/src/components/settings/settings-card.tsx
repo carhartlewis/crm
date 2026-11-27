@@ -1,5 +1,6 @@
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -14,6 +15,7 @@ export function SettingsCard({
   description,
   hint,
   action,
+  headerAction,
   children,
 }: {
   title: string;
@@ -21,6 +23,8 @@ export function SettingsCard({
   hint?: string;
   /** Usually the card's Save button. */
   action?: ReactNode;
+  /** A control beside the title, such as a list's Add button. */
+  headerAction?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -28,6 +32,7 @@ export function SettingsCard({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
+        {headerAction ? <CardAction>{headerAction}</CardAction> : null}
       </CardHeader>
       <CardContent>{children}</CardContent>
       {hint || action ? (

@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { activityMetaLine, bandFor, readBriefSections, relationship } from "./intel.ts";
+import {
+  activityMetaLine,
+  bandFor,
+  readBriefSections,
+  relationship,
+  factOutcome,
+  needsJudgement,
+  sameFactValue,
+} from "./intel.ts";
 
 describe("contact intel rules", () => {
   test("bands follow the score", () => {
@@ -75,5 +83,33 @@ describe("contact intel rules", () => {
       meetings: 1,
       nextMeeting: { at: "2026-12-11T15:00:00.000Z", subject: "Rollout checkpoint" },
     });
+  });
+});
+
+describe("factOutcome", () => {
+  const fact = { score: 0.8, value: "VP of Engineering", current: null, agentOwned: false };
+
+  test("fills an empty field, confirms the same value, and replaces the agent's own", () => {
+    expect(factOutcome(fact)).toBe("applied");
+    expect(factOutcome({ ...fact, current: "vp of engineering " })).toBe("applied");
+    expect(factOutcome({ ...fact, current: "Engineer", agentOwned: true })).toBe("applied");
+  });
+
+  test("stores nothing the agent is unsure of", () => {
+    expect(factOutcome({ ...fact, score: 0.4 })).toBe("too_unsure");
+  });
+
+  test("keeps a member's value unless Jev reads a real update and the agent is very sure", () => {
+    const member = { ...fact, current: "VP Eng" };
+
+    expect(needsJudgement(member)).toBe(true);
+    expect(factOutcome({ ...member, judgement: "same", score: 0.95 })).toBe("kept");
+    expect(factOutcome({ ...member, judgement: "update" })).toBe("kept");
+    expect(factOutcome({ ...member, judgement: "update", score: 0.95 })).toBe("applied");
+    expect(factOutcome({ ...member, judgement: "unsure", score: 0.95 })).toBe("proposed");
+  });
+
+  test("compares links without scheme, www or a final slash", () => {
+    expect(sameFactValue("https://www.linkedin.com/in/ada/", "linkedin.com/in/ada")).toBe(true);
   });
 });

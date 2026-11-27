@@ -156,6 +156,7 @@ describe("CRM tools", () => {
           lookup: async (query) =>
             "domain" in query ? { ...EMPTY_PROFILE, domain: query.domain, name: "Acme" } : null,
           readPage: async (url) => `# Page at ${url}`,
+          findPerson: async () => null,
         },
       },
       caller,

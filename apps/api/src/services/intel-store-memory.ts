@@ -12,6 +12,8 @@ export interface FakeRecord {
   readonly enrichmentStatus?: string;
   readonly enrichedAt?: Date | null;
   readonly enrichmentError?: string | null;
+  /** A contact's fact columns (`title`, `image_url` …), by column name. */
+  readonly values?: Readonly<Record<string, string | null>>;
 }
 
 export interface FakeActivity {
@@ -119,6 +121,27 @@ export function createMemoryIntelStore(members: Iterable<string>) {
               ? [fact.id]
               : [],
           ),
+        factValues: async (workspaceId, contactId, field, status) =>
+          [...draft.facts.values()].flatMap((fact) =>
+            fact.workspaceId === workspaceId &&
+            fact.contactId === contactId &&
+            fact.field === field &&
+            fact.status === status
+              ? [fact.value]
+              : [],
+          ),
+        contactValue: async (workspaceId, contactId, field) =>
+          inWorkspace("contact", workspaceId, contactId)?.values?.[field]?.trim() || null,
+        setContactValue: async (workspaceId, contactId, field, value) => {
+          const row = inWorkspace("contact", workspaceId, contactId);
+
+          if (row) {
+            draft.records.contact.set(contactId, {
+              ...row,
+              values: { ...row.values, [field]: value },
+            });
+          }
+        },
         insertFact: async (row) => {
           draft.facts.set(row.id, row);
         },

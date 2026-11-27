@@ -26,9 +26,10 @@ export function isRecordOfKind(kind: ChatRecordKind, id: string) {
 
 export const isContactFactId = (value: string) => isRecordId(ID_PREFIXES.contact_fact, value);
 
-/** The contact columns the agent may propose a value for, and how the sheet labels them. */
+/** The contact columns the agent may record a value for, and how the sheet labels them. */
 export const CONTACT_FACT_FIELDS = [
   { column: "title", label: "Title" },
+  { column: "image_url", label: "Photo" },
   { column: "seniority", label: "Seniority" },
   { column: "function", label: "Function" },
   { column: "linkedin_url", label: "LinkedIn" },
@@ -69,12 +70,85 @@ export const FACT_BAND_LABELS: Record<FactBand, string> = {
 };
 
 /**
- * A fact's life: the agent proposes it; a member applies (the contact column takes the value) or
- * dismisses it; a newer proposal for the same field supersedes it.
+ * A fact's life: the agent records it, and it is applied at once (the contact column takes the
+ * value) unless it would replace a member's own value; then it waits as `proposed` until a member
+ * applies or dismisses it. A newer proposal for the same field supersedes it.
  */
 export const FACT_STATUSES = ["proposed", "applied", "dismissed", "superseded"] as const;
 
 export type FactStatus = (typeof FACT_STATUSES)[number];
+
+/** How sure the agent must be before a fact changes a contact without asking. */
+export const AUTO_APPLY_SCORE = 0.6;
+
+/** How sure it must be before a fact may replace a member's own value (with Jev's agreement). */
+export const REPLACE_SCORE = 0.9;
+
+/**
+ * Jev's reading of a new value against a member's own: `same` thing in other words (VP Eng and
+ * VP of Engineering), a real `update` (a new job), or `unsure`.
+ */
+export type FactJudgement = "same" | "update" | "unsure";
+
+/**
+ * What happens to a fact the agent records: `applied` to the contact, `proposed` for a member to
+ * decide (rare), `kept` (the member's value stays and the fact is not stored), or `too_unsure`
+ * (not stored).
+ */
+export type FactOutcome = "applied" | "proposed" | "kept" | "too_unsure";
+
+/** One way of writing a value for comparison: case, spaces, scheme, `www.` and a final `/`. */
+function comparable(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\/(www\.)?/, "")
+    .replace(/\/+$/, "")
+    .replace(/\s+/g, " ");
+}
+
+export function sameFactValue(left: string, right: string) {
+  return comparable(left) === comparable(right);
+}
+
+export interface FactSituation {
+  readonly score: number;
+  readonly value: string;
+  /** The contact's value for the field now. */
+  readonly current: string | null;
+  /** The current value came from the agent (an applied fact), so newer research may replace it. */
+  readonly agentOwned: boolean;
+  /** Jev's reading, asked only when the fact would replace a member's value. */
+  readonly judgement?: FactJudgement | null | undefined;
+}
+
+/** Whether a fact replaces a member's value, so Jev should judge it before `factOutcome`. */
+export function needsJudgement(situation: Omit<FactSituation, "judgement">) {
+  return (
+    situation.score >= AUTO_APPLY_SCORE &&
+    Boolean(situation.current?.trim()) &&
+    !situation.agentOwned &&
+    !sameFactValue(situation.current ?? "", situation.value)
+  );
+}
+
+/**
+ * The agent fills contacts without asking (ADR 0025): a sure fact fills an empty field, confirms
+ * the same value, or replaces what the agent wrote before. A member's own value stays unless Jev
+ * reads the fact as a real update and the agent is very sure; only a very sure fact that Jev can't
+ * place waits for a member.
+ */
+export function factOutcome(situation: FactSituation): FactOutcome {
+  if (situation.score < AUTO_APPLY_SCORE) return "too_unsure";
+
+  if (!needsJudgement(situation)) return "applied";
+
+  if (situation.judgement === "same") return "kept";
+
+  if (situation.score < REPLACE_SCORE) return "kept";
+
+  return situation.judgement === "update" ? "applied" : "proposed";
+}
 
 /** The decisions a member makes on a proposed fact. */
 export const FACT_DECISIONS = ["applied", "dismissed"] as const;

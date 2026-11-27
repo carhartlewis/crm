@@ -59,7 +59,7 @@ export const researchCompanyPrompt = (name: string): AgentPrompt => ({
 /** Re-enrich on the contact sheet: the agent proposes facts and writes their background. */
 export const enrichContactPrompt = (name: string): AgentPrompt => ({
   title: `Re-enrich ${name}`,
-  text: "Re-enrich this contact: find their title, seniority, function, LinkedIn, X and GitHub, where they are based and their career so far. Propose each value as a suggestion for me to accept, and write their background. Mark the research as running while you work, then complete.",
+  text: "Re-enrich this contact: find their title, seniority, function, LinkedIn, X and GitHub, where they are based and their career so far. Save each value you are sure of, including their photo, and write their background. Mark the research as running while you work, then complete.",
 });
 
 /** Sync email & calendar from a record's Activity tab. */

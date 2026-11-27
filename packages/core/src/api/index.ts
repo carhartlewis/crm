@@ -952,6 +952,12 @@ export class FieldsApi extends HttpApiGroup.make("fields")
       success: TxId,
       error: FieldErrors,
     }),
+    /** "Fill the rest": the agent fills the field on every record without a value (ADR 0025). */
+    HttpApiEndpoint.post("fill", "/:id/fill", {
+      params: { id: Schema.String },
+      success: Schema.Struct({ queued: Schema.Boolean }),
+      error: FieldErrors,
+    }),
   )
   .middleware(Authentication)
   .prefix("/fields") {}

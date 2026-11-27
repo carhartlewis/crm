@@ -96,9 +96,63 @@ export type BrandQuery =
 export interface WebReader {
   /** `POST /brand/retrieve` (10 credits, free when no brand is found). Null when none is found. */
   readonly lookup: (query: BrandQuery) => Promise<Omit<BrandResearch, "homepage"> | null>;
+  /**
+   * `POST /people/enrich` (20 credits per match, beta): the best candidate for a person, with
+   * context.dev's identity-match score. Null when it finds none or the clues aren't enough.
+   */
+  readonly findPerson: (query: PersonQuery) => Promise<PersonMatch | null>;
   /** `GET /web/scrape/markdown` (1 credit): the page's main content, cut at `maxChars`. */
   readonly readPage: (url: string, maxChars?: number) => Promise<string | null>;
 }
+
+/**
+ * What we know about a person. context.dev needs a work email, a profile URL, or a first and
+ * last name with a company.
+ */
+export interface PersonQuery {
+  readonly email?: string | null | undefined;
+  readonly profileUrls?: readonly string[] | undefined;
+  readonly firstName?: string | null | undefined;
+  readonly lastName?: string | null | undefined;
+  readonly companyName?: string | null | undefined;
+  readonly companyDomain?: string | null | undefined;
+}
+
+export interface PersonRole {
+  readonly title: string;
+  readonly company: string;
+  readonly domain: string | null;
+  /** "2019" or "2019–2022". */
+  readonly years: string | null;
+}
+
+/** context.dev's best candidate for a person. Weak candidates come back too: read `score`. */
+export interface PersonMatch {
+  /** How sure context.dev is that this is the person, from 0 to 100. */
+  readonly score: number;
+  readonly name: string | null;
+  readonly firstName: string | null;
+  readonly lastName: string | null;
+  readonly email: string | null;
+  /** A photo on context.dev's media host (`https://media.brand.dev/pfp/…`). */
+  readonly avatarUrl: string | null;
+  readonly bio: string | null;
+  readonly location: {
+    readonly display: string | null;
+    readonly city: string | null;
+    readonly region: string | null;
+    readonly country: string | null;
+    readonly countryCode: string | null;
+  } | null;
+  readonly socialUrls: readonly string[];
+  readonly websiteUrls: readonly string[];
+  /** Null when their current role is unknown or they have none. */
+  readonly currentRole: (PersonRole & { readonly since: string | null }) | null;
+  readonly experience: readonly PersonRole[];
+}
+
+/** The host context.dev serves person photos from; the only one the API copies photos from. */
+export const PERSON_PHOTO_PATTERN = /^https:\/\/media\.brand\.dev\/pfp\/[0-9a-f-]{36}(?:\.png)?$/;
 
 export interface CompanyResearcher {
   /**
@@ -198,6 +252,101 @@ function researchOf(domain: string, brand: Brand | null, homepage: string | null
   };
 }
 
+const PartialDate = z.object({ year: z.number() }).nullish();
+
+const Organization = z.object({ name: z.string(), domain: z.string().nullish() });
+
+const Role = z.object({
+  title: z.string(),
+  organization: Organization,
+  start_date: PartialDate,
+  end_date: PartialDate,
+});
+
+const Person = z.object({
+  name: z.object({ full: text, first: text, last: text }).partial().nullish(),
+  email: text,
+  avatar_url: text,
+  bio: text,
+  location: z
+    .object({ display: text, city: text, region: text, country: text, country_code: text })
+    .partial()
+    .nullish(),
+  social_urls: z.array(z.string()).nullish(),
+  website_urls: z.array(z.string()).nullish(),
+  current_role: Role.nullish().catch(null),
+  experience: z.array(Role.catch({ title: "", organization: { name: "" } })).nullish(),
+});
+
+const Enriched = z.object({
+  match: z.object({
+    status: z.string(),
+    score: z.number().nullish(),
+    person: Person.nullish(),
+  }),
+});
+
+type Role = z.infer<typeof Role>;
+
+const yearsOf = (role: Role) => {
+  const start = role.start_date?.year;
+  const end = role.end_date?.year;
+
+  if (!start) return end ? String(end) : null;
+
+  return end && end !== start ? `${start}–${end}` : String(start);
+};
+
+const roleOf = (role: Role): PersonRole => ({
+  title: role.title,
+  company: role.organization.name,
+  domain: role.organization.domain ?? null,
+  years: yearsOf(role),
+});
+
+/** `POST /people/enrich`'s body, as far as we send it. */
+interface PersonRequestBody {
+  email?: string;
+  social_urls?: string[];
+  name?: { first: string; last: string };
+  company?: PersonCompany;
+}
+
+interface PersonCompany {
+  name?: string;
+  domain?: string;
+}
+
+/** The request body for a person, or null when the clues aren't enough for context.dev. */
+export function personRequest(query: PersonQuery) {
+  const email = query.email?.trim() || null;
+  const urls = (query.profileUrls ?? []).filter((url) => url.startsWith("https://")).slice(0, 20);
+  const first = query.firstName?.trim() || null;
+  const last = query.lastName?.trim() || null;
+  const companyName = query.companyName?.trim().slice(0, 200) || null;
+  const companyDomain = query.companyDomain ? brandDomain(query.companyDomain) : null;
+  const named = first !== null && last !== null;
+
+  if (!email && urls.length === 0 && !(named && (companyName || companyDomain))) return null;
+
+  const body: PersonRequestBody = {};
+  const company: PersonCompany = {};
+
+  if (email) body.email = email;
+
+  if (urls.length > 0) body.social_urls = urls;
+
+  if (named) body.name = { first: first.slice(0, 100), last: last.slice(0, 100) };
+
+  if (companyName) company.name = companyName;
+
+  if (companyDomain) company.domain = companyDomain;
+
+  if (companyName || companyDomain) body.company = company;
+
+  return body;
+}
+
 export function createContextDev({
   apiKey,
   fetch: fetchImpl = fetch,
@@ -261,6 +410,58 @@ export function createContextDev({
       );
 
       return profile;
+    },
+
+    async findPerson(query) {
+      const body = personRequest(query);
+
+      if (!body) return null;
+
+      const result = await get(Enriched, `${BASE}/people/enrich`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+
+      const person = result?.match.status === "candidate" ? result.match.person : null;
+
+      if (!person || result?.match.score == null) return null;
+
+      const current = person.current_role ?? null;
+      const location = person.location ?? null;
+
+      return {
+        score: result.match.score,
+        name: person.name?.full ?? null,
+        firstName: person.name?.first ?? null,
+        lastName: person.name?.last ?? null,
+        email: person.email,
+        avatarUrl:
+          person.avatar_url && PERSON_PHOTO_PATTERN.test(person.avatar_url)
+            ? person.avatar_url
+            : null,
+        bio: person.bio,
+        location: location
+          ? {
+              display: location.display ?? null,
+              city: location.city ?? null,
+              region: location.region ?? null,
+              country: location.country ?? null,
+              countryCode: location.country_code ?? null,
+            }
+          : null,
+        socialUrls: person.social_urls ?? [],
+        websiteUrls: person.website_urls ?? [],
+        currentRole: current
+          ? {
+              ...roleOf(current),
+              since: current.start_date ? String(current.start_date.year) : null,
+            }
+          : null,
+        experience: (person.experience ?? [])
+          .filter((role) => role.title && role.organization.name)
+          .slice(0, 8)
+          .map(roleOf),
+      };
     },
 
     async readPage(url, maxChars = 40_000) {

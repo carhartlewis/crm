@@ -34,6 +34,12 @@ import { type Actor, done, type Outcome, run, type TxId } from "./record-writes.
 
 type Write<E = never> = Effect.Effect<TxId, NoActiveWorkspace | Invalid | E>;
 
+export interface FillTarget {
+  readonly id: string;
+  readonly entity: string;
+  readonly label: string;
+}
+
 export interface CreateFieldInput {
   readonly id: string;
   readonly entity: string;
@@ -114,6 +120,11 @@ export interface FieldsService {
     ids: readonly string[],
   ) => Write<NotFound>;
   readonly putValue: (actor: Actor, input: PutValueInput) => Write<NotFound>;
+  /** The live, agent-filled field a member asked to fill on every record ("Fill the rest"). */
+  readonly fillTarget: (
+    actor: Actor,
+    fieldId: string,
+  ) => Effect.Effect<FillTarget, NoActiveWorkspace | Invalid | NotFound>;
   readonly agentList: (
     actor: Actor,
     entity: string,
@@ -642,6 +653,30 @@ export function makeFields(store: FieldStore, now = () => new Date()): FieldsSer
     },
 
     putValue: (actor, input) => putValue(actor, input, "member"),
+
+    fillTarget: (actor, fieldId) => {
+      if (!isFieldId(fieldId)) return Effect.fail(new NotFound({ message: "Field not found" }));
+
+      let target: FillTarget | null = null;
+
+      return write<Invalid | NotFound>(actor, "fill field", async (workspaceId, tx) => {
+        const field = await tx.definition(workspaceId, fieldId);
+
+        if (!field || field.archivedAt) return missing("Field");
+
+        if (!field.agentFilled) return rejected("Let your agents fill this field first");
+
+        target = { id: field.id, entity: field.entity, label: field.label };
+
+        return done;
+      }).pipe(
+        Effect.flatMap(() =>
+          target
+            ? Effect.succeed(target)
+            : Effect.fail(new NotFound({ message: "Field not found" })),
+        ),
+      );
+    },
 
     agentList: (actor, entity, recordId) => {
       if (!isFieldEntity(entity)) return invalid("Pass company, contact or deal");

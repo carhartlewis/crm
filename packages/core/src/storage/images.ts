@@ -23,6 +23,11 @@ export interface ImageCache {
    * a PNG, JPEG, GIF, WebP or ICO image, or are larger than the limit.
    */
   uploadAvatar(userId: string, bytes: Uint8Array): Promise<string | null>;
+  /**
+   * Copies a CRM contact's photo from context.dev's person data. Only `https://media.brand.dev`
+   * sources are fetched: the URL comes through the agent, and the server must not fetch others.
+   */
+  contactPhoto(contactId: string, source: string): Promise<string | null>;
   /** Copies a website's favicon, shared by every workspace on that host. */
   favicon(website: string): Promise<string | null>;
   /**
@@ -71,6 +76,8 @@ export function createImageCache({
     isStored: (url) => storage.isStored(url),
     avatar: (userId, source) => copy(`users/${userId}/avatar`, avatarSource(source)),
     uploadAvatar: (userId, bytes) => store(`users/${userId}/avatar`, bytes),
+    contactPhoto: (contactId, source) =>
+      copy(`contacts/${contactId}/photo`, contactPhotoSource(source)),
     favicon: (website) => {
       const host = websiteHost(website);
 
@@ -107,6 +114,17 @@ export function avatarSource(image: string) {
   }
 
   return url.href;
+}
+
+/** context.dev's person photo host only (`PERSON_PHOTO_PATTERN` in `@crm/core/brand`). */
+export function contactPhotoSource(source: string) {
+  if (!URL.canParse(source)) return null;
+
+  const url = new URL(source);
+
+  return url.protocol === "https:" && url.hostname === "media.brand.dev" && !url.port
+    ? url.href
+    : null;
 }
 
 function websiteHost(website: string) {

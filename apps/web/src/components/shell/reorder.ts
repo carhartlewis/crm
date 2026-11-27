@@ -48,6 +48,11 @@ export interface ReorderOptions {
   onSlotChange: () => void;
   /** Dropped in a new place. The only point React hears about the drag. */
   onCommit: (from: number, to: number) => void;
+  /**
+   * A selector for the part of an item that starts a drag (a grip). Without it the whole item
+   * does; set it when items hold inputs, so selecting their text never drags.
+   */
+  handle?: string;
 }
 
 const ITEM = "[data-reorder-item]";
@@ -81,7 +86,7 @@ interface Drag {
  * the pointer through `transform`, siblings slide aside, and past either end it rubber-bands.
  * Escape cancels. A press that never moves stays a click.
  */
-export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
+export function reorderable({ onSlotChange, onCommit, handle }: ReorderOptions) {
   return (list: HTMLElement | null) => {
     if (!list) return;
 
@@ -217,9 +222,12 @@ export function reorderable({ onSlotChange, onCommit }: ReorderOptions) {
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0 || event.pointerType === "touch") return;
 
-      const item = event.target instanceof Element ? event.target.closest<HTMLElement>(ITEM) : null;
+      const target = event.target instanceof Element ? event.target : null;
+      const item = target?.closest<HTMLElement>(ITEM) ?? null;
 
       if (item?.parentElement !== list) return;
+
+      if (handle && !target?.closest(handle)) return;
 
       settling?.();
       press = { pointerId: event.pointerId, startY: event.clientY, item };

@@ -22,6 +22,7 @@ import { createMemoryCompanyStore } from "../services/record-store-memory.ts";
 import { makeRecords, Records } from "../services/Records.ts";
 import { createMemoryFieldStore } from "../services/field-store-memory.ts";
 import { Fields, makeFields } from "../services/Fields.ts";
+import { Research } from "../services/Research.ts";
 import { Electric, makeElectric } from "../services/Electric.ts";
 import { createMemorySkillStore } from "../services/skill-store-memory.ts";
 import { makeSkills, Skills } from "../services/Skills.ts";
@@ -253,6 +254,7 @@ const app = HttpRouter.toWebHandler(
       FakeCompanies,
       FakeRecords,
       Layer.succeed(Fields, makeFields(createMemoryFieldStore({ members: [] }).store)),
+      Layer.succeed(Research, { start: () => {}, fill: async () => true }),
       FakeChats,
       Layer.succeed(Intel, makeIntel(createMemoryIntelStore([]).store)),
       Layer.succeed(CrmTools, { forCaller: () => [] }),

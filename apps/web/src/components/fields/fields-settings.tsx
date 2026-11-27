@@ -1,5 +1,4 @@
 import add16 from "@carbon/icons/es/add/16.js";
-import chevronRight16 from "@carbon/icons/es/chevron--right/16.js";
 import document16 from "@carbon/icons/es/document/16.js";
 import draggable16 from "@carbon/icons/es/draggable/16.js";
 import overflow16 from "@carbon/icons/es/overflow-menu--vertical/16.js";
@@ -17,11 +16,6 @@ import { createId, ID_PREFIXES } from "@crm/core/ids";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@crm/ui/components/collapsible";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -36,30 +30,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@crm/ui/components/dropdown-menu";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@crm/ui/components/empty";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { Tabs, TabsList, TabsTrigger } from "@crm/ui/components/tabs";
 import { useMutation } from "@tanstack/react-query";
 import { parseAsString, useQueryState } from "nuqs";
-import { type ReactNode, useCallback, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useState } from "react";
 import { toast } from "sonner";
-import { createField, type FieldDefinition, reorderFields, saveField } from "../../lib/fields.ts";
+import {
+  createField,
+  type FieldDefinition,
+  fillFieldMutation,
+  reorderFields,
+  saveField,
+} from "../../lib/fields.ts";
 import { haptic } from "../../lib/haptics.ts";
 import { moveItem } from "../../lib/pinned-order.ts";
+import { useCompanies, useContacts, useDeals } from "../records/use-crm.ts";
+import { SettingsCard } from "../settings/settings-card.tsx";
 import { SettingsPage } from "../settings/settings-page.tsx";
 import { reorderable } from "../shell/reorder.ts";
 import { FieldSheet } from "./field-sheet.tsx";
 import { useEntityFields, useFieldValues } from "./use-fields.ts";
 
 const AddIcon = carbonIcon(add16);
-const ChevronIcon = carbonIcon(chevronRight16);
 const DocumentIcon = carbonIcon(document16);
 const DragIcon = carbonIcon(draggable16);
 const MoreIcon = carbonIcon(overflow16);
@@ -69,21 +62,6 @@ export interface FieldsSettingsProps {
   readonly workspaceId: string;
   readonly entity: FieldEntity;
   readonly onEntity: (entity: FieldEntity) => void;
-}
-
-/** A group header row that opens and closes its list: label, then a count and a note. */
-function GroupToggle({ label, note }: { label: string; note: string }) {
-  return (
-    <div className="border-b py-3">
-      <CollapsibleTrigger className="group/toggle flex w-full items-center text-left">
-        <span className="flex min-w-0 flex-1 items-center gap-2">
-          <ChevronIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]/toggle:rotate-90" />
-          <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
-          <span className="shrink-0 text-muted-foreground">{note}</span>
-        </span>
-      </CollapsibleTrigger>
-    </div>
-  );
 }
 
 /** What a custom field's second line says: its brief, or how it is filled and where it shows. */
@@ -109,6 +87,8 @@ export function FieldsSettings({ workspaceId, entity, onEntity }: FieldsSettings
   const values = useFieldValues(workspaceId);
   const [editing, setEditing] = useQueryState("field", parseAsString);
   const [archiving, setArchiving] = useState<FieldDefinition | null>(null);
+
+  const recordCount = useRecordCount(workspaceId, entity);
 
   const filledCount = (fieldId: string) => values.filter((row) => row.field_id === fieldId).length;
 
@@ -141,6 +121,15 @@ export function FieldsSettings({ workspaceId, entity, onEntity }: FieldsSettings
   const archive = useMutation({
     mutationFn: ({ id, archived: on }: { id: string; archived: boolean }) =>
       saveField(workspaceId, id, { archived_at: on ? new Date().toISOString() : null }),
+    onError: (error) => toast.error(error.message),
+  });
+
+  const fill = useMutation({
+    ...fillFieldMutation,
+    onSuccess: (queued) =>
+      queued
+        ? toast.success("Your agents are filling the rest. Values appear as they find them.")
+        : toast.error("Your agents are busy with research. Try again in a few minutes."),
     onError: (error) => toast.error(error.message),
   });
 
@@ -200,192 +189,184 @@ export function FieldsSettings({ workspaceId, entity, onEntity }: FieldsSettings
     </Button>
   );
 
+  const rowKeys = (index: number) => (event: KeyboardEvent) => {
+    if (!event.altKey) return;
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      move(index, index - 1);
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      move(index, index + 1);
+    }
+  };
+
   return (
     <SettingsPage actions={actions} title="Fields">
-      <div className="flex flex-col gap-4">
-        <Tabs onValueChange={(next: FieldEntity) => onEntity(next)} value={entity}>
-          <TabsList aria-label="Record kind">
-            {FIELD_ENTITIES.map((kind) => (
-              <TabsTrigger key={kind} value={kind}>
-                {ENTITY_NAMES[kind].title}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <p className="text-muted-foreground text-pretty">
-          This shapes every {names.one} in your CRM. Order here is the order on the sheet.
-        </p>
-      </div>
+      <Tabs onValueChange={(next: FieldEntity) => onEntity(next)} value={entity}>
+        <TabsList aria-label="Record kind">
+          {FIELD_ENTITIES.map((kind) => (
+            <TabsTrigger key={kind} value={kind}>
+              {ENTITY_NAMES[kind].title}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
-      <div className="flex flex-col">
-        <Collapsible>
-          <GroupToggle
-            label="Standard fields"
-            note={`${STANDARD_FIELDS[entity].length} · built in`}
-          />
-          <CollapsibleContent>
-            <ul className="flex flex-col border-b py-2">
-              {STANDARD_FIELDS[entity].map((label) => (
-                <li className="truncate py-1.5 pl-6 text-muted-foreground" key={label}>
-                  {label}
-                </li>
-              ))}
-            </ul>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {suggested.length > 0 ? (
-          <Collapsible defaultOpen={fields.length === 0}>
-            <GroupToggle label="Suggested fields" note={`${suggested.length} · one click to add`} />
-            <CollapsibleContent>
-              <ul className="flex flex-col border-b py-1">
-                {suggested.map((template) => (
-                  <li className="flex min-w-0 items-center gap-3 py-1.5 pl-6" key={template.label}>
-                    <span className="min-w-0 flex-1 truncate">{template.label}</span>
-                    <TypeBadge>{fieldTypeLabel(template.type)}</TypeBadge>
-                    <Button
-                      disabled={create.isPending}
-                      onClick={() => create.mutate(template)}
-                      size="xs"
-                      variant="outline"
-                    >
-                      Add
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </CollapsibleContent>
-          </Collapsible>
-        ) : null}
-
+      <SettingsCard
+        description={`Shown on every ${names.one}'s sheet in this order. Drag to reorder.`}
+        headerAction={
+          fields.length > 0 ? (
+            <Button onClick={() => void setEditing("new")} size="sm" variant="outline">
+              <AddIcon />
+              New field
+            </Button>
+          ) : undefined
+        }
+        title="Custom fields"
+      >
         {fields.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <DocumentIcon />
-              </EmptyMedia>
-              <EmptyTitle>No custom fields yet</EmptyTitle>
-              <EmptyDescription>
-                Create dynamic fields that your agents can research and pre-fill.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button onClick={() => void setEditing("new")}>
-                <AddIcon />
-                New field
-              </Button>
-            </EmptyContent>
-          </Empty>
+          <div className="flex min-w-0 items-center gap-3 rounded-lg border border-dashed px-3 py-3">
+            <DocumentIcon className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-muted-foreground">
+              No custom fields yet. Your agents research and fill the ones you add.
+            </span>
+            <Button onClick={() => void setEditing("new")} size="sm" variant="outline">
+              <AddIcon />
+              New field
+            </Button>
+          </div>
         ) : (
-          <section aria-label="Custom fields" className="flex flex-col">
-            <div className="flex items-center justify-between border-b py-3 text-muted-foreground text-xs uppercase tracking-wide select-none">
-              <span>Custom fields</span>
-              <span className="normal-case tracking-normal">Drag to order</span>
-            </div>
-            <div className="flex flex-col" ref={listRef}>
-              {fields.map((field, index) => (
-                <div
-                  className="group/row flex min-w-0 items-center gap-2 border-b bg-background py-2"
-                  data-field-id={field.id}
-                  data-reorder-item
-                  key={field.id}
+          <div className="-my-2 flex flex-col" ref={listRef}>
+            {fields.map((field, index) => (
+              <div
+                className="group/row flex min-w-0 items-center gap-3 border-b bg-card py-2 last:border-b-0"
+                data-field-id={field.id}
+                data-reorder-item
+                key={field.id}
+              >
+                <DragIcon
+                  aria-hidden
+                  className="size-4 shrink-0 cursor-grab text-muted-foreground"
+                />
+                <button
+                  className="flex min-w-0 flex-1 flex-col items-start text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  onClick={() => void setEditing(field.id)}
+                  onKeyDown={rowKeys(index)}
+                  type="button"
                 >
-                  <DragIcon
-                    aria-hidden
-                    className="size-4 shrink-0 cursor-grab text-muted-foreground"
-                  />
-                  <button
-                    className="flex min-w-0 flex-1 flex-col items-start text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                    onClick={() => void setEditing(field.id)}
-                    onKeyDown={(event) => {
-                      if (!event.altKey) return;
-
-                      if (event.key === "ArrowUp") {
-                        event.preventDefault();
-                        move(index, index - 1);
-                      }
-
-                      if (event.key === "ArrowDown") {
-                        event.preventDefault();
-                        move(index, index + 1);
-                      }
-                    }}
-                    type="button"
+                  <span className="w-full truncate">{field.label}</span>
+                  <span className="w-full truncate text-muted-foreground">
+                    {fieldNote(field, names.title)}
+                  </span>
+                </button>
+                <span className="shrink-0 text-muted-foreground tabular-nums">
+                  {`${filledCount(field.id)} of ${recordCount} filled`}
+                </span>
+                <TypeBadge>{fieldTypeLabel(field.type)}</TypeBadge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        aria-label={`Actions for ${field.label}`}
+                        size="icon-sm"
+                        variant="ghost"
+                      />
+                    }
                   >
-                    <span className="w-full truncate">{field.label}</span>
-                    <span className="w-full truncate text-muted-foreground">
-                      {fieldNote(field, names.title)}
-                    </span>
-                  </button>
-                  <TypeBadge>{fieldTypeLabel(field.type)}</TypeBadge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          aria-label={`Actions for ${field.label}`}
-                          size="icon-sm"
-                          variant="ghost"
-                        />
-                      }
+                    <MoreIcon />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {field.agent_filled && filledCount(field.id) < recordCount ? (
+                      <DropdownMenuItem
+                        disabled={fill.isPending}
+                        onClick={() => fill.mutate(field.id)}
+                      >
+                        Fill the rest
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem onClick={() => void setEditing(field.id)}>
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={index === 0} onClick={() => move(index, index - 1)}>
+                      Move up
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={index === fields.length - 1}
+                      onClick={() => move(index, index + 1)}
                     >
-                      <MoreIcon />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => void setEditing(field.id)}>
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={index === 0}
-                        onClick={() => move(index, index - 1)}
-                      >
-                        Move up
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={index === fields.length - 1}
-                        onClick={() => move(index, index + 1)}
-                      >
-                        Move down
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setArchiving(field)} variant="destructive">
-                        Archive
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))}
-            </div>
-          </section>
+                      Move down
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setArchiving(field)} variant="destructive">
+                      Archive
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+          </div>
         )}
+      </SettingsCard>
 
-        {archived.length > 0 ? (
-          <Collapsible>
-            <GroupToggle
-              label="Archived"
-              note={`${archived.length} · values kept, hidden everywhere`}
-            />
-            <CollapsibleContent>
-              <ul className="flex flex-col border-b py-1">
-                {archived.map((field) => (
-                  <li className="flex min-w-0 items-center gap-3 py-1.5 pl-6" key={field.id}>
-                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                      {field.label}
-                    </span>
-                    <TypeBadge>{fieldTypeLabel(field.type)}</TypeBadge>
-                    <Button
-                      onClick={() => archive.mutate({ id: field.id, archived: false })}
-                      size="xs"
-                      variant="outline"
-                    >
-                      Restore
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </CollapsibleContent>
-          </Collapsible>
-        ) : null}
-      </div>
+      {suggested.length > 0 ? (
+        <SettingsCard description="Common fields, ready for your agents to fill." title="Suggested">
+          <ul className="-my-2 flex flex-col">
+            {suggested.map((template) => (
+              <li
+                className="flex min-w-0 items-center gap-3 border-b py-2 last:border-b-0"
+                key={template.label}
+              >
+                <span className="min-w-0 flex-1 truncate">{template.label}</span>
+                <TypeBadge>{fieldTypeLabel(template.type)}</TypeBadge>
+                <Button
+                  disabled={create.isPending}
+                  onClick={() => create.mutate(template)}
+                  size="sm"
+                  variant="outline"
+                >
+                  Add
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </SettingsCard>
+      ) : null}
+
+      <SettingsCard description={`Every ${names.one} has these.`} title="Standard fields">
+        <div className="flex flex-wrap gap-1.5">
+          {STANDARD_FIELDS[entity].map((label) => (
+            <Badge key={label} variant="outline">
+              {label}
+            </Badge>
+          ))}
+        </div>
+      </SettingsCard>
+
+      {archived.length > 0 ? (
+        <SettingsCard description="Hidden everywhere. Their values are kept." title="Archived">
+          <ul className="-my-2 flex flex-col">
+            {archived.map((field) => (
+              <li
+                className="flex min-w-0 items-center gap-3 border-b py-2 last:border-b-0"
+                key={field.id}
+              >
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">{field.label}</span>
+                <TypeBadge>{fieldTypeLabel(field.type)}</TypeBadge>
+                <Button
+                  onClick={() => archive.mutate({ id: field.id, archived: false })}
+                  size="sm"
+                  variant="outline"
+                >
+                  Restore
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </SettingsCard>
+      ) : null}
 
       {editing ? (
         <FieldSheet
@@ -432,6 +413,16 @@ export function FieldsSettings({ workspaceId, entity, onEntity }: FieldsSettings
       </Dialog>
     </SettingsPage>
   );
+}
+
+/** How many live (unarchived) records of the kind the workspace has: the M of "N of M filled". */
+function useRecordCount(workspaceId: string, entity: FieldEntity) {
+  const { companies } = useCompanies(workspaceId);
+  const { contacts } = useContacts(workspaceId);
+  const { deals } = useDeals(workspaceId);
+  const rows = entity === "company" ? companies : entity === "contact" ? contacts : deals;
+
+  return rows.filter((row) => !row.archived_at).length;
 }
 
 /** A field type in a small mono chip, as the design shows it. */

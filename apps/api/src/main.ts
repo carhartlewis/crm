@@ -17,6 +17,7 @@ import { Money } from "./services/Money.ts";
 import { Records } from "./services/Records.ts";
 import { SavedViews } from "./services/SavedViews.ts";
 import { Skills } from "./services/Skills.ts";
+import { Research } from "./services/Research.ts";
 import { Tracking } from "./services/Tracking.ts";
 
 const Server = Layer.unwrap(
@@ -32,6 +33,7 @@ const Server = Layer.unwrap(
         Records.layer,
         Intel.layer,
         Fields.layer,
+        Research.layer,
         Chats.layer,
         CrmTools.layer,
         Electric.layer,

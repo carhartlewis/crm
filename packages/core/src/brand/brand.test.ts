@@ -142,3 +142,95 @@ describe("context.dev for the agent", () => {
     expect(await reader.readPage("https://acme.com/pricing", 9)).toBe("# Pricing\n\n[cut]");
   });
 });
+
+describe("context.dev people", () => {
+  const PHOTO = "https://media.brand.dev/pfp/0f8fad5b-d9cb-469f-a165-70867728950e.png";
+
+  test("finds a person from a work email and reads their profile", async () => {
+    const reader = createContextDev({
+      apiKey: "k",
+      fetch: async (url, init) => {
+        expect(url).toBe("https://api.context.dev/v1/people/enrich");
+        expect(JSON.parse(String(init.body))).toEqual({
+          email: "ada@engines.test",
+          company: { domain: "engines.test" },
+        });
+
+        return Response.json({
+          request_id: "r1",
+          match: {
+            status: "candidate",
+            score: 92,
+            person: {
+              name: { full: "Ada Lovelace", first: "Ada", last: "Lovelace" },
+              avatar_url: PHOTO,
+              location: { display: "London, UK", city: "London", country_code: "GB" },
+              social_urls: ["https://www.linkedin.com/in/ada/"],
+              current_role: {
+                title: "Head of Analysis",
+                organization: { name: "Engines", domain: "engines.test" },
+                start_date: { year: 2021 },
+              },
+              experience: [
+                {
+                  title: "Analyst",
+                  organization: { name: "Babbage & Co" },
+                  start_date: { year: 2015 },
+                  end_date: { year: 2021 },
+                },
+              ],
+            },
+          },
+        });
+      },
+    });
+
+    const person = await reader.findPerson({
+      email: "ada@engines.test",
+      companyDomain: "https://www.engines.test",
+    });
+
+    expect(person).toMatchObject({
+      score: 92,
+      name: "Ada Lovelace",
+      avatarUrl: PHOTO,
+      location: { city: "London", countryCode: "GB" },
+      socialUrls: ["https://www.linkedin.com/in/ada/"],
+      currentRole: { title: "Head of Analysis", company: "Engines", since: "2021" },
+      experience: [{ title: "Analyst", company: "Babbage & Co", years: "2015–2021" }],
+    });
+  });
+
+  test("drops photos from other hosts, and returns null when nothing matches", async () => {
+    const answers = [
+      {
+        match: {
+          status: "candidate",
+          score: 40,
+          person: { avatar_url: "https://evil.test/a.png" },
+        },
+      },
+      { match: { status: "not_found", score: null, person: null } },
+    ];
+
+    const reader = createContextDev({
+      apiKey: "k",
+      fetch: async () => Response.json(answers.shift()),
+    });
+
+    expect((await reader.findPerson({ email: "a@b.test" }))?.avatarUrl).toBeNull();
+    expect(await reader.findPerson({ email: "a@b.test" })).toBeNull();
+  });
+
+  test("refuses clues context.dev can't use, without calling it", async () => {
+    const reader = createContextDev({
+      apiKey: "k",
+      fetch: async () => {
+        throw new Error("no request expected");
+      },
+    });
+
+    expect(await reader.findPerson({ firstName: "Ada", lastName: "Lovelace" })).toBeNull();
+    expect(await reader.findPerson({ firstName: "Ada", companyName: "Engines" })).toBeNull();
+  });
+});

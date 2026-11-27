@@ -45,6 +45,7 @@ import { Fields } from "../services/Fields.ts";
 import { ChatFiles, Images } from "../services/Images.ts";
 import { Records } from "../services/Records.ts";
 import { Intel } from "../services/Intel.ts";
+import { Research } from "../services/Research.ts";
 import { type AgentResult, Memory } from "../services/Memory.ts";
 import { Skills } from "../services/Skills.ts";
 import { Money } from "../services/Money.ts";
@@ -208,6 +209,7 @@ const FieldsHandlers = HttpApiBuilder.group(
   "fields",
   Effect.fn(function* (handlers) {
     const fields = yield* Fields;
+    const research = yield* Research;
 
     return handlers
       .handle("create", ({ payload }) =>
@@ -232,6 +234,14 @@ const FieldsHandlers = HttpApiBuilder.group(
       )
       .handle("putValue", ({ payload }) =>
         Effect.flatMap(actor, (who) => fields.putValue(who, payload)),
+      )
+      .handle("fill", ({ params }) =>
+        Effect.flatMap(actor, (who) =>
+          fields.fillTarget(who, params.id).pipe(
+            Effect.flatMap((target) => Effect.promise(() => research.fill(who, target))),
+            Effect.map((queued) => ({ queued })),
+          ),
+        ),
       );
   }),
 );

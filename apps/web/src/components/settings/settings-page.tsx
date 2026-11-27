@@ -9,8 +9,9 @@ import type { ReactNode } from "react";
 import { WorkspacePageHeader } from "../shell/page-header.tsx";
 
 /**
- * A settings page: its title (and actions) in the title bar, then its content in the page column
- * every page shares, so the title and content start at the same x as on Companies.
+ * A settings page: its title (and actions) in the title bar, then its content. Forms read in a
+ * narrow centred column, and the title bar keeps to that column so title, actions and content
+ * line up; tables and card grids use the page column every page shares.
  */
 export function SettingsPage({
   title,
@@ -31,7 +32,10 @@ export function SettingsPage({
   children: ReactNode;
 }) {
   return (
-    <PageShell contained={fill || table} width={fill ? "full" : "standard"}>
+    <PageShell
+      contained={fill || table}
+      width={fill ? "full" : table || wide ? "standard" : "narrow"}
+    >
       <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>{title}</PageShellTitle>
@@ -45,7 +49,7 @@ export function SettingsPage({
               ? "flex min-h-0 w-full flex-1 animate-enter flex-col"
               : wide
                 ? "flex w-full animate-enter flex-col gap-6"
-                : "flex w-full max-w-2xl animate-enter flex-col gap-8"
+                : "flex w-full animate-enter flex-col gap-8"
           }
         >
           {children}
