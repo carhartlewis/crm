@@ -18,7 +18,13 @@ import { mutationOptions } from "@tanstack/react-query";
 import { createCollection } from "@tanstack/react-db";
 import { request } from "./api-fetch.ts";
 import { prewarmUsed } from "./chat-api.ts";
-import { isoTimestamp, perWorkspace, syncedWrite, type WriteBody } from "./sync-collections.ts";
+import {
+  checkedTxid,
+  isoTimestamp,
+  perWorkspace,
+  syncedWrite,
+  type WriteBody,
+} from "./sync-collections.ts";
 
 /**
  * Chats, spaces and the user's sidebar row, synced like CRM records (ADR 0012, ADR 0018). Loaded
@@ -112,7 +118,7 @@ function createChatsCollection(workspaceId: string) {
               });
 
               pending?.resolve(created.sessionId);
-              await collection.utils.awaitTxId(created.txid);
+              await collection.utils.awaitTxId(checkedTxid(created.txid));
             } catch (error) {
               pending?.reject(error);
               throw error;
@@ -241,7 +247,7 @@ async function saveRow(row: SidebarRow) {
     }),
   });
 
-  return response.txid;
+  return checkedTxid(response.txid);
 }
 
 function createSidebarCollection(workspaceId: string) {

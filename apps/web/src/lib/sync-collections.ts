@@ -25,6 +25,16 @@ export interface SyncedWrite {
 }
 
 /**
+ * A write's txid, checked at runtime (the JSON may lack it whatever its type says): without one,
+ * the stream would wait for a change that never comes.
+ */
+export function checkedTxid(txid: number) {
+  if (!Number.isSafeInteger(txid)) throw new Error("The server returned no transaction id");
+
+  return Number(txid);
+}
+
+/**
  * Calls a write endpoint. The caller awaits `txid` in the collection's stream, so the change
  * counts as saved only once the synced row shows it.
  */

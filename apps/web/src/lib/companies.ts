@@ -1,3 +1,4 @@
+import { COMPANIES_SYNC_PATH } from "@crm/core/api";
 import { createId, ID_PREFIXES } from "@crm/core/ids";
 import { mutationOptions } from "@tanstack/react-query";
 import { electricCollectionOptions } from "@tanstack/electric-db-collection";
@@ -36,7 +37,7 @@ function createCompaniesCollection(workspaceId: string) {
       // workspace is in the URL so each workspace's shape is cached separately.
       // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- TanStack DB's option name (an Electric "shape").
       shapeOptions: {
-        url: new URL("/api/shapes/companies", window.location.origin).href,
+        url: new URL(COMPANIES_SYNC_PATH, window.location.origin).href,
         params: { workspace: workspaceId },
         parser: { timestamptz: isoTimestamp },
       },
