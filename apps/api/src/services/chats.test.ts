@@ -291,6 +291,30 @@ describe("history", () => {
 
     expect((await run(down.history(alice, id))).events).toEqual([{ type: "turn.started" }]);
   });
+
+  test("a slow agent doesn't hold the page: the cached events load at the time limit", async () => {
+    const memory = createMemoryChatStore(["ws_a:alice"]);
+    const eve = fakeAgent();
+    const kv = createMemoryKv();
+    const chats = makeChats(memory.store, eve.agent, kv);
+    const id = chatId();
+
+    await run(chats.create(alice, { id, title: "Hi", spaceId: null }));
+    eve.append("ses_1", { type: "turn.started" });
+    await run(chats.history(alice, id));
+
+    const slow = makeChats(
+      memory.store,
+      { ...eve.agent, readEvents: () => new Promise(() => undefined) },
+      kv,
+      10,
+    );
+
+    expect(await run(slow.history(alice, id))).toEqual({
+      session: { sessionId: "ses_1", streamIndex: 1 },
+      events: [{ type: "turn.started" }],
+    });
+  });
 });
 
 describe("the agent proxy", () => {
