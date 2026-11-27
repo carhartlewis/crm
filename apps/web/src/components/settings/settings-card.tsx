@@ -33,7 +33,7 @@ export function SettingsCard({
       {hint || action ? (
         <CardFooter>
           <div className="flex w-full items-center justify-between gap-4">
-            <p className="text-muted-foreground">{hint}</p>
+            <p className="min-w-0 truncate text-muted-foreground">{hint}</p>
             {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
           </div>
         </CardFooter>

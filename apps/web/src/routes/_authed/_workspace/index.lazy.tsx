@@ -58,11 +58,11 @@ function Home() {
                 <Card className="h-full">
                   <CardHeader>
                     <CardTitle>
-                      <span className="flex items-center gap-2">
-                        <PageIcon className="text-muted-foreground" />
-                        {page.label}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <PageIcon className="shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 truncate">{page.label}</span>
                         {shortcut && (
-                          <KbdGroup className="ml-auto">
+                          <KbdGroup className="ml-auto shrink-0">
                             {shortcutKeys(shortcut).map((key) => (
                               <Kbd key={key}>{key}</Kbd>
                             ))}

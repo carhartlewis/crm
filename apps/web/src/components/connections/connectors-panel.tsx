@@ -86,7 +86,9 @@ export function ConnectorsPanel({
   );
 
   return (
-    <section className="flex flex-col gap-3">
+    // A container: the card grid follows the space the page leaves, not the viewport, which says
+    // nothing while the sidebar is open.
+    <section className="@container flex flex-col gap-3">
       <SectionHeading count={shown.length}>
         {view === "yours" ? "Connected" : "All connectors"}
       </SectionHeading>
@@ -97,7 +99,8 @@ export function ConnectorsPanel({
             : "Nothing connected yet. Connect an app from Discover."}
         </p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        // Two columns only where a card keeps its text on few lines.
+        <div className="grid gap-3 @2xl:grid-cols-2 @6xl:grid-cols-3">
           {shown.map((integration) => (
             <IntegrationCard
               key={integration.id}
@@ -184,26 +187,41 @@ function IntegrationCard({
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 className="flex items-center gap-1.5 text-base font-medium">
-            {integration.name}
+          <h2 className="flex min-w-0 items-center gap-1.5 text-base font-medium">
+            <span className="min-w-0 truncate">{integration.name}</span>
             {integration.custom ? null : (
-              <VerifiedIcon aria-label="Verified" className="text-muted-foreground" />
+              <VerifiedIcon aria-label="Verified" className="shrink-0 text-muted-foreground" />
             )}
           </h2>
-          <p className="text-muted-foreground">{integration.summary}</p>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
+          <p className="truncate text-muted-foreground">{integration.summary}</p>
+          {/* One line: the text truncates from the end as the card narrows. */}
+          <p className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-muted-foreground">
             {connection && access ? (
               <>
-                <Badge variant="secondary">
+                <Badge variant="secondary" className="shrink-0">
                   <CheckIcon />
                   Added
                 </Badge>
-                <span aria-hidden>·</span>
-                <span>{accessLabels[access]}</span>
-                <span aria-hidden>·</span>
+                <span aria-hidden className="shrink-0">
+                  ·
+                </span>
+                <span className="min-w-0 shrink truncate">{accessLabels[access]}</span>
+                <span aria-hidden className="shrink-0">
+                  ·
+                </span>
               </>
-            ) : null}
-            <span>by {integration.vendor}</span>
+            ) : (
+              // Same line shape as an added card, so a grid of both reads evenly.
+              <>
+                <Badge variant="outline" className="shrink-0">
+                  Not added
+                </Badge>
+                <span aria-hidden className="shrink-0">
+                  ·
+                </span>
+              </>
+            )}
+            <span className="min-w-0 truncate">by {integration.vendor}</span>
           </p>
         </div>
         {connection && access ? (

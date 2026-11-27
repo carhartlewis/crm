@@ -5,8 +5,11 @@ import { BorderBeam } from "@crm/ui/components/border-beam";
 /**
  * Every card carries the border beam. It runs while the card has pointer or keyboard
  * interest, so a page of cards stays calm and costs no paint at rest. Card text is chrome and
- * not selectable; mark CRM values inside a card (names, emails, amounts) `select-text`. `className` lays out the
- * card from the call site (it sits on the beam frame); the card fills it.
+ * not selectable; mark CRM values inside a card (names, emails, amounts) `select-text`. Card text
+ * stays on one line and truncates as the card narrows, never wrapping to new lines: the title and
+ * description slots do it, and custom lines in a card use `truncate` (with `min-w-0` in flex or
+ * grid). `className` lays out the card from the call site (it sits on the beam frame); the card
+ * fills it.
  */
 function Card({
   className,
@@ -75,7 +78,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+        "min-w-0 truncate font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
         className,
       )}
       {...props}
@@ -87,7 +90,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn("min-w-0 truncate text-sm text-muted-foreground", className)}
       {...props}
     />
   );
