@@ -40,5 +40,8 @@ export function createS3Storage(options: S3Options): Storage {
       await client.delete(`${PUBLIC_PREFIX}/${key}`);
     },
     isStored: (url) => url.startsWith(base),
+    keyOf: (url) => (url.startsWith(base) ? decodeURIComponent(url.slice(base.length)) : null),
+    // Development only: the API takes the bytes itself, with no body limit there.
+    clientUpload: async () => null,
   };
 }

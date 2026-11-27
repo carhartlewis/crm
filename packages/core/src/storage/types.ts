@@ -18,6 +18,23 @@ export interface Storage {
   delete(key: string): Promise<void>;
   /** True when this storage serves `url`, so callers don't copy their own objects again. */
   isStored(url: string): boolean;
+  /**
+   * A token for the browser to upload `key` itself, for files too large to pass through the API,
+   * limited to one type and size. Null when uploads go through the API (S3 in development).
+   */
+  clientUpload(key: string, limits: ClientUploadLimits): Promise<ClientUpload | null>;
+  /** The object's key, when `url` is one of this storage's objects. */
+  keyOf(url: string): string | null;
+}
+
+export interface ClientUploadLimits {
+  readonly contentType: string;
+  readonly maxBytes: number;
+}
+
+export interface ClientUpload {
+  readonly pathname: string;
+  readonly token: string;
 }
 
 /** Rejects keys that are empty, absolute, or that can climb out of their folder. */

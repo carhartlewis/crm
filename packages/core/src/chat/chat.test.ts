@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createId, ID_PREFIXES } from "../ids/index.ts";
 import {
+  CHAT_FILE_BYTES,
+  chatFileTypeOf,
   cleanGeneratedTitle,
   callDecision,
   callKind,
@@ -133,5 +135,17 @@ describe("generated chat titles", () => {
     expect(cleanGeneratedTitle("Title: Q4 pipeline")).toBe("Q4 pipeline");
     expect(cleanGeneratedTitle("   ")).toBeUndefined();
     expect(cleanGeneratedTitle("x".repeat(80))?.length).toBe(60);
+  });
+});
+
+describe("chat files", () => {
+  test("documents, sheets, images and text by extension; nothing else", () => {
+    expect(chatFileTypeOf("Series A Diligence.PDF")).toBe("application/pdf");
+    expect(chatFileTypeOf("Plan.xlsx")).toContain("spreadsheetml");
+    expect(chatFileTypeOf("notes.md")).toBe("text/plain");
+    expect(chatFileTypeOf("page.html")).toBeNull();
+    expect(chatFileTypeOf("logo.svg")).toBeNull();
+    expect(chatFileTypeOf("README")).toBeNull();
+    expect(CHAT_FILE_BYTES).toBe(30 * 1024 * 1024);
   });
 });

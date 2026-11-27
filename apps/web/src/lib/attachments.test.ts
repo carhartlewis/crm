@@ -1,43 +1,48 @@
 import { describe, expect, test } from "bun:test";
-import { checkImages, MAX_IMAGE_BYTES, messageContent } from "./attachments.ts";
+import { checkFiles, FILE_ACCEPT, MAX_FILES, messageContent } from "./attachments.ts";
 
-const file = (name: string, type: string, size = 10) =>
-  new File([new Uint8Array(size)], name, { type });
+const file = (name: string, size = 10) => new File([new Uint8Array(size)], name);
 
-const image = {
-  id: "1",
-  filename: "shot.png",
-  mediaType: "image/png",
-  dataUrl: "data:image/png;base64,AA==",
+const pdf = {
+  url: "https://x.public.blob.vercel-storage.com/chat-files/cht_1/a.pdf",
+  mediaType: "application/pdf",
+  filename: "Diligence.pdf",
 };
 
-describe("image attachments", () => {
-  test("only small PNG, JPEG, GIF and WebP images, at most four a message", () => {
-    const check = checkImages(
+describe("attachments", () => {
+  test("documents, sheets, images and text up to 30 MB; not pages or programs", () => {
+    const check = checkFiles(
       [
-        file("a.png", "image/png"),
-        file("b.pdf", "application/pdf"),
-        file("c.jpg", "image/jpeg", MAX_IMAGE_BYTES + 1),
-        file("d.webp", "image/webp"),
-        file("e.gif", "image/gif"),
+        file("Diligence.pdf"),
+        file("SAFE Amendment.docx"),
+        file("Plan.xlsx"),
+        file("page.html"),
+        file("huge.pdf", 30 * 1024 * 1024 + 1),
+        file("empty.csv", 0),
       ],
-      2,
+      0,
     );
 
-    expect(check.accepted.map((accepted) => accepted.name)).toEqual(["a.png", "d.webp"]);
-    expect(check.refused).toEqual([
-      "b.pdf isn't a PNG, JPEG, GIF or WebP",
-      "c.jpg is larger than 3 MB",
-      "At most 4 images",
+    expect(check.accepted.map((accepted) => accepted.name)).toEqual([
+      "Diligence.pdf",
+      "SAFE Amendment.docx",
+      "Plan.xlsx",
     ]);
+    expect(check.refused).toEqual([
+      "page.html isn't a file chats take",
+      "huge.pdf is larger than 30 MB",
+      "empty.csv is empty",
+    ]);
+    expect(checkFiles([file("a.png")], MAX_FILES).refused).toEqual([`At most ${MAX_FILES} files`]);
+    expect(FILE_ACCEPT).toContain(".xlsx");
   });
 
-  test("text alone stays text; with images, the text comes first", () => {
+  test("text alone stays text; with files, the text comes first and files go by URL", () => {
     expect(messageContent("Hi", [])).toBe("Hi");
-    expect(messageContent("What is this?", [image])).toEqual([
-      { type: "text", text: "What is this?" },
-      { type: "file", mediaType: "image/png", filename: "shot.png", data: image.dataUrl },
+    expect(messageContent("Summarize this", [pdf])).toEqual([
+      { type: "text", text: "Summarize this" },
+      { type: "file", mediaType: "application/pdf", filename: "Diligence.pdf", data: pdf.url },
     ]);
-    expect(messageContent("", [image])).toHaveLength(1);
+    expect(messageContent("", [pdf])).toHaveLength(1);
   });
 });

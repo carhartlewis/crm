@@ -3,11 +3,11 @@ import {
   type ChatStatus,
   PromptInput,
   PromptInputBody,
+  PromptInputAttachments,
   PromptInputButton,
   PromptInputCommands,
   PromptInputFooter,
   PromptInputHeader,
-  PromptInputImages,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
@@ -25,10 +25,11 @@ import {
 } from "react";
 import { toast } from "sonner";
 import {
-  checkImages,
-  IMAGE_TYPES,
-  type ImageAttachment,
-  readImage,
+  type Attachment,
+  checkFiles,
+  FILE_ACCEPT,
+  releasePreviews,
+  toAttachment,
 } from "../../lib/attachments.ts";
 
 import {
@@ -43,8 +44,8 @@ const AttachIcon = carbonIcon(attachment);
 const NO_COMMANDS: readonly SlashCommand[] = [];
 
 export interface ComposerProps {
-  /** The message: its text (trimmed) and any images the person attached. */
-  readonly onSend: (text: string, images: readonly ImageAttachment[]) => void;
+  /** The message: its text (trimmed) and any files the person attached. */
+  readonly onSend: (text: string, files: readonly Attachment[]) => void;
   /** Stops the agent's turn; the submit button becomes Stop while it works. */
   readonly onStop?: () => void;
   readonly status?: ChatStatus;
@@ -74,8 +75,8 @@ function focusField(field: HTMLTextAreaElement | null) {
 /**
  * The chat composer: AI Elements' prompt input in the border beam. Enter sends, also while the
  * agent works (the chat decides whether that redirects the reply or waits for it), and Escape
- * stops the turn. The button is Stop while the box is empty and Send once there's text. Images
- * come in by paste, drop or the attach button; the agent switches to a model that reads them.
+ * stops the turn. The button is Stop while the box is empty and Send once there's text. Files
+ * come in by paste, drop or the attach button and upload when the message is sent.
  */
 export function Composer({
   onSend,
@@ -104,7 +105,7 @@ export function Composer({
 
   const working = status === "streaming" || status === "submitted";
   const [hasText, setHasText] = useState(false);
-  const [images, setImages] = useState<readonly ImageAttachment[]>([]);
+  const [files, setFiles] = useState<readonly Attachment[]>([]);
   const picker = useRef<HTMLInputElement>(null);
 
   // The `/` menu: open while only `/name` is typed, until Escape or a pick.
@@ -139,37 +140,31 @@ export function Composer({
     command.run("");
   };
 
-  const attach = async (files: readonly File[]) => {
-    const { accepted, refused } = checkImages(files, images.length);
+  const attach = (picked: readonly File[]) => {
+    const { accepted, refused } = checkFiles(picked, files.length);
 
     if (refused.length > 0) toast.error(refused.join(". "));
 
-    try {
-      const read = await Promise.all(accepted.map(readImage));
-
-      setImages((held) => [...held, ...read]);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't read that image");
-    }
+    if (accepted.length > 0) setFiles((held) => [...held, ...accepted.map(toAttachment)]);
   };
 
   // A pasted screenshot is attached; pasted text goes in the box as usual.
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = [...event.clipboardData.files];
+    const pasted = [...event.clipboardData.files];
 
-    if (files.length === 0) return;
+    if (pasted.length === 0) return;
 
     event.preventDefault();
-    void attach(files);
+    attach(pasted);
   };
 
   const onDrop = (event: DragEvent<HTMLFormElement>) => {
-    const files = [...event.dataTransfer.files];
+    const dropped = [...event.dataTransfer.files];
 
-    if (files.length === 0) return;
+    if (dropped.length === 0) return;
 
     event.preventDefault();
-    void attach(files);
+    attach(dropped);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -211,7 +206,7 @@ export function Composer({
       onSubmit={({ text }) => {
         const message = text.trim();
 
-        if (!message && images.length === 0) return;
+        if (!message && files.length === 0) return;
 
         setHasText(false);
         setQuery(null);
@@ -224,8 +219,8 @@ export function Composer({
           return;
         }
 
-        setImages([]);
-        onSend(message, images);
+        setFiles([]);
+        onSend(message, files);
       }}
       onDragOver={(event) => {
         if (event.dataTransfer.types.includes("Files")) event.preventDefault();
@@ -239,9 +234,16 @@ export function Composer({
         onActive={setActive}
         onPick={(index) => pick(matches[index])}
       />
-      <PromptInputImages
-        images={images.map((image) => ({ id: image.id, src: image.dataUrl, name: image.filename }))}
-        onRemove={(id) => setImages((held) => held.filter((image) => image.id !== id))}
+      <PromptInputAttachments
+        attachments={files.map((file) => ({
+          id: file.id,
+          name: file.filename,
+          src: file.previewUrl,
+        }))}
+        onRemove={(id) => {
+          releasePreviews(files.filter((file) => file.id === id));
+          setFiles((held) => held.filter((file) => file.id !== id));
+        }}
       />
       <PromptInputBody>
         <PromptInputTextarea
@@ -270,8 +272,8 @@ export function Composer({
       <PromptInputFooter>
         <PromptInputTools>
           <PromptInputButton
-            tooltip="Attach images"
-            aria-label="Attach images"
+            tooltip="Attach files"
+            aria-label="Attach files"
             disabled={disabled}
             onClick={() => picker.current?.click()}
           >
@@ -280,11 +282,11 @@ export function Composer({
           <input
             ref={picker}
             type="file"
-            accept={IMAGE_TYPES.join(",")}
+            accept={FILE_ACCEPT}
             multiple
             hidden
             onChange={(event) => {
-              void attach([...(event.currentTarget.files ?? [])]);
+              attach([...(event.currentTarget.files ?? [])]);
               event.currentTarget.value = "";
             }}
           />
@@ -293,7 +295,7 @@ export function Composer({
           {tools}
           <PromptInputSubmit
             // With text in the box, the button sends (and redirects); empty, it stops.
-            status={working && !hasText && images.length === 0 ? status : "ready"}
+            status={working && !hasText && files.length === 0 ? status : "ready"}
             onStop={onStop}
             disabled={disabled}
           />

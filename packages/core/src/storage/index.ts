@@ -36,4 +36,19 @@ export {
   type ImageCacheDependencies,
 } from "./images.ts";
 
-export type { PutOptions, Storage, StorageDriver, StoredObject } from "./types.ts";
+export {
+  chatFileType,
+  createChatFiles,
+  type ChatFiles,
+  type ChatFileUpload,
+  type StoredChatFile,
+} from "./chat-files.ts";
+
+export type {
+  ClientUpload,
+  ClientUploadLimits,
+  PutOptions,
+  Storage,
+  StorageDriver,
+  StoredObject,
+} from "./types.ts";

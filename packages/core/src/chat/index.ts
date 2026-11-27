@@ -328,3 +328,41 @@ export function callDecision(mode: PermissionMode, kind: CallKind): CallDecision
 
   return mode === "manual" ? "ask" : "run";
 }
+
+/** The largest file a chat takes. Larger PDFs and images reach the agent as a file to open. */
+export const CHAT_FILE_BYTES = 30 * 1024 * 1024;
+
+/**
+ * What a chat accepts, by extension, and the type it is stored as. Text is stored as plain text
+ * or CSV, never HTML, so a stored file can't run script. The server checks the bytes too
+ * (`chatFileType` in `@crm/core/storage`).
+ */
+export const CHAT_FILE_TYPES: ReadonlyMap<string, string> = new Map([
+  ["png", "image/png"],
+  ["jpg", "image/jpeg"],
+  ["jpeg", "image/jpeg"],
+  ["gif", "image/gif"],
+  ["webp", "image/webp"],
+  ["pdf", "application/pdf"],
+  ["docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  ["xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  ["pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+  ["doc", "application/msword"],
+  ["xls", "application/vnd.ms-excel"],
+  ["ppt", "application/vnd.ms-powerpoint"],
+  ["csv", "text/csv"],
+  ["tsv", "text/tab-separated-values"],
+  ["txt", "text/plain"],
+  ["md", "text/plain"],
+  ["json", "text/plain"],
+]);
+
+/** `Plan.XLSX` → `xlsx`; empty when there is no extension. */
+export function fileExtension(filename: string) {
+  return /\.([a-z0-9]+)$/i.exec(filename)?.[1]?.toLowerCase() ?? "";
+}
+
+/** The type a chat file is stored as, from its name; null when chats don't take it. */
+export function chatFileTypeOf(filename: string): string | null {
+  return CHAT_FILE_TYPES.get(fileExtension(filename)) ?? null;
+}

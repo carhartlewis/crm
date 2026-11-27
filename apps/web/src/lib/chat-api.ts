@@ -1,4 +1,4 @@
-import type { ImageAttachment } from "./attachments.ts";
+import type { Attachment } from "./attachments.ts";
 import type { ChatHistory } from "@crm/core/api";
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import { request, send } from "./api-fetch.ts";
@@ -65,10 +65,10 @@ export function prewarmUsed() {
   lastPrewarm = 0;
 }
 
-/** A message typed on New chat, with any images, before its chat existed. */
+/** A message typed on New chat, with any files, before its chat existed. */
 export interface FirstMessage {
   readonly text: string;
-  readonly images: readonly ImageAttachment[];
+  readonly files: readonly Attachment[];
 }
 
 /**

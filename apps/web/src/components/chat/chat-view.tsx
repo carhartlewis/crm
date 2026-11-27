@@ -36,7 +36,12 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { branchOf, chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
-import { type ImageAttachment, messageContent } from "../../lib/attachments.ts";
+import {
+  type Attachment,
+  messageContent,
+  releasePreviews,
+  uploadAttachment,
+} from "../../lib/attachments.ts";
 import { askToNotify, chatNotice, newQuestion, notifyChat } from "../../lib/chat-notify.ts";
 import { PERMISSION_MODE_OPTIONS, RUN_PLAN_MODE } from "../../lib/permission-mode.ts";
 import { type SlashCommand, skillCommandName, skillMessage } from "../../lib/slash-commands.ts";
@@ -183,25 +188,36 @@ export function ChatView({
     },
   });
 
+  // Attached files upload first (up to 30 MB each), then the message carries their URLs.
+  const uploadFiles = async (files: readonly Attachment[]) => {
+    if (files.length === 0) return [];
+
+    const progress = toast.loading(
+      files.length === 1 ? "Uploading the file" : `Uploading ${files.length} files`,
+    );
+
+    try {
+      return await Promise.all(files.map((file) => uploadAttachment(chatId, file)));
+    } finally {
+      toast.dismiss(progress);
+      releasePreviews(files);
+    }
+  };
+
   // Sends, answers and stops resolve when the server accepts them; a refusal (such as a session
   // the agent can no longer run) shows as a toast, and the optimistic message stays marked failed.
   const send = useMutation({
     // While a turn runs, Jev decides whether the message redirects it or waits (see the API's
     // follow-up judge); the person never chooses.
-    mutationFn: async ({
-      text,
-      images = [],
-    }: {
-      text: string;
-      images?: readonly ImageAttachment[];
-    }) => {
+    mutationFn: async ({ text, files = [] }: { text: string; files?: readonly Attachment[] }) => {
       askToNotify();
 
+      const sent = await uploadFiles(files);
       const task = activeTurn(agent.view) === undefined ? null : lastRequest(agent.messages);
       const mode = task === null || !text ? "steer" : await followUpMode(chatId, text, task);
 
       return agent.send(
-        messageContent(text, images),
+        messageContent(text, sent),
         mode === "queue" ? { turnPolicy: "queue" } : undefined,
       );
     },
@@ -444,7 +460,7 @@ export function ChatView({
           fieldRef={field}
           status={working ? "streaming" : "ready"}
           disabled={agent.status === "resuming"}
-          onSend={(text, images) => send.mutate({ text, images })}
+          onSend={(text, files) => send.mutate({ text, files })}
           commands={commands}
           onStop={() => stop.mutate()}
           tools={
@@ -569,20 +585,58 @@ function ChatPart({
     case "interaction":
       return <InteractionPrompt interaction={part} onAnswer={onAnswer} />;
     case "file":
-      // An attached image shows when eve kept a URL the browser can load; otherwise its name.
-      return part.url && part.mediaType.startsWith("image/") ? (
-        <img
-          src={part.url}
-          alt={part.filename ?? "Attached image"}
-          className="max-h-48 max-w-full rounded-md border object-contain"
-        />
-      ) : (
-        <span className="text-xs text-muted-foreground">{part.filename ?? part.mediaType}</span>
-      );
+      return <MessageFile url={part.url} mediaType={part.mediaType} filename={part.filename} />;
     default:
       return null;
   }
 }
+
+/**
+ * A file sent with a message: an image as a preview, anything else as a tile that opens it. A
+ * file eve kept no URL for (sent before files were stored) shows its name only.
+ */
+function MessageFile({
+  url,
+  mediaType,
+  filename,
+}: {
+  url: string | undefined;
+  mediaType: string;
+  filename: string | undefined;
+}) {
+  const name = filename ?? mediaType;
+
+  if (url && mediaType.startsWith("image/")) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="block w-fit">
+        <img
+          src={url}
+          alt={name}
+          loading="lazy"
+          className="max-h-60 max-w-full rounded-md border object-contain"
+        />
+      </a>
+    );
+  }
+
+  const tile = (
+    <span className="flex max-w-72 min-w-0 flex-col gap-0.5 rounded-md border bg-background px-3 py-2 select-none">
+      <span className="truncate text-sm font-medium text-foreground">{name}</span>
+      <span className="text-xs text-muted-foreground">{fileKind(name)}</span>
+    </span>
+  );
+
+  return url ? (
+    <a href={url} target="_blank" rel="noreferrer" className="block w-fit">
+      {tile}
+    </a>
+  ) : (
+    tile
+  );
+}
+
+/** "PDF", "XLSX": what a file is, from its name. */
+const fileKind = (name: string) => /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toUpperCase() ?? "File";
 
 /** One call as a step; a run of two or more calls to one tool as a group that opens. */
 function ToolCalls({

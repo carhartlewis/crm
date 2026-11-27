@@ -29,7 +29,7 @@ import { Companies } from "../services/Companies.ts";
 import { CrmTools } from "../services/crm-tools.ts";
 import { type Actor, Connections } from "../services/Connections.ts";
 import { Electric } from "../services/Electric.ts";
-import { Images } from "../services/Images.ts";
+import { ChatFiles, Images } from "../services/Images.ts";
 import { type AgentResult, Memory } from "../services/Memory.ts";
 import { Skills } from "../services/Skills.ts";
 import { AuthenticationLive } from "./Authentication.ts";
@@ -123,6 +123,14 @@ const chatActor = Effect.gen(function* () {
 const ChatsHandlers = HttpApiBuilder.group(CrmApi, "chats", (handlers) =>
   Effect.gen(function* () {
     const chats = yield* Chats;
+    const files = yield* ChatFiles;
+
+    // Only someone who can see the chat attaches files to it.
+    const inChat = (id: string) => Effect.flatMap(chatActor, (who) => chats.visible(who, id));
+
+    const refused = new Invalid({
+      message: "Attach a document, sheet, image or text file under 30 MB",
+    });
 
     return handlers
       .handle("prewarm", () => Effect.flatMap(chatActor, chats.prewarm))
@@ -140,9 +148,46 @@ const ChatsHandlers = HttpApiBuilder.group(CrmApi, "chats", (handlers) =>
       )
       .handle("followUp", ({ params, payload }) =>
         Effect.flatMap(chatActor, (who) => chats.followUp(who, params.id, payload)),
+      )
+      .handle("startFile", ({ params, payload }) =>
+        Effect.gen(function* () {
+          yield* inChat(params.id);
+
+          const upload = yield* Effect.promise(() =>
+            files.start(params.id, payload.filename, payload.size),
+          );
+
+          return upload ?? (yield* Effect.fail(refused));
+        }),
+      )
+      .handle("storeFile", ({ params, payload }) =>
+        Effect.gen(function* () {
+          yield* inChat(params.id);
+
+          const bytes = Uint8Array.fromBase64(payload.data);
+
+          const stored = yield* Effect.promise(() =>
+            files.store(params.id, payload.filename, bytes),
+          );
+
+          return stored ?? (yield* Effect.fail(refused));
+        }),
+      )
+      .handle("confirmFile", ({ params, payload }) =>
+        Effect.gen(function* () {
+          yield* inChat(params.id);
+
+          const stored = yield* Effect.promise(() =>
+            files.confirm(params.id, payload.filename, payload.url),
+          );
+
+          return stored ?? (yield* Effect.fail(refused));
+        }),
       );
   }),
 );
+
+const ChatsHandlersWithFiles = ChatsHandlers.pipe(Layer.provide(ChatFiles.layer));
 
 const ChatSpacesHandlers = HttpApiBuilder.group(CrmApi, "chatSpaces", (handlers) =>
   Effect.gen(function* () {
@@ -268,7 +313,7 @@ const ApiRoutes = HttpApiBuilder.layer(CrmApi).pipe(
     ConnectionsHandlers,
     SkillsHandlers,
     MemoryHandlers,
-    ChatsHandlers,
+    ChatsHandlersWithFiles,
     ChatSpacesHandlers,
     SidebarHandlers,
   ]),

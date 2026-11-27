@@ -560,6 +560,29 @@ export const FollowUp = Schema.Struct({
 /** `steer` redirects the running turn now; `queue` waits for it to finish. */
 export const FollowUpMode = Schema.Struct({ mode: Schema.Literals(["steer", "queue"]) });
 
+/** A file to attach to a chat message: its name (which sets its type) and size in bytes. */
+export const ChatFileStart = Schema.Struct({ filename: Schema.String, size: Schema.Number });
+
+/** Straight to storage with a token (Vercel Blob), or through the API (development). */
+export const ChatFileUpload = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("direct"),
+    pathname: Schema.String,
+    token: Schema.String,
+    contentType: Schema.String,
+  }),
+  Schema.Struct({ kind: Schema.Literal("api") }),
+]);
+
+/** A file's bytes as base64, for uploads through the API. */
+export const ChatFileBytes = Schema.Struct({ filename: Schema.String, data: Schema.String });
+
+/** A file the browser uploaded itself, to check. */
+export const ChatFileUploaded = Schema.Struct({ filename: Schema.String, url: Schema.String });
+
+/** A stored chat file. */
+export const ChatFile = Schema.Struct({ url: Schema.String, mediaType: Schema.String });
+
 export class ChatsApi extends HttpApiGroup.make("chats")
   .add(
     /** Keeps an eve session ready for the caller's next chat (10 minutes, in Redis). */
@@ -593,6 +616,27 @@ export class ChatsApi extends HttpApiGroup.make("chats")
       params: { id: Schema.String },
       payload: FollowUp,
       success: FollowUpMode,
+      error: ChatErrors,
+    }),
+    /** Starts attaching a file to a message: how the browser should send it. */
+    HttpApiEndpoint.post("startFile", "/:id/files", {
+      params: { id: Schema.String },
+      payload: ChatFileStart,
+      success: ChatFileUpload,
+      error: ChatErrors,
+    }),
+    /** Stores a file's bytes sent through the API. */
+    HttpApiEndpoint.post("storeFile", "/:id/files/bytes", {
+      params: { id: Schema.String },
+      payload: ChatFileBytes,
+      success: ChatFile,
+      error: ChatErrors,
+    }),
+    /** Checks a file the browser uploaded to storage itself. */
+    HttpApiEndpoint.post("confirmFile", "/:id/files/confirm", {
+      params: { id: Schema.String },
+      payload: ChatFileUploaded,
+      success: ChatFile,
       error: ChatErrors,
     }),
   )

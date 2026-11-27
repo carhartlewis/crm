@@ -69,7 +69,7 @@ function ChatPage() {
     ...startChatMutation,
     onSuccess: ({ id, sessionId }, { text }) => {
       seedNewChat(queryClient, userId, id, sessionId);
-      queueFirstMessage(id, { text, images: [] });
+      queueFirstMessage(id, { text, files: [] });
       void navigate({ to: "/chats/$chatId", params: { chatId: id } });
     },
     onError: (error) => toast.error(error.message),

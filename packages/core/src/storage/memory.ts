@@ -24,6 +24,9 @@ export function createMemoryStorage() {
       objects.delete(key);
     },
     isStored: (url: string) => url.startsWith(MEMORY_URL),
+    keyOf: (url: string) =>
+      url.startsWith(MEMORY_URL) ? decodeURIComponent(url.slice(MEMORY_URL.length)) : null,
+    clientUpload: async () => null,
     read: (key: string) => objects.get(key) ?? null,
   } satisfies Storage & { read(key: string): MemoryObject | null };
 }

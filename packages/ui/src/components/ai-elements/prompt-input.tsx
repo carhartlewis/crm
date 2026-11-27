@@ -141,35 +141,48 @@ function PromptInputHeader({ className, ...props }: PromptInputHeaderProps) {
   );
 }
 
-export interface PromptInputImage {
+export interface PromptInputAttachment {
   readonly id: string;
-  readonly src: string;
   readonly name: string;
+  /** An image's preview; a document shows its name and type instead. */
+  readonly src?: string | undefined;
 }
 
-export interface PromptInputImagesProps {
-  readonly images: readonly PromptInputImage[];
+export interface PromptInputAttachmentsProps {
+  readonly attachments: readonly PromptInputAttachment[];
   readonly onRemove: (id: string) => void;
 }
 
-/** Images attached to the message, as small previews above the text; each one can be removed. */
-function PromptInputImages({ images, onRemove }: PromptInputImagesProps) {
-  if (images.length === 0) return null;
+const extensionOf = (name: string) => /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toUpperCase() ?? "FILE";
+
+/** Files attached to the message, above the text: image previews and document tiles. */
+function PromptInputAttachments({ attachments, onRemove }: PromptInputAttachmentsProps) {
+  if (attachments.length === 0) return null;
 
   return (
     <PromptInputHeader className="gap-2 pt-3 select-none">
-      {images.map((image) => (
+      {attachments.map((attachment) => (
         <div
-          key={image.id}
-          data-slot="prompt-input-image"
-          className="group/image relative size-14 shrink-0 overflow-hidden rounded-md border bg-muted"
+          key={attachment.id}
+          data-slot="prompt-input-attachment"
+          title={attachment.name}
+          className="group/attachment relative flex h-14 shrink-0 overflow-hidden rounded-md border bg-muted"
         >
-          <img src={image.src} alt={image.name} className="size-full object-cover" />
+          {attachment.src ? (
+            <img src={attachment.src} alt={attachment.name} className="size-14 object-cover" />
+          ) : (
+            <span className="flex w-40 min-w-0 flex-col justify-center gap-0.5 px-3">
+              <span className="truncate text-xs font-medium text-foreground">
+                {attachment.name}
+              </span>
+              <span className="text-xs text-muted-foreground">{extensionOf(attachment.name)}</span>
+            </span>
+          )}
           <button
             type="button"
-            aria-label={`Remove ${image.name}`}
-            className="absolute top-0.5 right-0.5 flex size-5 items-center justify-center rounded-full bg-background/90 text-foreground opacity-0 transition group-hover/image:opacity-100 focus-visible:opacity-100"
-            onClick={() => onRemove(image.id)}
+            aria-label={`Remove ${attachment.name}`}
+            className="absolute top-0.5 right-0.5 flex size-5 items-center justify-center rounded-full bg-background/90 text-foreground opacity-0 transition group-hover/attachment:opacity-100 focus-visible:opacity-100"
+            onClick={() => onRemove(attachment.id)}
           >
             <CloseIcon className="size-3" />
           </button>
@@ -363,8 +376,8 @@ export {
   PromptInputButton,
   PromptInputCommands,
   PromptInputFooter,
+  PromptInputAttachments,
   PromptInputHeader,
-  PromptInputImages,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputToolbar,

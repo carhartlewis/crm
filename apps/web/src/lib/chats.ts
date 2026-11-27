@@ -17,7 +17,7 @@ import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 import { mutationOptions } from "@tanstack/react-query";
 import { createCollection } from "@tanstack/react-db";
 import { request } from "./api-fetch.ts";
-import type { ImageAttachment } from "./attachments.ts";
+import type { Attachment } from "./attachments.ts";
 import { prewarmUsed } from "./chat-api.ts";
 import {
   checkedTxid,
@@ -311,8 +311,8 @@ interface StartChat {
   readonly permissionMode: PermissionMode;
   /** The chat's title when it isn't the start of `text` (a branch). */
   readonly title?: string;
-  /** Images sent with the first message; the chat page sends them, not this mutation. */
-  readonly images?: readonly ImageAttachment[];
+  /** Files sent with the first message; the chat page uploads and sends them. */
+  readonly files?: readonly Attachment[];
 }
 
 /**

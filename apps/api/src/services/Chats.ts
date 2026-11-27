@@ -204,6 +204,8 @@ export interface ChatsService {
   ) => Effect.Effect<TxId, Failure>;
   readonly remove: (actor: ChatActor, id: string) => Effect.Effect<TxId, Failure>;
   readonly history: (actor: ChatActor, id: string) => Effect.Effect<ChatHistory, Failure>;
+  /** Succeeds when the actor may see the chat; Not found otherwise. */
+  readonly visible: (actor: ChatActor, id: string) => Effect.Effect<void, Failure>;
   /** Whether a message sent mid-turn redirects the turn or waits for it. */
   readonly followUp: (
     actor: ChatActor,
@@ -535,6 +537,13 @@ export function makeChats(
         ),
       );
     },
+
+    visible: (actor, id) =>
+      run("visible", async () => {
+        const chat = await visibleChat(actor, id);
+
+        return chat.ok ? ok(undefined) : chat;
+      }),
 
     followUp: (actor, id, input) =>
       run("followUp", async () => {

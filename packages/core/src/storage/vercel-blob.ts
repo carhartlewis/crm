@@ -1,5 +1,9 @@
 import { del, put } from "@vercel/blob";
+import { generateClientTokenFromReadWriteToken } from "@vercel/blob/client";
 import { assertValidKey, type PutOptions, type Storage } from "./types.ts";
+
+/** How long the browser has to start an upload. */
+const CLIENT_UPLOAD_MS = 10 * 60 * 1000;
 
 const BLOB_HOST = ".public.blob.vercel-storage.com";
 
@@ -25,5 +29,24 @@ export function createVercelBlobStorage(token: string): Storage {
       await del(key, { token });
     },
     isStored: (url) => URL.canParse(url) && new URL(url).hostname.endsWith(BLOB_HOST),
+    keyOf: (url) =>
+      URL.canParse(url) && new URL(url).hostname.endsWith(BLOB_HOST)
+        ? decodeURIComponent(new URL(url).pathname.slice(1))
+        : null,
+    async clientUpload(key, { contentType, maxBytes }) {
+      assertValidKey(key);
+
+      const clientToken = await generateClientTokenFromReadWriteToken({
+        token,
+        pathname: key,
+        allowedContentTypes: [contentType],
+        maximumSizeInBytes: maxBytes,
+        validUntil: Date.now() + CLIENT_UPLOAD_MS,
+        addRandomSuffix: false,
+        allowOverwrite: false,
+      });
+
+      return { pathname: key, token: clientToken };
+    },
   };
 }
