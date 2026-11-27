@@ -8,7 +8,15 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Active workspace**: The workspace a session acts in (`session.activeOrganizationId`). Set at sign-in to the most recently joined workspace. Not proof of membership on its own.
 
-**Company**: A CRM record for an organisation a workspace deals with (table `company`): name, optional domain (bare hostname), owner. Belongs to one workspace; synced to the client through a workspace-scoped shape (ADR 0012).
+**Company**: A CRM record for an organisation a workspace deals with (table `company`): name, optional domain (bare hostname), owner, profile fields, a logo and a primary contact (ADR 0023). Belongs to one workspace; synced to the client through a workspace-scoped shape (ADR 0012).
+
+**Contact**: A person in the CRM (table `contact`), at one company or none, with an owner. Shown as "Contacts" in the UI.
+
+**Deal**: An opportunity with one company (table `deal`): amount and currency, expected close date, owner and a **stage**. The open stages are Demo booked, Qualified to buy, Decision maker in and Contract sent; Closed won, Closed lost and Unqualified close it, and the last two need a reason (`@crm/core/records`).
+
+**Open pipeline**: The sum of open deals' amounts in the reporting currency (USD); deals in other currencies are counted apart.
+
+**Activity**: A note, call, email, meeting or task logged on a company, contact or deal (table `activity`), plus the stage changes the CRM writes. A task can be due and done.
 
 **Shape**: An ElectricSQL stream of the rows of one table that match a filter. The API proxy fixes each shape to the active workspace (ADR 0012).
 
@@ -38,7 +46,7 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Onboarding shell**: The full-window layout for sign-in, setup and route-level states: shader backdrop, app mark, title, content.
 
-**Pinned**: The sidebar group with the workspace's pages (Companies, Contacts, Workflows), plus the spaces and chats a user pinned, in one order per user (the `sidebar` row, ADR 0018). Each user orders it by dragging; ⌥1–⌥9 open the first nine.
+**Pinned**: The sidebar group with the workspace's pages (Companies, Contacts, Deals, Workflows), plus the spaces and chats a user pinned, in one order per user (the `sidebar` row, ADR 0018). Each user orders it by dragging; ⌥1–⌥9 open the first nine.
 
 **Peek**: The card that opens when you hover or focus a pinned page: what it holds, its shortcut, and the workspace's members. Its code and data load on hover, before it opens.
 

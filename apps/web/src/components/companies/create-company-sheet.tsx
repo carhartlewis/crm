@@ -21,7 +21,7 @@ export interface CreateCompanySheetProps {
 }
 
 /**
- * New company, from anywhere (⌘C, the Companies page button). Its own chunk, warmed when the
+ * New company, from anywhere (⌥⇧C, the Companies page button). Its own chunk, warmed when the
  * shell is idle, so TanStack DB loads only once a company page or this sheet needs it.
  */
 export default function CreateCompanySheet({

@@ -40,7 +40,7 @@ export function checkedTxid(txid: number) {
  */
 export async function syncedWrite(
   path: string,
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: WriteBody,
 ): Promise<SyncedWrite> {
   const response = await fetch(path, {

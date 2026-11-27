@@ -19,9 +19,11 @@ export const shortcuts = {
   forward: { code: "BracketRight", mod: true },
   // New chat, the workspace home (ADR 0018).
   newChat: { code: "Digit0", alt: true },
-  // Opens the create sheet from anywhere. ⌘C stays copy whenever there's something to copy:
-  // see `claimsCopyShortcut`.
-  create: { code: "KeyC", mod: true },
+  // Create sheets, from any page (outside text fields): ⌥⇧ plus the kind's letter. ⌥ is the
+  // app's own modifier (⌥0, ⌥1–⌥9), and browsers reserve no ⌥⇧ letters, unlike ⌘⇧C (inspect).
+  newCompany: { code: "KeyC", alt: true, shift: true },
+  newContact: { code: "KeyP", alt: true, shift: true },
+  newDeal: { code: "KeyD", alt: true, shift: true },
 } as const satisfies Record<string, Shortcut>;
 
 /** ⌥1 to ⌥9 open the first nine pinned pages, spaces and chats, in the order the user arranged. */
@@ -69,32 +71,4 @@ export function ariaKeyShortcuts(shortcut: Shortcut, apple = isApple()) {
     ...(shortcut.shift ? ["Shift"] : []),
     key,
   ].join("+");
-}
-
-/**
- * ⌘C creates only when it can't mean copy: no text is selected and focus isn't in a field.
- * With a selection it copies, as everywhere else on the Mac.
- */
-/** What `claimsCopyShortcut` reads from a DOM `Selection`. */
-export interface TextSelection {
-  readonly isCollapsed: boolean;
-  toString(): string;
-}
-
-/** What `claimsCopyShortcut` reads from the focused element (`document.activeElement`). */
-export interface FocusedElement {
-  readonly tagName: string;
-  readonly isContentEditable?: boolean;
-}
-
-export function claimsCopyShortcut(
-  selection: TextSelection | null,
-  focused: FocusedElement | null,
-) {
-  const editing =
-    focused !== null &&
-    (focused.isContentEditable === true ||
-      ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName));
-
-  return !editing && (selection === null || selection.isCollapsed || selection.toString() === "");
 }

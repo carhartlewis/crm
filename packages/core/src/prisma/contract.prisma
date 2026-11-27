@@ -27,6 +27,10 @@ model User {
   chatSpaces         ChatSpace[]
   sidebars           Sidebar[]
   spaceMemberships   ChatSpaceMember[]
+  ownedContacts      Contact[]  @relation("ContactOwner")
+  ownedDeals         Deal[]     @relation("DealOwner")
+  activities         Activity[] @relation("ActivityAuthor")
+  savedViews         SavedView[] @relation("SavedViewOwner")
 
   @@map("user")
 }
@@ -103,6 +107,19 @@ model Workspace {
   chatSpaces  ChatSpace[]
   sidebars    Sidebar[]
   spaceMembers ChatSpaceMember[]
+  contacts    Contact[]
+  deals       Deal[]
+  dealContacts DealContact[]
+  activities  Activity[]
+  fieldDefinitions FieldDefinition[]
+  fieldOptions FieldOption[]
+  fieldValues FieldValue[]
+  savedViews  SavedView[]
+  exchangeRates ExchangeRate[]
+  setting     WorkspaceSetting?
+  contactFacts ContactFact[]
+  contactBriefs ContactBrief[]
+  websiteVisits WebsiteVisit[]
 
   @@map("workspace")
 }
@@ -149,19 +166,197 @@ model Company {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name        String
   domain      String?
+  website     String?
+  // What the company does, from research or typed by a member.
+  description String?
+  // Logos copied into our storage (`ImageCache.logo`), never hotlinked. `icon_url` is the square
+  // mark tables and chips show; `logo_url` the wide wordmark. `icon_tone` is `opaque`, `dark` or
+  // `light`: a dark or light mark is inverted in the other theme when it has no dark copy.
+  logoUrl     String?   @map("logo_url")
+  logoDarkUrl String?   @map("logo_dark_url")
+  iconUrl     String?   @map("icon_url")
+  iconDarkUrl String?   @map("icon_dark_url")
+  iconTone    String?   @map("icon_tone")
+  brandColor  String?   @map("brand_color")
+  industry    String?
+  subIndustry String?   @map("sub_industry")
+  city        String?
+  stateCode   String?   @map("state_code")
+  country     String?
+  countryCode String?   @map("country_code")
+  phone       String?
+  email       String?
+  linkedinUrl String?   @map("linkedin_url")
+  twitterUrl  String?   @map("twitter_url")
+  githubUrl   String?   @map("github_url")
+  pricingUrl  String?   @map("pricing_url")
+  careersUrl  String?   @map("careers_url")
   ownerId     String?   @map("owner_id")
   owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  // The person to talk to first; one of the company's contacts.
+  primaryContactId String? @unique @map("primary_contact_id")
+  primaryContact   Contact? @relation("CompanyPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  // `pending`, `running`, `complete`, `failed` or `skipped` (`@crm/core/records`).
+  enrichmentStatus String  @default("pending") @map("enrichment_status")
+  enrichedAt       DateTime? @map("enriched_at")
+  enrichmentError  String?  @map("enrichment_error")
+  // `manual`, `import`, `email`, `calendar` or `tracking`: how the row arrived.
+  source      String    @default("manual")
+  lastActivityAt DateTime? @map("last_activity_at")
+  archivedAt  DateTime? @map("archived_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
   memoryFacts MemoryFact[]
+  contacts    Contact[] @relation("CompanyContacts")
+  deals       Deal[]
+  activities  Activity[]
 
   @@index([workspaceId])
   @@map("company")
 }
 
-// A copy of one fact Supermemory read from a workspace's or company's memory (ADR 0017), so
-// ⌘K searches facts locally. The API refreshes it from Supermemory; nothing else writes it.
-// Synced to members of the workspace through Electric.
+// People at companies (or at none yet).
+
+model Contact {
+  // Client-generated (`createId("ctc")`).
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  firstName   String    @map("first_name")
+  lastName    String?   @map("last_name")
+  email       String?
+  phone       String?
+  title       String?
+  seniority   String?
+  // Their function, such as Engineering or Finance.
+  function    String?
+  linkedinUrl String?   @map("linkedin_url")
+  twitterUrl  String?   @map("twitter_url")
+  githubUrl   String?   @map("github_url")
+  imageUrl    String?   @map("image_url")
+  companyId   String?   @map("company_id")
+  company     Company?  @relation("CompanyContacts", fields: [companyId], references: [id], onDelete: SetNull)
+  primaryOf   Company?  @relation("CompanyPrimaryContact")
+  ownerId     String?   @map("owner_id")
+  owner       User?     @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  enrichmentStatus String  @default("pending") @map("enrichment_status")
+  enrichedAt       DateTime? @map("enriched_at")
+  enrichmentError  String?  @map("enrichment_error")
+  source      String    @default("manual")
+  lastActivityAt DateTime? @map("last_activity_at")
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+  deals       DealContact[]
+  activities  Activity[]
+  facts       ContactFact[]
+  brief       ContactBrief?
+
+  @@index([workspaceId])
+  @@index([companyId])
+  @@map("contact")
+}
+
+// Opportunities with a company. Stages and currencies are listed in `@crm/core/records`.
+
+model Deal {
+  // Client-generated (`createId("del")`).
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  companyId   String    @map("company_id")
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ownerId     String?   @map("owner_id")
+  owner       User?     @relation("DealOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  stage       String    @default("demo_booked")
+  stageChangedAt DateTime @default(now()) @map("stage_changed_at")
+  amount      Decimal(precision: 14, scale: 2)?
+  currency    String    @default("USD")
+  // The amount in the workspace's reporting currency, converted at write time (ADR 0024). Null
+  // when there is no amount or no rate for the currency.
+  baseAmount   Decimal(precision: 24, scale: 4)? @map("base_amount")
+  baseCurrency String?   @map("base_currency")
+  fxRate       Decimal(precision: 20, scale: 10)? @map("fx_rate")
+  fxRateAt     DateTime? @map("fx_rate_at")
+  expectedCloseDate Date? @map("expected_close_date")
+  closedAt    DateTime? @map("closed_at")
+  // Why a lost or unqualified deal closed.
+  closedReason String?  @map("closed_reason")
+  lastActivityAt DateTime? @map("last_activity_at")
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+  contacts    DealContact[]
+  activities  Activity[]
+
+  @@index([workspaceId])
+  @@index([companyId])
+  @@map("deal")
+}
+
+// Who is on a deal, and their part in it (such as Champion).
+
+model DealContact {
+  dealId      String    @map("deal_id")
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contactId   String    @map("contact_id")
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  // Kept on the row so the shape filters by workspace without a join.
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  role        String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@id([dealId, contactId])
+  @@index([workspaceId])
+  @@map("deal_contact")
+}
+
+// Notes, calls, emails, meetings and tasks on a record, plus stage changes the CRM writes.
+
+model Activity {
+  // Client-generated (`createId("act")`).
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // `note`, `call`, `email`, `meeting`, `task`, `stage_change` or `enrichment`.
+  type        String
+  subject     String?
+  body        String?
+  occurredAt  DateTime  @map("occurred_at")
+  // Tasks only: when it is due and when it was done.
+  dueAt       DateTime? @map("due_at")
+  completedAt DateTime? @map("completed_at")
+  companyId   String?   @map("company_id")
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId   String?   @map("contact_id")
+  contact     Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId      String?   @map("deal_id")
+  deal        Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  createdById String?   @map("created_by_id")
+  createdBy   User?     @relation("ActivityAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  // Type-specific detail, such as `{ from, to }` for a stage change.
+  meta        Json(storage: jsonb)?
+  // `manual`, `email`, `calendar` or `agent`: who logged it.
+  source      String    @default("manual")
+  // The synced thread or event it came from; one activity each, so a re-sync never duplicates.
+  emailThreadId   String? @map("email_thread_id")
+  calendarEventId String? @map("calendar_event_id")
+  // A link to the thread, event or page it came from.
+  externalUrl String?   @map("external_url")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+
+  @@unique([workspaceId, emailThreadId])
+  @@unique([workspaceId, calendarEventId])
+  @@index([workspaceId])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([dealId])
+  @@map("activity")
+}
 
 model MemoryFact {
   // Supermemory's fact id: the copy's natural key.
@@ -463,9 +658,14 @@ model Chat {
   // The title was made by the CRM (from the first message, then by the agent); a person's rename
   // turns it off so the agent never overwrites it.
   autoTitle     Boolean    @default(true) @map("auto_title")
+  // The record the chat is about, from a record sheet's Agent tab: `company`, `contact` or
+  // `deal`, and its id. Null for a chat started anywhere else.
+  recordKind    String?    @map("record_kind")
+  recordId      String?    @map("record_id")
 
   @@index([workspaceId])
   @@index([spaceId])
+  @@index([recordId])
   @@map("chat")
 }
 
@@ -527,4 +727,217 @@ model ChatSpaceMember {
   @@id([spaceId, userId])
   @@index([workspaceId])
   @@map("chat_space_member")
+}
+
+// Custom fields (ADR 0024): a workspace adds its own fields to companies, contacts and deals.
+
+model FieldDefinition {
+  // `createId("fdf")`.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // `company`, `contact` or `deal`.
+  entity      String
+  // Stable machine name, unique per entity in the workspace, such as `account_type`.
+  key         String
+  label       String
+  // `text`, `long_text`, `number`, `date`, `checkbox`, `select`, `url`, `email`, `phone` or `user`.
+  type        String
+  // The agent may fill it from research; `agentBrief` tells it what to look for.
+  agentFilled Boolean   @default(true) @map("agent_filled")
+  agentBrief  String?   @map("agent_brief")
+  required    Boolean   @default(false)
+  showOnSheet  Boolean  @default(true) @map("show_on_sheet")
+  showOnTable  Boolean  @default(false) @map("show_on_table")
+  showOnFilter Boolean  @default(false) @map("show_on_filter")
+  position    Int       @default(0)
+  // Archived fields keep their values but show nowhere.
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+  options     FieldOption[]
+  values      FieldValue[]
+
+  @@unique([workspaceId, entity, key])
+  @@index([workspaceId])
+  @@map("field_definition")
+}
+
+model FieldOption {
+  // `createId("fop")`.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fieldId     String    @map("field_id")
+  field       FieldDefinition @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  label       String
+  position    Int       @default(0)
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([fieldId])
+  @@map("field_option")
+}
+
+// One field's value on one record. `recordId` names a company, contact or deal (by the field's
+// entity); the typed column for the field's type holds the value.
+model FieldValue {
+  // `createId("fvl")`.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fieldId     String    @map("field_id")
+  field       FieldDefinition @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  recordId    String    @map("record_id")
+  text        String?
+  number      Decimal(precision: 24, scale: 4)?
+  date        Date?
+  bool        Boolean?
+  optionId    String?   @map("option_id")
+  userId      String?   @map("user_id")
+  // `member` or `agent`: who set it last.
+  setBy       String    @default("member") @map("set_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+
+  @@unique([fieldId, recordId])
+  @@index([workspaceId])
+  @@index([recordId])
+  @@map("field_value")
+}
+
+// Saved filters for a record list, personal or shared with the workspace.
+
+model SavedView {
+  // `createId("svw")`.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerId     String?   @map("owner_id")
+  owner       User?     @relation("SavedViewOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  // `company`, `contact` or `deal`.
+  entity      String
+  name        String
+  shared      Boolean   @default(false)
+  // The list's URL query (filters, sort, columns) as saved.
+  query       String
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("saved_view")
+}
+
+// Exchange rates for reporting totals (ADR 0024): units of `quote` per one `base`.
+
+model ExchangeRate {
+  // `createId("fxr")`.
+  id          String    @id
+  base        String
+  quote       String
+  rate        Decimal(precision: 20, scale: 10)
+  asOf        Date      @map("as_of")
+  // `fetched` (a public rates service) or `manual` (a member set it for their workspace).
+  source      String    @default("fetched")
+  // Null for fetched rates, which every workspace shares.
+  workspaceId String?   @map("workspace_id")
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Per workspace for manual rates. Fetched rows have no workspace (and Postgres treats NULLs as
+  // distinct), so the API replaces a day's fetched rate itself.
+  @@unique([workspaceId, base, quote, asOf, source])
+  @@index([base, quote, asOf])
+  @@index([workspaceId])
+  @@map("exchange_rate")
+}
+
+// A workspace's CRM settings; one row per workspace, made on first save.
+
+model WorkspaceSetting {
+  workspaceId        String    @id @map("workspace_id")
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  reportingCurrency  String    @default("USD") @map("reporting_currency")
+  // The public key of the website tracking snippet; null until tracking is turned on.
+  trackingKey        String?   @unique @map("tracking_key")
+  updatedAt          DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+
+  @@map("workspace_setting")
+}
+
+// What the agent found out about a contact (ADR 0024). A member accepts or dismisses each
+// proposed fact; an accepted one is written to the contact.
+
+model ContactFact {
+  // `createId("cft")`.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contactId   String    @map("contact_id")
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  // The contact column it is about, such as `title` or `linkedin_url`.
+  field       String
+  value       String
+  // 0 to 1, and its band: `verified`, `probable` or `possible`.
+  score       Float
+  band        String
+  evidence    Json(storage: jsonb)?
+  sourceUrl   String?   @map("source_url")
+  // `proposed`, `applied`, `dismissed` or `superseded`.
+  status      String    @default("proposed")
+  decidedById String?   @map("decided_by_id")
+  decidedAt   DateTime? @map("decided_at")
+  observedAt  DateTime  @default(now()) @map("observed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([contactId])
+  @@map("contact_fact")
+}
+
+// The agent's short brief on a contact: who they are and where they have been.
+
+model ContactBrief {
+  contactId   String    @id @map("contact_id")
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  narrative   String
+  // `{ currentRole, tenure, previousRoles: [{ title, company, years }], seniority, function, location }`.
+  sections    Json(storage: jsonb)
+  sourceUrl   String?   @map("source_url")
+  refreshedAt DateTime  @default(now()) @map("refreshed_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("contact_brief")
+}
+
+// Website visits from the tracking snippet, matched to a company by domain or a contact by email.
+
+model WebsiteVisit {
+  // `createId("wvs")`.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // The browser's anonymous id from the snippet.
+  visitorId   String    @map("visitor_id")
+  companyId   String?   @map("company_id")
+  contactId   String?   @map("contact_id")
+  path        String
+  referrer    String?
+  utmSource   String?   @map("utm_source")
+  utmMedium   String?   @map("utm_medium")
+  utmCampaign String?   @map("utm_campaign")
+  occurredAt  DateTime  @default(now()) @map("occurred_at")
+
+  @@index([workspaceId])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([visitorId])
+  @@map("website_visit")
 }

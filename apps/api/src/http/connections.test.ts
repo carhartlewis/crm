@@ -1,5 +1,5 @@
 import { createMemoryFactMirror } from "../services/memory-mirror-memory.ts";
-import { createImageCache, createMemoryStorage } from "@crm/core/storage";
+import { createImageCache, createChatFiles, createMemoryStorage } from "@crm/core/storage";
 import { SessionUser } from "@crm/core/api";
 import { createMemoryKv } from "@crm/core/kv";
 import { integrations } from "@crm/integrations";
@@ -12,11 +12,16 @@ import { Auth, AuthError } from "../services/Auth.ts";
 import { Chats, makeChats } from "../services/Chats.ts";
 import { createMemoryChatStore } from "../services/chat-store-memory.ts";
 import { CrmTools } from "../services/crm-tools.ts";
+import { Intel, makeIntel } from "../services/Intel.ts";
+import { createMemoryIntelStore } from "../services/intel-store-memory.ts";
 import { Companies, makeCompanies } from "../services/Companies.ts";
-import { Images } from "../services/Images.ts";
+import { ChatFiles, Images } from "../services/Images.ts";
 import { makeMemory, Memory } from "../services/Memory.ts";
 import { createMemoryDirectory } from "../services/memory-directory-memory.ts";
-import { createMemoryCompanyStore } from "../services/company-store-memory.ts";
+import { createMemoryCompanyStore } from "../services/record-store-memory.ts";
+import { makeRecords, Records } from "../services/Records.ts";
+import { createMemoryFieldStore } from "../services/field-store-memory.ts";
+import { Fields, makeFields } from "../services/Fields.ts";
 import { Electric, makeElectric } from "../services/Electric.ts";
 import { createMemorySkillStore } from "../services/skill-store-memory.ts";
 import { makeSkills, Skills } from "../services/Skills.ts";
@@ -29,6 +34,12 @@ import {
 } from "../services/Connections.ts";
 import { loopbackUrl } from "./desktop.ts";
 import { Routes } from "./routes.ts";
+import { makeMoney, Money } from "../services/Money.ts";
+import { createMemoryMoneyStore } from "../services/money-store-memory.ts";
+import { createMemorySavedViewStore } from "../services/saved-view-store.ts";
+import { makeSavedViews, SavedViews } from "../services/SavedViews.ts";
+import { makeTracking, Tracking } from "../services/Tracking.ts";
+import { createMemoryTrackingStore } from "../services/tracking-store-memory.ts";
 
 const alice = new SessionUser({
   id: "user_1",
@@ -218,6 +229,7 @@ const FakeConnections = Layer.succeed(
 
 // Companies and Electric are not under test here; they only complete the route layer.
 const FakeCompanies = Layer.succeed(Companies, makeCompanies(createMemoryCompanyStore([]).store));
+const FakeRecords = Layer.succeed(Records, makeRecords(createMemoryCompanyStore([]).store));
 
 const FakeChats = Layer.succeed(
   Chats,
@@ -239,7 +251,10 @@ const app = HttpRouter.toWebHandler(
       FakeAuth,
       FakeConnections,
       FakeCompanies,
+      FakeRecords,
+      Layer.succeed(Fields, makeFields(createMemoryFieldStore({ members: [] }).store)),
       FakeChats,
+      Layer.succeed(Intel, makeIntel(createMemoryIntelStore([]).store)),
       Layer.succeed(CrmTools, { forCaller: () => [] }),
       FakeElectric,
       Layer.succeed(
@@ -251,6 +266,17 @@ const app = HttpRouter.toWebHandler(
         }),
       ),
       Layer.succeed(Images, createImageCache({ storage: createMemoryStorage() })),
+      Layer.succeed(ChatFiles, createChatFiles({ storage: createMemoryStorage() })),
+      // Money and saved views are covered in money.test.ts and saved-views.test.ts.
+      Layer.succeed(
+        Money,
+        makeMoney(createMemoryMoneyStore([]).store, { fetch: async () => Response.json({}) }),
+      ),
+      Layer.succeed(SavedViews, makeSavedViews(createMemorySavedViewStore([]).store)),
+      Layer.succeed(
+        Tracking,
+        makeTracking(createMemoryTrackingStore({ members: [] }).store, createMemoryKv()),
+      ),
       // Memory is covered in Memory.test.ts; here it is off.
       Layer.succeed(
         Memory,

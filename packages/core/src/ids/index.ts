@@ -16,6 +16,15 @@
 export const ID_PREFIXES = {
   company: "com",
   contact: "ctc",
+  deal: "del",
+  activity: "act",
+  field_definition: "fdf",
+  field_option: "fop",
+  field_value: "fvl",
+  saved_view: "svw",
+  exchange_rate: "fxr",
+  contact_fact: "cft",
+  website_visit: "wvs",
   workflow: "wfk",
   connection: "cnx",
   custom_connector: "ccn",
@@ -46,6 +55,9 @@ export const ID_EXEMPTIONS = {
   oauthClientAssertion: "managed by better-auth",
   memory_fact: "a copy keyed by Supermemory's fact id (ADR 0017)",
   chat_space_member: "a join row keyed by (space_id, user_id) (ADR 0020)",
+  deal_contact: "a join row keyed by (deal_id, contact_id)",
+  workspace_setting: "one row per workspace, keyed by workspace_id",
+  contact_brief: "one row per contact, keyed by contact_id",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

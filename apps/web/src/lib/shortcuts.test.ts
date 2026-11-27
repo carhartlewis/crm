@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   ariaKeyShortcuts,
-  claimsCopyShortcut,
   pinnedShortcut,
   shortcutKeys,
   shortcuts,
@@ -29,29 +28,18 @@ describe("shortcutKeys", () => {
   });
 });
 
-const selected = (text: string) => ({ isCollapsed: text === "", toString: () => text });
+describe("create shortcuts", () => {
+  test("each record kind has its own, all distinct and free of ⌘", () => {
+    const keys = [shortcuts.newCompany, shortcuts.newContact, shortcuts.newDeal].map(toHotkey);
 
-describe("claimsCopyShortcut", () => {
-  test("creates when nothing is selected and focus is on the page", () => {
-    expect(claimsCopyShortcut(selected(""), null)).toBe(true);
-    expect(claimsCopyShortcut(null, null)).toBe(true);
-  });
-
-  test("leaves ⌘C as copy when text is selected", () => {
-    expect(claimsCopyShortcut(selected("Acme Inc."), null)).toBe(false);
-  });
-
-  test("leaves ⌘C alone while typing in a field", () => {
-    expect(claimsCopyShortcut(selected(""), { tagName: "INPUT" })).toBe(false);
-    expect(claimsCopyShortcut(selected(""), { tagName: "DIV", isContentEditable: true })).toBe(
-      false,
-    );
+    expect(keys).toEqual(["alt+shift+c", "alt+shift+p", "alt+shift+d"]);
+    expect(shortcutKeys(shortcuts.newDeal, true)).toEqual(["⌥", "⇧", "D"]);
   });
 });
 
 describe("ariaKeyShortcuts", () => {
   test("names keys the way aria-keyshortcuts expects", () => {
-    expect(ariaKeyShortcuts(shortcuts.create, true)).toBe("Meta+C");
+    expect(ariaKeyShortcuts(shortcuts.newCompany, true)).toBe("Alt+Shift+C");
     expect(ariaKeyShortcuts(shortcuts.back, false)).toBe("Control+[");
     expect(ariaKeyShortcuts(pinnedShortcut(0)!, true)).toBe("Alt+1");
   });

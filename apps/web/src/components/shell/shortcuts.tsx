@@ -5,7 +5,7 @@ import { parsePinKey } from "@crm/core/chat";
 import { isPageId, pageById } from "../../lib/pages.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
-import { claimsCopyShortcut, pinnedShortcut, shortcuts, toHotkey } from "../../lib/shortcuts.ts";
+import { pinnedShortcut, shortcuts, toHotkey } from "../../lib/shortcuts.ts";
 
 // ⌘ shortcuts work everywhere, text fields included. The ⌥ ones (the library's default) stay
 // out of text fields, where Option types characters.
@@ -42,22 +42,16 @@ export function Shortcuts({
   useHotkeys(toHotkey(shortcuts.sidebar), toggleSidebar, EVERYWHERE, [toggleSidebar]);
   useHotkeys(toHotkey(shortcuts.back), () => router.history.back(), EVERYWHERE, [router]);
   useHotkeys(toHotkey(shortcuts.forward), () => router.history.forward(), EVERYWHERE, [router]);
-  // Sheets open from anywhere; ⌘C stays copy while there's a selection or a field has focus.
-  useHotkeys(
-    toHotkey(shortcuts.create),
-    // Held keys repeat; one press opens one sheet, and pressing it again while open does nothing.
-    (event) => {
-      if (!event.repeat) void setCreate("company");
-    },
-    {
-      enabled: () => claimsCopyShortcut(window.getSelection(), document.activeElement),
-      enableOnFormTags: false,
-      // The same test, not `true`: the hook prevents the default even when `enabled` says no,
-      // which swallowed ⌘C on selected text, so nothing was copied.
-      preventDefault: () => claimsCopyShortcut(window.getSelection(), document.activeElement),
-    },
-    [setCreate],
-  );
+
+  // Create sheets open from any page, but not while typing: in a field, ⌥⇧C/P/D still type
+  // their characters (Ç, ∏, Î). Held keys repeat, so one press opens one sheet.
+  const create = (kind: "company" | "contact" | "deal") => (event: KeyboardEvent) => {
+    if (!event.repeat) void setCreate(kind);
+  };
+
+  useHotkeys(toHotkey(shortcuts.newCompany), create("company"), OUTSIDE_TEXT, [setCreate]);
+  useHotkeys(toHotkey(shortcuts.newContact), create("contact"), OUTSIDE_TEXT, [setCreate]);
+  useHotkeys(toHotkey(shortcuts.newDeal), create("deal"), OUTSIDE_TEXT, [setCreate]);
   useHotkeys(toHotkey(shortcuts.newChat), () => void router.navigate({ to: "/" }), OUTSIDE_TEXT, [
     router,
   ]);

@@ -1,4 +1,5 @@
 import { isCompanyId, normalizeCompanyDomain, normalizeCompanyName } from "@crm/core/company";
+import { COMPANY_FIELDS, isContactId, normalizePatch } from "@crm/core/records";
 
 /**
  * Pure decisions behind the companies endpoints and the shape proxy: input normalisation and
@@ -15,10 +16,8 @@ export interface NewCompany {
   domain: string | null;
 }
 
-export interface CompanyPatch {
-  name?: string;
-  domain?: string | null;
-}
+/** Normalised columns to change (snake_case, as synced); absent columns stay unchanged. */
+export type CompanyPatch = Record<string, string | null>;
 
 export function parseCompanyId(id: string): Decision<string> {
   return isCompanyId(id) ? { ok: true, value: id } : fail("That company id is not valid");
@@ -44,30 +43,27 @@ export function parseNewCompany(input: {
   return { ok: true, value: { id: id.value, name: name.name, domain: domain.domain } };
 }
 
-/** Normalises only the fields present; absent fields stay unchanged. */
-export function parseCompanyPatch(input: {
-  name?: string | undefined;
-  domain?: string | null | undefined;
-}): Decision<CompanyPatch> {
-  const patch: CompanyPatch = {};
+/**
+ * Normalises only the fields present (any of `COMPANY_FIELDS`, plus the primary contact);
+ * absent fields stay unchanged.
+ */
+export function parseCompanyPatch(
+  input: Readonly<Record<string, string | null | undefined>>,
+): Decision<CompanyPatch> {
+  const { primary_contact_id: primary, ...fields } = input;
+  const patch = normalizePatch(COMPANY_FIELDS, fields);
 
-  if (input.name !== undefined) {
-    const name = normalizeCompanyName(input.name);
+  if (!patch.ok) return fail(patch.message);
 
-    if (!name.ok) return fail(name.message);
+  if (primary !== undefined) {
+    if (primary !== null && primary !== "" && !isContactId(primary)) {
+      return fail("That contact id is not valid");
+    }
 
-    patch.name = name.name;
+    patch.value["primary_contact_id"] = primary || null;
   }
 
-  if (input.domain !== undefined) {
-    const domain = normalizeCompanyDomain(input.domain);
-
-    if (!domain.ok) return fail(domain.message);
-
-    patch.domain = domain.domain;
-  }
-
-  return { ok: true, value: patch };
+  return { ok: true, value: patch.value };
 }
 
 /**

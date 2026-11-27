@@ -27,7 +27,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ComponentType } from "react";
 import { toast } from "sonner";
-import { rankCommands, type Searchable } from "../../lib/command-search.ts";
+import { rankSearch, type Searchable } from "@crm/ui/lib/search-rank";
 import { useChatSpaces, useVisibleChats } from "../../lib/chat-spaces.ts";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { useMemoryFacts } from "../../lib/memory-facts.ts";
@@ -85,6 +85,8 @@ export interface CommandPaletteProps {
 /** Each record kind's results show under, and with the icon of, its page. */
 const recordPages = {
   company: pageById("companies"),
+  contact: pageById("contacts"),
+  deal: pageById("deals"),
 } satisfies { readonly [K in RecordKind]: Page };
 
 /** At most this many results render while typing; the rest are a narrower query away. */
@@ -264,6 +266,33 @@ export default function CommandPalette({
       icon: SpacesIcon,
       run: () => void setCreate("space"),
     },
+    {
+      id: "create:company",
+      label: "New company",
+      section: "Go to",
+      keywords: ["create", "add", "account", "organisation"],
+      icon: AddIcon,
+      shortcut: shortcuts.newCompany,
+      run: () => void setCreate("company"),
+    },
+    {
+      id: "create:contact",
+      label: "New contact",
+      section: "Go to",
+      keywords: ["create", "add", "person", "people"],
+      icon: AddIcon,
+      shortcut: shortcuts.newContact,
+      run: () => void setCreate("contact"),
+    },
+    {
+      id: "create:deal",
+      label: "New deal",
+      section: "Go to",
+      keywords: ["create", "add", "opportunity", "pipeline"],
+      icon: AddIcon,
+      shortcut: shortcuts.newDeal,
+      run: () => void setCreate("deal"),
+    },
     // Pinned chats and spaces are in the sidebar; ⌘K lists the pages, with their pinned shortcut.
     ...order.flatMap((key, index) => {
       const pin = parsePinKey(key);
@@ -363,7 +392,7 @@ export default function CommandPalette({
 /**
  * The search box and results. Mounted only while the palette is open, so it opens empty. With
  * no query, commands show under their sections; with one, commands and records show best match
- * first (`rankCommands`), each with its section, so cmdk's own filter is off.
+ * first (`rankSearch`), each with its section, so cmdk's own filter is off.
  */
 function PaletteSearch({
   commands,
@@ -377,7 +406,7 @@ function PaletteSearch({
   placeholder: string;
 }) {
   const [query, setQuery] = useState("");
-  const ranked = rankCommands([...commands, ...records], query);
+  const ranked = rankSearch([...commands, ...records], query);
   const isFact = (command: PaletteCommand) => command.id.startsWith("fact:");
 
   const shownFacts = new Set(

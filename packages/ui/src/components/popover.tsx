@@ -18,9 +18,13 @@ function PopoverContent({
   alignOffset = 0,
   side = "bottom",
   sideOffset = 4,
+  flush = false,
   ...props
 }: PopoverPrimitive.Popup.Props &
-  Pick<PopoverPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
+  Pick<PopoverPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset"> & {
+    /** No padding or gap, for content that fills the popover edge to edge (a `Command` list). */
+    flush?: boolean;
+  }) {
   return (
     // Above the fixed sidebar, so a modal popover's backdrop covers it (see DropdownMenuContent).
     <PopoverPrimitive.Portal className="relative z-50">
@@ -33,8 +37,9 @@ function PopoverContent({
       >
         <PopoverPrimitive.Popup
           data-slot="popover-content"
+          data-flush={flush || undefined}
           className={cn(
-            "select-none z-50 flex w-72 origin-(--transform-origin) flex-col gap-2.5 rounded-lg bg-popover/80 backdrop-blur-xl backdrop-saturate-150 p-2.5 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            "select-none z-50 flex w-max min-w-[max(var(--anchor-width),18rem)] max-w-(--available-width) origin-(--transform-origin) flex-col gap-2.5 rounded-lg bg-popover/80 backdrop-blur-xl backdrop-saturate-150 p-2.5 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-flush:gap-0 data-flush:p-0",
             className,
           )}
           {...props}

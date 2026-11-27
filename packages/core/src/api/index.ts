@@ -1,5 +1,6 @@
 import { Context, Schema } from "effect";
 import { StoredFolders, StoredPinned, StoredRecent } from "../chat/index.ts";
+import { WebsiteActivity } from "../tracking/index.ts";
 import {
   HttpApi,
   HttpApiEndpoint,
@@ -108,41 +109,193 @@ export type Company = typeof Company.Type;
 /** The Postgres transaction id of a write. The client awaits it in the shape before dropping optimistic state. */
 export const TxId = Schema.Struct({ txid: Schema.Number });
 
+const Text = Schema.NullOr(Schema.String);
+const Patchable = Schema.optional(Text);
+
+/**
+ * A PATCH body: any of a kind's editable columns (`COMPANY_FIELDS` and friends in
+ * `@crm/core/records`), each a string or null. The API normalises and checks every value.
+ */
+const patchOf = <const Columns extends readonly string[]>(columns: Columns) =>
+  // SAFETY: `fromEntries` gets exactly one `Patchable` entry per column in `columns`.
+  Object.fromEntries(columns.map((column) => [column, Patchable])) as {
+    readonly [K in Columns[number]]: typeof Patchable;
+  };
+
 export const CreateCompany = Schema.Struct({
   /** Made in the browser: `createId("com")` from `@crm/core/ids` (or a UUID from before prefixes). */
   id: Schema.String,
   name: Schema.String,
-  domain: Schema.NullOr(Schema.String),
+  domain: Text,
+  owner_id: Schema.optional(Text),
 });
 
 export const UpdateCompany = Schema.Struct({
-  name: Schema.optional(Schema.String),
-  domain: Schema.optional(Schema.NullOr(Schema.String)),
+  ...patchOf([
+    "name",
+    "domain",
+    "website",
+    "phone",
+    "email",
+    "industry",
+    "city",
+    "country",
+    "owner_id",
+    "description",
+    "linkedin_url",
+    "twitter_url",
+    "github_url",
+    "primary_contact_id",
+  ]),
+  /** True archives the company (hidden from lists), false restores it. */
+  archived: Schema.optional(Schema.Boolean),
 });
 
-const CompanyErrors = [NotFound, NoActiveWorkspace, Invalid];
+const RecordErrors = [NotFound, NoActiveWorkspace, Invalid];
 
-export class CompaniesApi extends HttpApiGroup.make("companies")
-  .add(
-    HttpApiEndpoint.post("create", "/", {
-      payload: CreateCompany,
-      success: TxId,
-      error: CompanyErrors,
-    }),
+/** Create, patch and delete for one record kind: `POST /`, `PATCH /:id`, `DELETE /:id`. */
+const recordEndpoints = <C extends Schema.Top, U extends Schema.Top>(create: C, update: U) =>
+  [
+    HttpApiEndpoint.post("create", "/", { payload: create, success: TxId, error: RecordErrors }),
     HttpApiEndpoint.patch("update", "/:id", {
       params: { id: Schema.String },
-      payload: UpdateCompany,
+      payload: update,
       success: TxId,
-      error: CompanyErrors,
+      error: RecordErrors,
     }),
     HttpApiEndpoint.delete("remove", "/:id", {
       params: { id: Schema.String },
       success: TxId,
-      error: CompanyErrors,
+      error: RecordErrors,
+    }),
+  ] as const;
+
+export class CompaniesApi extends HttpApiGroup.make("companies")
+  .add(...recordEndpoints(CreateCompany, UpdateCompany))
+  .add(
+    /**
+     * Re-enrich: copies the company's logo again and refreshes its website research, off the
+     * request path. `queued` is false when the company has no domain to look up.
+     */
+    HttpApiEndpoint.post("enrich", "/:id/enrich", {
+      params: { id: Schema.String },
+      success: Schema.Struct({ queued: Schema.Boolean }),
+      error: RecordErrors,
     }),
   )
   .middleware(Authentication)
   .prefix("/companies") {}
+
+export const CreateContact = Schema.Struct({
+  /** `createId("ctc")`. */
+  id: Schema.String,
+  first_name: Schema.String,
+  last_name: Schema.optional(Text),
+  email: Schema.optional(Text),
+  phone: Schema.optional(Text),
+  title: Schema.optional(Text),
+  company_id: Schema.optional(Text),
+  owner_id: Schema.optional(Text),
+});
+
+export const UpdateContact = Schema.Struct({
+  ...patchOf([
+    "first_name",
+    "last_name",
+    "title",
+    "email",
+    "phone",
+    "linkedin_url",
+    "twitter_url",
+    "github_url",
+    "seniority",
+    "function",
+    "company_id",
+    "owner_id",
+  ]),
+  archived: Schema.optional(Schema.Boolean),
+});
+
+export class ContactsApi extends HttpApiGroup.make("contacts")
+  .add(...recordEndpoints(CreateContact, UpdateContact))
+  .middleware(Authentication)
+  .prefix("/contacts") {}
+
+export const CreateDeal = Schema.Struct({
+  /** `createId("del")`. */
+  id: Schema.String,
+  name: Schema.String,
+  company_id: Schema.String,
+  owner_id: Schema.optional(Text),
+  stage: Schema.optional(Schema.String),
+  amount: Schema.optional(Text),
+  currency: Schema.optional(Schema.String),
+  expected_close_date: Schema.optional(Text),
+});
+
+export const UpdateDeal = Schema.Struct({
+  ...patchOf([
+    "name",
+    "amount",
+    "currency",
+    "expected_close_date",
+    "company_id",
+    "owner_id",
+    "description",
+  ]),
+  /** A new stage; the API stamps when it changed and logs a stage change. */
+  stage: Schema.optional(Schema.String),
+  /** Why a lost or unqualified deal closed; required when moving to one of those stages. */
+  closed_reason: Patchable,
+  archived: Schema.optional(Schema.Boolean),
+});
+
+export class DealsApi extends HttpApiGroup.make("deals")
+  .add(...recordEndpoints(CreateDeal, UpdateDeal))
+  .add(
+    /** Puts a contact on a deal, or changes their role when already on it. */
+    HttpApiEndpoint.put("attachContact", "/:id/contacts/:contactId", {
+      params: { id: Schema.String, contactId: Schema.String },
+      payload: Schema.Struct({ role: Schema.optional(Text) }),
+      success: TxId,
+      error: RecordErrors,
+    }),
+    HttpApiEndpoint.delete("detachContact", "/:id/contacts/:contactId", {
+      params: { id: Schema.String, contactId: Schema.String },
+      success: TxId,
+      error: RecordErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/deals") {}
+
+export const CreateActivity = Schema.Struct({
+  /** `createId("act")`. */
+  id: Schema.String,
+  /** One of `LOGGED_ACTIVITY_TYPES`: note, call, email, meeting or task. */
+  type: Schema.String,
+  subject: Schema.optional(Text),
+  body: Schema.optional(Text),
+  /** ISO timestamp; now when left out. */
+  occurred_at: Schema.optional(Schema.String),
+  due_at: Schema.optional(Text),
+  company_id: Schema.optional(Text),
+  contact_id: Schema.optional(Text),
+  deal_id: Schema.optional(Text),
+});
+
+export const UpdateActivity = Schema.Struct({
+  subject: Patchable,
+  body: Patchable,
+  due_at: Patchable,
+  /** Tasks: true marks it done now, false reopens it. */
+  completed: Schema.optional(Schema.Boolean),
+});
+
+export class ActivitiesApi extends HttpApiGroup.make("activities")
+  .add(...recordEndpoints(CreateActivity, UpdateActivity))
+  .middleware(Authentication)
+  .prefix("/activities") {}
 
 /** A third-party server failed; `message` is shown to the user. */
 export class UpstreamUnavailable extends Schema.TaggedError<UpstreamUnavailable>()(
@@ -527,6 +680,12 @@ export const CreateChat = Schema.Struct({
   spaceId: Schema.NullOr(Schema.String),
   /** `manual` (the default), `auto` or `bypass` (ADR 0019). */
   permissionMode: Schema.optional(Schema.String),
+  /**
+   * The record the chat is about, from a record sheet's Agent tab (ADR 0024): `company`,
+   * `contact` or `deal`, and its id. The agent reads it before each turn.
+   */
+  recordKind: Schema.optional(Schema.NullOr(Schema.String)),
+  recordId: Schema.optional(Schema.NullOr(Schema.String)),
 });
 
 export const UpdateChat = Schema.Struct({
@@ -702,16 +861,239 @@ export class SidebarApi extends HttpApiGroup.make("sidebar")
   .middleware(Authentication)
   .prefix("/sidebar") {}
 
+/** A new custom field (`@crm/core/fields`); its key is made from the label. */
+export const CreateField = Schema.Struct({
+  /** `createId("fdf")`. */
+  id: Schema.String,
+  /** `company`, `contact` or `deal`. */
+  entity: Schema.String,
+  label: Schema.String,
+  /** One of `FIELD_TYPES`; fixed once created. */
+  type: Schema.String,
+  agent_filled: Schema.optional(Schema.Boolean),
+  agent_brief: Schema.optional(Text),
+  required: Schema.optional(Schema.Boolean),
+  show_on_sheet: Schema.optional(Schema.Boolean),
+  show_on_table: Schema.optional(Schema.Boolean),
+  show_on_filter: Schema.optional(Schema.Boolean),
+  /** Select fields: the options in order, each with a `createId("fop")` id. */
+  options: Schema.optional(
+    Schema.Array(Schema.Struct({ id: Schema.String, label: Schema.String })),
+  ),
+});
+
+export const UpdateField = Schema.Struct({
+  label: Schema.optional(Schema.String),
+  agent_filled: Schema.optional(Schema.Boolean),
+  agent_brief: Patchable,
+  required: Schema.optional(Schema.Boolean),
+  show_on_sheet: Schema.optional(Schema.Boolean),
+  show_on_table: Schema.optional(Schema.Boolean),
+  show_on_filter: Schema.optional(Schema.Boolean),
+  /** True archives the field (hidden everywhere, values kept), false restores it. */
+  archived: Schema.optional(Schema.Boolean),
+});
+
+/** A field's value on one record. `null` clears it. Select values are option ids. */
+export const PutFieldValue = Schema.Struct({
+  /** `createId("fvl")` for a value the record doesn't have yet; ignored when it has one. */
+  id: Schema.optional(Schema.String),
+  field_id: Schema.String,
+  record_id: Schema.String,
+  value: Schema.NullOr(Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
+});
+
+const FieldErrors = [NotFound, NoActiveWorkspace, Invalid];
+
+/** Custom fields of companies, contacts and deals; reads sync through the `FIELD_*` shapes. */
+export class FieldsApi extends HttpApiGroup.make("fields")
+  .add(
+    HttpApiEndpoint.post("create", "/", {
+      payload: CreateField,
+      success: TxId,
+      error: FieldErrors,
+    }),
+    HttpApiEndpoint.patch("update", "/:id", {
+      params: { id: Schema.String },
+      payload: UpdateField,
+      success: TxId,
+      error: FieldErrors,
+    }),
+    /** Sets the order of an entity's fields: `ids` first to last. */
+    HttpApiEndpoint.put("reorder", "/order", {
+      payload: Schema.Struct({ entity: Schema.String, ids: Schema.Array(Schema.String) }),
+      success: TxId,
+      error: FieldErrors,
+    }),
+    HttpApiEndpoint.post("createOption", "/:id/options", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ id: Schema.String, label: Schema.String }),
+      success: TxId,
+      error: FieldErrors,
+    }),
+    HttpApiEndpoint.patch("updateOption", "/:id/options/:optionId", {
+      params: { id: Schema.String, optionId: Schema.String },
+      payload: Schema.Struct({
+        label: Schema.optional(Schema.String),
+        /** True hides the option from pickers; values that use it keep it. */
+        archived: Schema.optional(Schema.Boolean),
+      }),
+      success: TxId,
+      error: FieldErrors,
+    }),
+    HttpApiEndpoint.put("reorderOptions", "/:id/options/order", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ ids: Schema.Array(Schema.String) }),
+      success: TxId,
+      error: FieldErrors,
+    }),
+    HttpApiEndpoint.put("putValue", "/values", {
+      payload: PutFieldValue,
+      success: TxId,
+      error: FieldErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/fields") {}
+
+/** A workspace's CRM settings (ADR 0024); the row also syncs (`WORKSPACE_SETTINGS_SYNC_PATH`). */
+export const WorkspaceSettings = Schema.Struct({ reporting_currency: Schema.String });
+
+/**
+ * The reporting currency: totals add deals' amounts converted into it. Changing it converts every
+ * open deal again in the same transaction.
+ */
+export class WorkspaceSettingsApi extends HttpApiGroup.make("workspaceSettings")
+  .add(
+    HttpApiEndpoint.get("get", "/", { success: WorkspaceSettings, error: RecordErrors }),
+    HttpApiEndpoint.put("save", "/", {
+      payload: WorkspaceSettings,
+      success: TxId,
+      error: RecordErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/workspace-settings") {}
+
+/**
+ * A workspace's own rate: one `currency` is `rate` units of the reporting currency. It wins over
+ * the fetched rate, and open deals in that currency are converted again.
+ */
+export class ExchangeRatesApi extends HttpApiGroup.make("exchangeRates")
+  .add(
+    HttpApiEndpoint.put("setManual", "/manual/:currency", {
+      params: { currency: Schema.String },
+      payload: Schema.Struct({ rate: Schema.String }),
+      success: TxId,
+      error: RecordErrors,
+    }),
+    /** Goes back to the fetched rate. */
+    HttpApiEndpoint.delete("clearManual", "/manual/:currency", {
+      params: { currency: Schema.String },
+      success: TxId,
+      error: RecordErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/exchange-rates") {}
+
+export const CreateSavedView = Schema.Struct({
+  /** `createId("svw")`. */
+  id: Schema.String,
+  /** `company`, `contact` or `deal`. */
+  entity: Schema.String,
+  name: Schema.String,
+  /** The list's URL query, without `?`. */
+  query: Schema.String,
+  shared: Schema.optional(Schema.Boolean),
+});
+
+export const UpdateSavedView = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  query: Schema.optional(Schema.String),
+  shared: Schema.optional(Schema.Boolean),
+});
+
+/**
+ * Saved list views. The caller owns what they create; a shared view is seen and edited by every
+ * member, a personal one only by its owner.
+ */
+export class SavedViewsApi extends HttpApiGroup.make("savedViews")
+  .add(...recordEndpoints(CreateSavedView, UpdateSavedView))
+  .middleware(Authentication)
+  .prefix("/saved-views") {}
+
+/** The workspace's website tracking: its public key, or `null` while tracking is off. */
+export const TrackingSettings = Schema.Struct({ key: Schema.NullOr(Schema.String) });
+
+const TrackingErrors = [NotFound, NoActiveWorkspace];
+
+/**
+ * Website tracking for members: turn the snippet on or off, and read a company's or contact's
+ * website activity (`null` when it has no visits). The snippet's own public endpoints are raw
+ * routes in apps/api (`TRACKING_COLLECT_PATH`, `TRACKING_IDENTIFY_PATH`).
+ */
+export class TrackingApi extends HttpApiGroup.make("tracking")
+  .add(
+    HttpApiEndpoint.get("settings", "/", { success: TrackingSettings, error: TrackingErrors }),
+    /** Turns tracking on with a new key; keeps the existing key when it is already on. */
+    HttpApiEndpoint.post("enable", "/", { success: TrackingSettings, error: TrackingErrors }),
+    /** Turns tracking off: the key stops working. Stored visits stay. */
+    HttpApiEndpoint.delete("disable", "/", {
+      success: HttpApiSchema.NoContent,
+      error: TrackingErrors,
+    }),
+    HttpApiEndpoint.get("company", "/companies/:id", {
+      params: { id: Schema.String },
+      success: Schema.NullOr(WebsiteActivity),
+      error: TrackingErrors,
+    }),
+    HttpApiEndpoint.get("contact", "/contacts/:id", {
+      params: { id: Schema.String },
+      success: Schema.NullOr(WebsiteActivity),
+      error: TrackingErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/tracking") {}
+
+/** A member's decision on a fact the agent proposed for a contact (ADR 0024). */
+export const DecideContactFact = Schema.Struct({
+  /** `applied` (the contact column already took the value) or `dismissed`. */
+  status: Schema.String,
+});
+
+/** What the agent learned about records, as members act on it (ADR 0024). */
+export class IntelApi extends HttpApiGroup.make("intel")
+  .add(
+    HttpApiEndpoint.patch("decideFact", "/contact-facts/:id", {
+      params: { id: Schema.String },
+      payload: DecideContactFact,
+      success: TxId,
+      error: RecordErrors,
+    }),
+  )
+  .middleware(Authentication) {}
+
 export class CrmApi extends HttpApi.make("crm")
+  .add(IntelApi)
+  .add(FieldsApi)
   .add(SystemApi)
   .add(AccountApi)
   .add(CompaniesApi)
+  .add(ContactsApi)
+  .add(DealsApi)
+  .add(ActivitiesApi)
   .add(ConnectionsApi)
   .add(SkillsApi)
   .add(MemoryApi)
   .add(ChatsApi)
   .add(ChatSpacesApi)
   .add(SidebarApi)
+  .add(WorkspaceSettingsApi)
+  .add(ExchangeRatesApi)
+  .add(SavedViewsApi)
+  .add(TrackingApi)
   .prefix("/api") {}
 
 /**
@@ -720,6 +1102,18 @@ export class CrmApi extends HttpApi.make("crm")
  * the URL, and so the browser cache entry, distinct per workspace.
  */
 export const COMPANIES_SYNC_PATH = "/api/shapes/companies";
+
+/** The active workspace's contacts (same `?workspace=` rule). */
+export const CONTACTS_SYNC_PATH = "/api/shapes/contacts";
+
+/** The active workspace's deals (same `?workspace=` rule). */
+export const DEALS_SYNC_PATH = "/api/shapes/deals";
+
+/** Who is on each deal in the active workspace (same `?workspace=` rule). */
+export const DEAL_CONTACTS_SYNC_PATH = "/api/shapes/deal-contacts";
+
+/** The active workspace's activity: notes, calls, emails, meetings, tasks, stage changes. */
+export const ACTIVITIES_SYNC_PATH = "/api/shapes/activities";
 
 /**
  * The caller's own connections in the active workspace (same `?workspace=` rule). The proxy
@@ -757,8 +1151,32 @@ export const CHAT_SPACE_MEMBERS_SYNC_PATH = "/api/shapes/chat-space-members";
 /** The caller's own sidebar row in the active workspace (same `?workspace=` rule). */
 export const SIDEBAR_SYNC_PATH = "/api/shapes/sidebar";
 
+/** The active workspace's settings row: its reporting currency (same `?workspace=` rule). */
+export const WORKSPACE_SETTINGS_SYNC_PATH = "/api/shapes/workspace-settings";
+
+/** Exchange rates: the fetched ones every workspace shares, plus the active workspace's own. */
+export const EXCHANGE_RATES_SYNC_PATH = "/api/shapes/exchange-rates";
+
+/** The active workspace's shared views and the caller's own (same `?workspace=` rule). */
+export const SAVED_VIEWS_SYNC_PATH = "/api/shapes/saved-views";
+
+/** The active workspace's custom field definitions (same `?workspace=` rule). */
+export const FIELD_DEFINITIONS_SYNC_PATH = "/api/shapes/field-definitions";
+
+/** The options of the active workspace's select fields (same `?workspace=` rule). */
+export const FIELD_OPTIONS_SYNC_PATH = "/api/shapes/field-options";
+
+/** The active workspace's custom field values (same `?workspace=` rule). */
+export const FIELD_VALUES_SYNC_PATH = "/api/shapes/field-values";
+
 /**
  * The agent proxy's prefix: `useEveAgent({ baseUrl: chatAgentBase(chatId) })`. The API checks
  * the chat and forwards `/eve/v1/session/<its session>/…` to the agent (ADR 0018).
  */
 export const chatAgentBase = (chatId: string) => `/api/chats/${encodeURIComponent(chatId)}/agent`;
+
+/** The agent's proposed facts on the active workspace's contacts (same `?workspace=` rule). */
+export const CONTACT_FACTS_SYNC_PATH = "/api/shapes/contact-facts";
+
+/** The agent's briefs on the active workspace's contacts (same `?workspace=` rule). */
+export const CONTACT_BRIEFS_SYNC_PATH = "/api/shapes/contact-briefs";

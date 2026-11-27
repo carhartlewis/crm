@@ -2,11 +2,21 @@ import { describe, expect, test } from "bun:test";
 import { moveItem, normalizeOrder, parseStoredOrder } from "./pinned-order.ts";
 
 describe("normalizeOrder", () => {
-  test("keeps the saved order and appends pages added since", () => {
+  test("puts a page added since where the default order has it", () => {
+    expect(normalizeOrder(["page:companies", "page:contacts", "page:workflows"])).toEqual([
+      "page:companies",
+      "page:contacts",
+      "page:deals",
+      "page:workflows",
+    ]);
+  });
+
+  test("keeps the saved order, and adds new pages after every page saved before them", () => {
     expect(normalizeOrder(["page:workflows", "page:companies"])).toEqual([
       "page:workflows",
       "page:companies",
       "page:contacts",
+      "page:deals",
     ]);
   });
 
@@ -15,6 +25,7 @@ describe("normalizeOrder", () => {
       "page:workflows",
       "page:companies",
       "page:contacts",
+      "page:deals",
     ]);
   });
 
@@ -24,17 +35,16 @@ describe("normalizeOrder", () => {
     expect(normalizeOrder([chat, "page:contacts"])).toEqual([
       chat,
       "page:contacts",
-      "page:companies",
+      "page:deals",
       "page:workflows",
+      "page:companies",
     ]);
   });
 
   test("drops unknown and duplicate ids, and survives garbage", () => {
-    expect(normalizeOrder(["deals", "page:deals", "chat:nope", "contacts", "contacts"])).toEqual([
-      "page:contacts",
-      "page:companies",
-      "page:workflows",
-    ]);
+    expect(
+      normalizeOrder(["reports", "page:reports", "chat:nope", "contacts", "contacts"]),
+    ).toEqual(["page:contacts", "page:deals", "page:workflows", "page:companies"]);
   });
 });
 

@@ -38,8 +38,10 @@ function toPinKey(entry: string): PinKey | undefined {
 }
 
 /**
- * Known keys in the saved order, then any page added since, so nothing is lost or duplicated.
- * Pages are always pinned; spaces and chats only when the user pinned them.
+ * Known keys in the saved order, plus any page added since, so nothing is lost or duplicated.
+ * A new page goes right after the page before it in the default order (Deals after Contacts, so
+ * above Workflows), or at the end when that page isn't saved. Pages are always pinned;
+ * spaces and chats only when the user pinned them.
  */
 export function normalizeOrder(saved: readonly string[]): readonly PinKey[] {
   const keys = new Set<PinKey>();
@@ -50,7 +52,18 @@ export function normalizeOrder(saved: readonly string[]): readonly PinKey[] {
     if (key) keys.add(key);
   }
 
-  return [...keys, ...DEFAULT_ORDER.filter((key) => !keys.has(key))];
+  const order = [...keys];
+
+  for (const [index, key] of DEFAULT_ORDER.entries()) {
+    if (keys.has(key)) continue;
+
+    const previous = DEFAULT_ORDER[index - 1];
+    const at = previous && order.includes(previous) ? order.indexOf(previous) + 1 : order.length;
+
+    order.splice(at, 0, key);
+  }
+
+  return order;
 }
 
 /** Moves the item at `from` to `to`, shifting the items between. */

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { rankCommands, type Searchable } from "./command-search.ts";
+import { rankSearch, type Searchable } from "./search-rank";
 
 const commands: readonly Searchable[] = [
   { label: "Home", section: "Go to" },
@@ -17,9 +17,9 @@ const commands: readonly Searchable[] = [
   { label: "Use light theme", section: "Actions" },
 ];
 
-const labels = (query: string) => rankCommands(commands, query).map(({ item }) => item.label);
+const labels = (query: string) => rankSearch(commands, query).map(({ item }) => item.label);
 
-describe("rankCommands", () => {
+describe("rankSearch", () => {
   test("without a query, keeps every item in its order", () => {
     expect(labels("  ")).toEqual(commands.map((command) => command.label));
   });
@@ -61,12 +61,12 @@ describe("rankCommands", () => {
   });
 
   test("highlights what matched in the label only", () => {
-    const [memory] = rankCommands(commands, "mem");
-    const [workflows] = rankCommands(commands, "automations");
+    const [memory] = rankSearch(commands, "mem");
+    const [workflows] = rankSearch(commands, "automations");
 
     expect(memory?.ranges).toEqual([10, 13]);
     // Each typed word is marked where it starts a word, not where it first appears.
-    expect(rankCommands(commands, "sk wo")[0]?.ranges).toEqual([0, 2, 10, 12]);
+    expect(rankSearch(commands, "sk wo")[0]?.ranges).toEqual([0, 2, 10, 12]);
     expect(workflows?.ranges).toBeNull();
   });
 });

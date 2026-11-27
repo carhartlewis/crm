@@ -10,6 +10,8 @@ interface SheetProps {
 /** Each record kind's sheet. A kind without one fails type checking. */
 const sheets = {
   company: preloadable(() => import("../companies/company-sheet.tsx")),
+  contact: preloadable(() => import("../contacts/contact-sheet.tsx")),
+  deal: preloadable(() => import("../deals/deal-sheet.tsx")),
 } satisfies { readonly [K in RecordKind]: ComponentType<SheetProps> };
 
 /**

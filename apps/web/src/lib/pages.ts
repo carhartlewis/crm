@@ -1,4 +1,5 @@
 import building from "@carbon/icons/es/building/16.js";
+import currencyDollar from "@carbon/icons/es/currency--dollar/16.js";
 import flow from "@carbon/icons/es/flow/16.js";
 import userMultiple from "@carbon/icons/es/user--multiple/16.js";
 import { carbonIcon } from "@crm/ui/components/icon";
@@ -18,6 +19,13 @@ export const pages = [
     to: "/contacts",
     icon: carbonIcon(userMultiple),
     description: "Everyone you know, with their history across email and calls.",
+  },
+  {
+    id: "deals",
+    label: "Deals",
+    to: "/deals",
+    icon: carbonIcon(currencyDollar),
+    description: "The pipeline, and everything that has already closed.",
   },
   {
     id: "workflows",

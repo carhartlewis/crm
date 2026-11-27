@@ -1,4 +1,5 @@
 import { createId, ID_PREFIXES } from "@crm/core/ids";
+import { DEAL_STAGES, LOGGED_ACTIVITY_TYPES } from "@crm/core/records";
 import type { LocalTool } from "@crm/integrations/gateway";
 import { createContextDev, type WebReader } from "@crm/core/brand";
 import type { JevClient } from "@crm/memory/jev";
@@ -8,8 +9,13 @@ import { AppConfig } from "../config.ts";
 import { Companies, type CompaniesService } from "./Companies.ts";
 import { postgresDirectory } from "./crm-directory.ts";
 import { factSubject } from "./fact-subject.ts";
+import { Fields, type FieldsService } from "./Fields.ts";
+import { fieldTools } from "./field-tools.ts";
+import { Intel, type IntelService } from "./Intel.ts";
+import { intelTools } from "./intel-tools.ts";
 import { type AgentCaller, type AgentResult, Memory, type MemoryService } from "./Memory.ts";
 import { Postgres } from "./Postgres.ts";
+import { Records, type RecordsService } from "./Records.ts";
 
 /**
  * The CRM's own tools on the MCP gateway (ADR 0018): the agent reaches companies, members and
@@ -21,11 +27,45 @@ export interface DirectoryCompany {
   readonly id: string;
   readonly name: string;
   readonly domain: string | null;
+  readonly industry: string | null;
+  readonly location: string | null;
+  readonly description: string | null;
   readonly ownerName: string | null;
+  readonly contacts: number;
+  readonly openDeals: number;
+  readonly lastActivityAt: string | null;
   readonly createdAt: string;
 }
 
+export interface DirectoryContact {
+  readonly id: string;
+  readonly name: string;
+  readonly title: string | null;
+  readonly email: string | null;
+  readonly phone: string | null;
+  readonly companyId: string | null;
+  readonly companyName: string | null;
+  readonly ownerName: string | null;
+  readonly lastActivityAt: string | null;
+}
+
+export interface DirectoryDeal {
+  readonly id: string;
+  readonly name: string;
+  readonly stage: string;
+  readonly amount: string | null;
+  readonly currency: string;
+  readonly expectedCloseDate: string | null;
+  readonly companyId: string;
+  readonly companyName: string;
+  readonly ownerName: string | null;
+  readonly description: string | null;
+  readonly closedReason: string | null;
+  readonly lastActivityAt: string | null;
+}
+
 export interface DirectoryMember {
+  readonly id?: string;
   readonly name: string;
   readonly email: string;
   readonly role: string;
@@ -39,18 +79,39 @@ export interface CrmDirectory {
     limit: number,
   ): Promise<readonly DirectoryCompany[]>;
   company(workspaceId: string, id: string): Promise<DirectoryCompany | null>;
+  /** `companyId` empty means every company. */
+  contacts(
+    workspaceId: string,
+    query: string,
+    companyId: string,
+    limit: number,
+  ): Promise<readonly DirectoryContact[]>;
+  contact(workspaceId: string, id: string): Promise<DirectoryContact | null>;
+  /** `stage`: a stage id, `open`, `closed`, or empty for all. */
+  deals(
+    workspaceId: string,
+    query: string,
+    filter: { readonly companyId: string; readonly stage: string },
+    limit: number,
+  ): Promise<readonly DirectoryDeal[]>;
+  deal(workspaceId: string, id: string): Promise<DirectoryDeal | null>;
   members(workspaceId: string): Promise<readonly DirectoryMember[]>;
 }
 
 export interface CrmToolDeps {
   readonly directory: CrmDirectory;
   readonly companies: CompaniesService;
+  readonly records: RecordsService;
   readonly memory: Pick<MemoryService["agent"], "search" | "remember" | "forget">;
   /** context.dev, when the API has a key; without it the web tools aren't listed. */
   readonly web: WebReader | null;
   /** Jev, to file a fact under the company it is about; without it facts the agent gives no
    * company for stay with the workspace unless they name one. */
   readonly jev: JevClient | null;
+  /** What the agent learns about records (ADR 0024); without it those tools aren't listed. */
+  readonly intel?: IntelService;
+  /** Custom fields; without it `crm__list_fields` and `crm__set_field_value` aren't listed. */
+  readonly fields?: FieldsService;
 }
 
 /** How long saving a fact waits for Jev to say which company it is about. */
@@ -75,7 +136,7 @@ const fromAgent = <T, D>(result: AgentResult<T>, done: D) =>
   result.ok ? answer(result.value ?? done) : refuse(result.message);
 
 /** The first failure's message, as the model should read it. */
-async function run<A>(effect: Effect.Effect<A, { readonly message: string }>) {
+export async function run<A>(effect: Effect.Effect<A, { readonly message: string }>) {
   const exit = await Effect.runPromiseExit(effect);
 
   if (Exit.isSuccess(exit)) return answer(exit.value);
@@ -90,8 +151,27 @@ const CompanyId = Schema.String.annotate({
   description: "A company id from crm__list_companies, such as com_…",
 });
 
+const ContactId = Schema.String.annotate({
+  description: "A contact id from crm__list_contacts, such as ctc_…",
+});
+
+const DealId = Schema.String.annotate({
+  description: "A deal id from crm__list_deals, such as del_…",
+});
+
+const OwnerId = Schema.optional(Schema.NullOr(Schema.String)).annotate({
+  description: "A member's user id from crm__list_members; null leaves it unassigned.",
+});
+
+const Limit = Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 200 })));
+
+const Text = (description: string) =>
+  Schema.optional(Schema.NullOr(Schema.String)).annotate({ description });
+
+const STAGE_HELP = `One of: ${DEAL_STAGES.map((stage) => `${stage.id} (${stage.label})`).join(", ")}.`;
+
 /** One tool: its MCP definition, and a call that decodes its arguments first. */
-function tool<S extends Schema.Top & { readonly DecodingServices: never }>(
+export function tool<S extends Schema.Top & { readonly DecodingServices: never }>(
   definition: {
     readonly name: string;
     readonly description: string;
@@ -210,7 +290,8 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
     tool(
       {
         name: "get_company",
-        description: "One company in the CRM: name, domain, owner and when it was added.",
+        description:
+          "One company in the CRM: name, domain, industry, location, about, owner, contact and open-deal counts.",
         readOnly: true,
         input: Schema.Struct({ id: CompanyId }),
       },
@@ -245,25 +326,244 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
     tool(
       {
         name: "update_company",
-        description: "Rename a company or change its domain. Leave out what stays the same.",
+        description:
+          "Change a company's details. Leave out what stays the same; null clears a field. `archived: true` hides it from lists.",
         readOnly: false,
         input: Schema.Struct({
           id: CompanyId,
           name: Schema.optional(Schema.String),
-          domain: Schema.optional(Schema.NullOr(Schema.String)),
+          domain: Text("Website domain, such as acme.com."),
+          website: Text("Full website URL."),
+          description: Text("What the company does, in a few sentences."),
+          industry: Text("Industry, such as Software or Healthcare."),
+          city: Text("City of the headquarters."),
+          country: Text("Country of the headquarters."),
+          phone: Text("Main phone number."),
+          email: Text("General contact email."),
+          linkedin_url: Text("LinkedIn page URL."),
+          twitter_url: Text("X (Twitter) URL."),
+          github_url: Text("GitHub URL."),
+          owner_id: OwnerId,
+          primary_contact_id: Text("A contact at this company to mark as primary."),
+          archived: Schema.optional(Schema.Boolean),
         }),
+      },
+      ({ id, ...patch }) =>
+        run(deps.companies.update(actor, id, patch).pipe(Effect.as({ id, updated: true }))),
+    ),
+    tool(
+      {
+        name: "list_contacts",
+        description:
+          "List people in the CRM. Pass `query` to match a name, email or title, and `companyId` for one company's people.",
+        readOnly: true,
+        input: Schema.Struct({
+          query: Schema.optional(Schema.String),
+          companyId: Schema.optional(CompanyId),
+          limit: Limit,
+        }),
+      },
+      async (input) =>
+        answer({
+          contacts: await deps.directory.contacts(
+            caller.workspaceId,
+            input.query?.trim() ?? "",
+            input.companyId ?? "",
+            input.limit ?? 50,
+          ),
+        }),
+    ),
+    tool(
+      {
+        name: "get_contact",
+        description: "One contact: name, title, email, phone, company and owner.",
+        readOnly: true,
+        input: Schema.Struct({ id: ContactId }),
+      },
+      async (input) => {
+        const contact = await deps.directory.contact(caller.workspaceId, input.id);
+
+        return contact ? answer(contact) : refuse("No contact with that id in this workspace.");
+      },
+    ),
+    tool(
+      {
+        name: "create_contact",
+        description:
+          "Add a person to the CRM, optionally at a company. The caller becomes the owner.",
+        readOnly: false,
+        input: Schema.Struct({
+          first_name: Schema.String,
+          last_name: Text("Last name."),
+          title: Text("Job title, such as Head of Security."),
+          email: Text("Work email."),
+          phone: Text("Phone number."),
+          company_id: Schema.optional(Schema.NullOr(CompanyId)),
+        }),
+      },
+      (input) => {
+        const id = createId(ID_PREFIXES.contact);
+
+        return run(
+          deps.records.contacts
+            .create(actor, { ...input, id })
+            .pipe(Effect.as({ id, created: true })),
+        );
+      },
+    ),
+    tool(
+      {
+        name: "update_contact",
+        description:
+          "Change a contact's details. Leave out what stays the same; null clears a field. `archived: true` hides them from lists.",
+        readOnly: false,
+        input: Schema.Struct({
+          id: ContactId,
+          first_name: Schema.optional(Schema.String),
+          last_name: Text("Last name."),
+          title: Text("Job title."),
+          email: Text("Work email."),
+          phone: Text("Phone number."),
+          linkedin_url: Text("LinkedIn profile URL."),
+          twitter_url: Text("X (Twitter) URL."),
+          github_url: Text("GitHub URL."),
+          seniority: Text("Seniority, such as Executive or Manager."),
+          function: Text("Function, such as Engineering or Finance."),
+          company_id: Schema.optional(Schema.NullOr(CompanyId)),
+          owner_id: OwnerId,
+          archived: Schema.optional(Schema.Boolean),
+        }),
+      },
+      ({ id, ...patch }) =>
+        run(deps.records.contacts.update(actor, id, patch).pipe(Effect.as({ id, updated: true }))),
+    ),
+    tool(
+      {
+        name: "list_deals",
+        description:
+          "List deals with their company, stage, amount and close date. Filter by `query` (deal or company name), `companyId`, or `stage` (a stage id, `open` or `closed`).",
+        readOnly: true,
+        input: Schema.Struct({
+          query: Schema.optional(Schema.String),
+          companyId: Schema.optional(CompanyId),
+          stage: Schema.optional(Schema.String),
+          limit: Limit,
+        }),
+      },
+      async (input) =>
+        answer({
+          deals: await deps.directory.deals(
+            caller.workspaceId,
+            input.query?.trim() ?? "",
+            { companyId: input.companyId ?? "", stage: input.stage ?? "" },
+            input.limit ?? 50,
+          ),
+        }),
+    ),
+    tool(
+      {
+        name: "get_deal",
+        description:
+          "One deal: stage, amount, currency, close date, company, owner and description.",
+        readOnly: true,
+        input: Schema.Struct({ id: DealId }),
+      },
+      async (input) => {
+        const deal = await deps.directory.deal(caller.workspaceId, input.id);
+
+        return deal ? answer(deal) : refuse("No deal with that id in this workspace.");
+      },
+    ),
+    tool(
+      {
+        name: "create_deal",
+        description: "Open a deal with a company. The caller becomes the owner.",
+        readOnly: false,
+        input: Schema.Struct({
+          name: Schema.String,
+          company_id: CompanyId,
+          stage: Schema.optional(Schema.String).annotate({ description: STAGE_HELP }),
+          amount: Text("Amount, such as 186000."),
+          currency: Schema.optional(Schema.String).annotate({
+            description: "ISO code; USD by default.",
+          }),
+          expected_close_date: Text("Expected close date, YYYY-MM-DD."),
+        }),
+      },
+      (input) => {
+        const id = createId(ID_PREFIXES.deal);
+
+        return run(
+          deps.records.deals.create(actor, { ...input, id }).pipe(Effect.as({ id, created: true })),
+        );
+      },
+    ),
+    tool(
+      {
+        name: "update_deal",
+        description:
+          "Change a deal: its stage, amount, close date, owner or description. Moving to closed_lost or unqualified_to_buy needs `closed_reason`.",
+        readOnly: false,
+        input: Schema.Struct({
+          id: DealId,
+          name: Schema.optional(Schema.String),
+          stage: Schema.optional(Schema.String).annotate({ description: STAGE_HELP }),
+          closed_reason: Text("Why the deal was lost or unqualified."),
+          amount: Text("Amount, such as 186000."),
+          currency: Text("ISO currency code."),
+          expected_close_date: Text("Expected close date, YYYY-MM-DD."),
+          description: Text("Where the deal stands, in a few sentences."),
+          owner_id: OwnerId,
+          archived: Schema.optional(Schema.Boolean),
+        }),
+      },
+      ({ id, ...patch }) =>
+        run(deps.records.deals.update(actor, id, patch).pipe(Effect.as({ id, updated: true }))),
+    ),
+    tool(
+      {
+        name: "add_deal_contact",
+        description: "Put a contact on a deal, with their role such as Champion or Economic buyer.",
+        readOnly: false,
+        input: Schema.Struct({ deal_id: DealId, contact_id: ContactId, role: Text("Their role.") }),
       },
       (input) =>
         run(
-          deps.companies
-            .update(actor, input.id, { name: input.name, domain: input.domain })
-            .pipe(Effect.as({ id: input.id, updated: true })),
+          deps.records.deals
+            .attachContact(actor, input.deal_id, input.contact_id, input.role)
+            .pipe(Effect.as({ added: true })),
         ),
     ),
     tool(
       {
+        name: "log_activity",
+        description: `Log a ${LOGGED_ACTIVITY_TYPES.join(", ")} on a company, contact or deal. Tasks can have a due time.`,
+        readOnly: false,
+        input: Schema.Struct({
+          type: Schema.String.annotate({ description: LOGGED_ACTIVITY_TYPES.join(", ") }),
+          subject: Text("Short title."),
+          body: Text("The note or summary, in the member's words."),
+          due_at: Text("Tasks: ISO due time."),
+          company_id: Schema.optional(Schema.NullOr(CompanyId)),
+          contact_id: Schema.optional(Schema.NullOr(ContactId)),
+          deal_id: Schema.optional(Schema.NullOr(DealId)),
+        }),
+      },
+      (input) => {
+        const id = createId(ID_PREFIXES.activity);
+
+        return run(
+          deps.records.activities
+            .create(actor, { ...input, id })
+            .pipe(Effect.as({ id, logged: true })),
+        );
+      },
+    ),
+    tool(
+      {
         name: "list_members",
-        description: "The people in this CRM workspace: name, email and role.",
+        description:
+          "The people in this CRM workspace: user id, name, email and role. Use the id as an owner.",
         readOnly: true,
         input: Schema.Struct({}),
       },
@@ -330,6 +630,8 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
       },
       async (input) => fromAgent(await deps.memory.forget(caller, input), { forgotten: true }),
     ),
+    ...(deps.intel ? intelTools(deps.intel, caller) : []),
+    ...(deps.fields ? fieldTools(deps.fields, caller) : []),
   ];
 }
 
@@ -346,15 +648,27 @@ export class CrmTools extends Context.Service<
       const deps: CrmToolDeps = {
         directory: postgresDirectory(yield* Postgres),
         companies: yield* Companies,
+        records: yield* Records,
         memory: (yield* Memory).agent,
         web: Option.match(config.contextDevApiKey, {
           onNone: () => null,
           onSome: (apiKey) => createContextDev({ apiKey: Redacted.value(apiKey) }),
         }),
         jev: Option.isSome(config.aiGatewayApiKey) ? gatewayJev() : null,
+        intel: yield* Intel,
+        fields: yield* Fields,
       };
 
       return { forCaller: (caller) => crmTools(deps, caller) };
     }),
-  ).pipe(Layer.provide([Postgres.layer, Companies.layer, Memory.layer]));
+  ).pipe(
+    Layer.provide([
+      Postgres.layer,
+      Companies.layer,
+      Records.layer,
+      Memory.layer,
+      Intel.layer,
+      Fields.layer,
+    ]),
+  );
 }

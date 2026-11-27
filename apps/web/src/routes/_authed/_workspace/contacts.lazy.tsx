@@ -1,17 +1,20 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { EmptyState, PageLayout } from "../../../components/shell/page.tsx";
-import { pageById } from "../../../lib/pages.ts";
+import { ContactsTable } from "../../../components/contacts/contacts-table.tsx";
+import { RecordsPage } from "../../../components/records/records-page.tsx";
 
 export const Route = createLazyFileRoute("/_authed/_workspace/contacts")({
   component: Contacts,
 });
 
 function Contacts() {
+  const { session } = Route.useRouteContext();
+
   return (
-    <PageLayout page={pageById("contacts")}>
-      <EmptyState page={pageById("contacts")} title="No contacts yet">
-        People appear here as you add them or connect your email and calendar.
-      </EmptyState>
-    </PageLayout>
+    <RecordsPage create="contact" createLabel="New contact" title="Contacts">
+      {(workspaceId) => (
+        // Another workspace is another list: fresh selection, position and filters.
+        <ContactsTable key={workspaceId} userId={session.user.id} workspaceId={workspaceId} />
+      )}
+    </RecordsPage>
   );
 }

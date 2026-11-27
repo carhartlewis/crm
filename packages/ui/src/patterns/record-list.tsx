@@ -62,15 +62,27 @@ export function RecordList({
   );
 }
 
-/** A record named in a sentence: its name in medium weight, underlined on hover, opens it. */
-export function RecordChip({ label, onOpen }: { label: string; onOpen: () => void }) {
+/**
+ * A record named in a sentence or a table cell: its mark (a logo or avatar), then its name in
+ * medium weight, underlined on hover; opens it.
+ */
+export function RecordChip({
+  label,
+  icon,
+  onOpen,
+}: {
+  label: string;
+  icon?: ReactNode;
+  onOpen: () => void;
+}) {
   return (
     <button
       type="button"
       data-slot="record-chip"
       onClick={onOpen}
-      className="font-medium text-foreground underline decoration-transparent underline-offset-3 transition-colors outline-none select-text hover:decoration-current focus-visible:decoration-current"
+      className="inline-flex items-baseline gap-1.5 font-medium text-foreground underline decoration-transparent underline-offset-3 transition-colors outline-none select-text hover:decoration-current focus-visible:decoration-current"
     >
+      {icon && <span className="inline-flex shrink-0 self-center">{icon}</span>}
       {label}
     </button>
   );

@@ -33,10 +33,13 @@ type RecordSheetProps<Tab extends string> = {
   onClose: () => void;
   label: string;
   header: ReactNode;
+  /** Key figures under the header (`RecordStats`), shown on every tab. */
+  stats?: ReactNode;
   tabs: RecordTabSpec<Tab>[];
   tab: Tab;
   onTabChange: (tab: Tab) => void;
-  rail: ReactNode;
+  /** The details rail beside the tabs; leave it out for full-width tabs. */
+  rail?: ReactNode;
   loading?: boolean;
   placeholder?: ReactNode;
 };
@@ -67,6 +70,7 @@ function RecordSheetContent<Tab extends string>({
   onClose,
   label,
   header,
+  stats,
   tabs,
   tab,
   onTabChange,
@@ -99,6 +103,7 @@ function RecordSheetContent<Tab extends string>({
       </div>
 
       {loading ? <RecordHeaderSkeleton label={label} /> : header}
+      {loading ? null : stats}
 
       {placeholder ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-6 text-center text-muted-foreground">
@@ -124,7 +129,7 @@ function RecordSheetContent<Tab extends string>({
               {loading ? <SectionSkeleton /> : active?.content}
             </div>
           </div>
-          <RecordRail>{loading ? <RailSkeleton /> : rail}</RecordRail>
+          {rail === undefined ? null : <RecordRail>{loading ? <RailSkeleton /> : rail}</RecordRail>}
         </div>
       )}
     </AdaptiveSheetContent>
@@ -233,11 +238,23 @@ function RecordActionButtons({ actions }: { actions: readonly RecordMenuItem[] }
 export function RecordHeader({
   title,
   code,
+  leading,
+  subtitle,
+  badges,
+  controls,
   actions = NO_ITEMS,
   menu = NO_ITEMS,
 }: {
   title: string;
   code?: string;
+  /** A logo or avatar before the title. */
+  leading?: ReactNode;
+  /** One muted line under the title, such as `domain · city · industry`. */
+  subtitle?: ReactNode;
+  /** Status lines under the subtitle, such as "Primary contact at …". */
+  badges?: ReactNode;
+  /** Custom controls before the action buttons, such as a stage picker. */
+  controls?: ReactNode;
   actions?: readonly RecordMenuItem[];
   menu?: readonly RecordMenuItem[];
 }) {
@@ -247,7 +264,8 @@ export function RecordHeader({
 
   return (
     <header className="shrink-0 border-b px-4 py-3 select-text group-data-[mode=sheet]/adaptive-sheet:px-8">
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        {leading ? <div className="flex shrink-0 pt-0.5">{leading}</div> : null}
         <div className="flex min-w-0 flex-1 flex-col">
           <h2
             className="truncate text-title outline-none"
@@ -260,17 +278,58 @@ export function RecordHeader({
           {showCode ? (
             <p className="truncate font-mono text-caption text-muted-foreground">{code}</p>
           ) : null}
+          {subtitle ? (
+            <div className="flex min-w-0 items-center gap-1.5 truncate text-label text-muted-foreground">
+              {subtitle}
+            </div>
+          ) : null}
+          {badges ? (
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-3 text-label text-muted-foreground">
+              {badges}
+            </div>
+          ) : null}
         </div>
         {mode === "sheet" ? (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {controls}
             <RecordActionButtons actions={actions} />
             <RecordMenu items={menu} />
           </div>
         ) : (
-          <RecordMenu items={[...actions, ...menu]} />
+          <div className="flex shrink-0 items-center gap-2">
+            {controls}
+            <RecordMenu items={[...actions, ...menu]} />
+          </div>
         )}
       </div>
     </header>
+  );
+}
+
+export type RecordStat = {
+  readonly label: string;
+  readonly value: ReactNode;
+};
+
+/**
+ * A record's key figures as one strip of equal cells (Open pipeline, Open deals, Next close,
+ * Owner): label above, value below; values truncate as the sheet narrows.
+ */
+export function RecordStats({ stats }: { stats: readonly RecordStat[] }) {
+  return (
+    <dl className="flex shrink-0 border-b bg-muted/40 select-text">
+      {stats.map((stat) => (
+        <div
+          className="flex min-w-0 flex-1 basis-0 flex-col gap-1 border-r px-4 py-3 last:border-r-0 group-data-[mode=sheet]/adaptive-sheet:first:pl-8"
+          key={stat.label}
+        >
+          <dt className="truncate text-label text-muted-foreground">{stat.label}</dt>
+          <dd className="flex min-w-0 items-center gap-2 truncate font-medium text-body tabular-nums">
+            {stat.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

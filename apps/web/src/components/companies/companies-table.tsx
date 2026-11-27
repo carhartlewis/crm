@@ -1,45 +1,76 @@
-import { DropdownMenuItem } from "@crm/ui/components/dropdown-menu";
-import { BulkActionsMenu } from "@crm/ui/patterns/data-table/bulk-actions";
-import {
-  DataTable,
-  type DataTableColumn,
-  type DataTableFacet,
-} from "@crm/ui/patterns/data-table/data-table";
+import { enrichmentLabel, ENRICHMENT_STATUSES, isOpenStage } from "@crm/core/records";
+import type { DataTableColumn } from "@crm/ui/patterns/data-table/data-table";
 import { createListSearchParams } from "@crm/ui/patterns/data-table/list-search-params";
-import { DayCell, TextCell, TitleCell } from "@crm/ui/patterns/data-table/table-cells";
-import { useListTable } from "@crm/ui/patterns/data-table/use-list-table";
-import { RecordRowMenu } from "@crm/ui/patterns/record-sheet/record-sheet";
-import { useRecordSheetParams } from "@crm/ui/patterns/record-sheet/use-record-sheet-params";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useLiveQuery } from "@tanstack/react-db";
-import { useRef, useState } from "react";
+import { CountCell, TextCell } from "@crm/ui/patterns/data-table/table-cells";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { type Company, companiesCollection, deleteCompaniesMutation } from "../../lib/companies.ts";
-import { useCreateSheet } from "../../lib/create-sheet.ts";
-import { RECORD_TABS } from "../../lib/records.ts";
-import { workspaceQuery } from "../../lib/session.ts";
-import { noPosition, type ListPosition, useListKeys } from "../records/use-list-keys.ts";
+import { type Company, companiesCollection } from "../../lib/companies.ts";
+import { ACTIVITY_FACET, activityBuckets } from "../../lib/activity-bucket.ts";
+import { localDay, momentDate, relativeTime } from "../../lib/record-format.ts";
+import { deleteRecords } from "../../lib/synced-records.ts";
+import { useCustomColumns } from "../records/use-custom-columns.ts";
+import { AssignOwnerMenu } from "../records/bulk-edit.tsx";
+import { CompanyLogo, OwnerCell } from "../records/record-visuals.tsx";
+import {
+  activityAt,
+  ownerFacet,
+  RecordTable,
+  STATUS_FACET,
+  statusOf,
+} from "../records/record-table.tsx";
+import {
+  countBy,
+  useCompanies,
+  useContacts,
+  useDeals,
+  useMembers,
+  type Member,
+} from "../records/use-crm.ts";
 
-const SEARCH_PARAMS = createListSearchParams<never, "owner">({
-  defaultSort: "updatedAt",
+type Facet = "owner" | "industry" | "enrichment" | "activity" | "status";
+
+const SEARCH_PARAMS = createListSearchParams<never, Facet>({
+  defaultSort: "createdAt",
   defaultDir: "desc",
-  facetIds: ["owner"],
+  facetIds: ["owner", "industry", "enrichment", "activity", "status"],
+  facetDefaults: { status: ["active"] },
 });
 
-type Column = "name" | "domain" | "owner" | "updatedAt" | "createdAt";
+type Column =
+  | "name"
+  | "domain"
+  | "industry"
+  | "owner"
+  | "contacts"
+  | "openDeals"
+  | "createdAt"
+  | "lastActivity"
+  | "enrichment";
 
-type OwnerName = (ownerId: string | null) => string | null;
+interface ColumnDeps {
+  readonly memberOf: (id: string | null | undefined) => Member | null;
+  readonly contactCounts: ReadonlyMap<string, number>;
+  readonly openDealCounts: ReadonlyMap<string, number>;
+}
 
-/** The columns, ordered by kind in the table (title, person, text, dates). */
-function companyColumns(ownerName: OwnerName): DataTableColumn<Company, Column>[] {
+function companyColumns({
+  memberOf,
+  contactCounts,
+  openDealCounts,
+}: ColumnDeps): DataTableColumn<Company, Column>[] {
   return [
     {
       id: "name",
       kind: "title",
-      header: "Name",
+      header: "Company",
       sortable: true,
       hideable: false,
-      cell: (row) => <TitleCell>{row.name}</TitleCell>,
+      cell: (row) => (
+        <span className="flex min-w-0 items-center gap-2">
+          <CompanyLogo company={row} size="sm" />
+          <span className="block min-w-0 truncate font-medium">{row.name}</span>
+        </span>
+      ),
     },
     {
       id: "domain",
@@ -49,18 +80,32 @@ function companyColumns(ownerName: OwnerName): DataTableColumn<Company, Column>[
       cell: (row) => <TextCell>{row.domain}</TextCell>,
     },
     {
+      id: "industry",
+      kind: "text",
+      header: "Industry",
+      sortable: true,
+      cell: (row) => <TextCell>{row.industry}</TextCell>,
+    },
+    {
       id: "owner",
       kind: "person",
       header: "Owner",
       sortable: true,
-      cell: (row) => <TextCell>{ownerName(row.owner_id)}</TextCell>,
+      cell: (row) => <OwnerCell owner={memberOf(row.owner_id)} />,
     },
     {
-      id: "updatedAt",
-      kind: "date",
-      header: "Last change",
+      id: "contacts",
+      kind: "count",
+      header: "Contacts",
       sortable: true,
-      cell: (row) => <DayCell value={row.updated_at} />,
+      cell: (row) => <CountCell>{String(contactCounts.get(row.id) ?? 0)}</CountCell>,
+    },
+    {
+      id: "openDeals",
+      kind: "count",
+      header: "Open deals",
+      sortable: true,
+      cell: (row) => <CountCell>{String(openDealCounts.get(row.id) ?? 0)}</CountCell>,
     },
     {
       id: "createdAt",
@@ -68,29 +113,24 @@ function companyColumns(ownerName: OwnerName): DataTableColumn<Company, Column>[
       header: "Created",
       sortable: true,
       defaultHidden: true,
-      cell: (row) => <DayCell value={row.created_at} />,
+      cell: (row) => <TextCell>{momentDate(row.created_at)}</TextCell>,
+    },
+    {
+      id: "lastActivity",
+      kind: "date",
+      header: "Last activity",
+      sortable: true,
+      cell: (row) => <TextCell>{relativeTime(row.last_activity_at)}</TextCell>,
+    },
+    {
+      id: "enrichment",
+      kind: "short",
+      header: "Enrichment",
+      sortable: true,
+      defaultHidden: true,
+      cell: (row) => <TextCell>{enrichmentLabel(row.enrichment_status)}</TextCell>,
     },
   ];
-}
-
-/** The row's "…" menu. */
-function companyRowMenu(actions: { open: (id: string) => void; remove: (id: string) => void }) {
-  return function CompanyRowMenu(row: Company) {
-    return (
-      <RecordRowMenu
-        label={`Actions for ${row.name}`}
-        items={[
-          { id: "open", label: "View details", onSelect: () => actions.open(row.id) },
-          {
-            id: "delete",
-            label: "Delete",
-            destructive: true,
-            onSelect: () => actions.remove(row.id),
-          },
-        ]}
-      />
-    );
-  };
 }
 
 export interface CompaniesTableProps {
@@ -101,127 +141,143 @@ export interface CompaniesTableProps {
 /** Companies, synced locally: search, filter and sort never wait on the network. */
 export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
   const collection = companiesCollection(workspaceId);
+  const { companies, loading } = useCompanies(workspaceId);
+  const { contacts } = useContacts(workspaceId);
+  const { deals } = useDeals(workspaceId);
+  const { members, memberOf, nameOf } = useMembers(userId, workspaceId);
 
-  const { data: rows = [], isLoading } = useLiveQuery({
-    query: (q) => q.from({ company: collection }),
+  const custom = useCustomColumns<Company, never, Facet>({
+    entity: "company",
+    userId,
+    workspaceId,
+    base: SEARCH_PARAMS,
   });
 
-  const { data: workspace } = useQuery(workspaceQuery(userId, workspaceId));
-  const [createKind] = useCreateSheet();
-  const record = useRecordSheetParams({ recordKey: "company", tabs: RECORD_TABS.company });
-  const [position, setPosition] = useState<ListPosition>(noPosition);
-  const frame = useRef<HTMLDivElement>(null);
+  const contactCounts = countBy(
+    contacts.filter((contact) => !contact.archived_at),
+    (contact) => contact.company_id,
+  );
 
-  const ownerName = (ownerId: string | null) =>
-    workspace?.members.find((member) => member.userId === ownerId)?.user.name ?? null;
+  const openDealCounts = countBy(
+    deals.filter((deal) => !deal.archived_at && isOpenStage(deal.stage)),
+    (deal) => deal.company_id,
+  );
 
   const remove = useMutation({
-    ...deleteCompaniesMutation,
+    mutationFn: (ids: readonly string[]) => deleteRecords(collection, ids),
     onSuccess: (count) =>
       toast.success(count === 1 ? "Company deleted" : `${count} companies deleted`),
     onError: (error) => toast.error(error.message),
   });
 
-  const columns = companyColumns(ownerName);
+  const archive = useMutation({
+    mutationFn: async ({ ids, archived }: { ids: readonly string[]; archived: boolean }) => {
+      const at = archived ? new Date().toISOString() : null;
 
-  const facets: DataTableFacet[] = [
-    {
-      id: "owner",
-      label: "Owner",
-      options: (workspace?.members ?? []).map((member) => ({
-        value: member.userId,
-        label: member.user.name,
-      })),
+      await collection
+        .update([...ids], (drafts) => {
+          for (const draft of drafts) draft.archived_at = at;
+        })
+        .when("settled");
     },
-  ];
-
-  const list = useListTable({
-    tableId: "companies",
-    searchParams: SEARCH_PARAMS,
-    rows,
-    loading: isLoading,
-    getRowId: (row) => row.id,
-    haystack: (row) => `${row.name} ${row.domain ?? ""} ${ownerName(row.owner_id) ?? ""}`,
-    sortValues: {
-      name: (row) => row.name.toLowerCase(),
-      domain: (row) => row.domain ?? "",
-      owner: (row) => ownerName(row.owner_id) ?? "",
-      updatedAt: (row) => row.updated_at,
-      createdAt: (row) => row.created_at,
-    },
-    facetOf: { owner: (row) => row.owner_id ?? "" },
-    tieBreak: (left, right) => right.created_at.localeCompare(left.created_at),
-    noun: "companies",
-    searchPlaceholder: "Search companies…",
-    blank: { title: "No companies yet", description: "Press C to add your first company." },
-    filtered: "No matching companies.",
+    onError: (error) => toast.error(error.message),
   });
 
-  const ids = list.visible.map((row) => row.id);
+  const industries = [
+    ...new Set(companies.map((company) => company.industry).filter((value) => value !== null)),
+  ].toSorted();
 
-  // Only the keys show the active row. A row opened with the pointer keeps the list's place for
-  // j/k, but stays unmarked when its sheet closes.
-  const [keyed, setKeyed] = useState(false);
+  const today = localDay();
 
-  const openWith = (fromKeys: boolean) => (id: string) => {
-    setPosition({ activeId: id, anchorId: null });
-    setKeyed(fromKeys);
-    void record.open(id);
-  };
-
-  const open = openWith(false);
-
-  // Keyboard moves turn the page with the active row.
-  const moveTo = (next: ListPosition) => {
-    setPosition(next);
-    setKeyed(true);
-    list.reveal(next.activeId);
-  };
-
-  // The sheet itself is in the shell (CompanySheet), so it also opens from ⌘K.
-  const sheetOpen = record.id !== null;
-
-  useListKeys({
-    ids,
-    position,
-    setPosition: moveTo,
-    selection: list.selection,
-    enabled: !sheetOpen && createKind === null,
-    onOpen: openWith(true),
-    onFilter: () => frame.current?.querySelector<HTMLInputElement>('input[type="search"]')?.focus(),
+  const assignOwner = useMutation({
+    mutationFn: async ({ ids, ownerId }: { ids: readonly string[]; ownerId: string | null }) => {
+      await collection
+        .update([...ids], (drafts) => {
+          for (const draft of drafts) draft.owner_id = ownerId;
+        })
+        .when("settled");
+    },
+    onError: (error) => toast.error(error.message),
   });
+
+  /** A company takes its deals with it; its contacts stay. */
+  const deleteImpact = (ids: readonly string[]) => {
+    const gone = new Set(ids);
+
+    return {
+      deals: deals.filter((deal) => gone.has(deal.company_id)).length,
+      contacts: contacts.filter((contact) => contact.company_id && gone.has(contact.company_id))
+        .length,
+    };
+  };
+
+  const columns = companyColumns({ memberOf, contactCounts, openDealCounts });
 
   return (
-    <div ref={frame} className="flex min-h-0 flex-1 flex-col gap-4">
-      <DataTable
-        {...list.tableProps}
-        columns={columns}
-        facetCounts={{}}
-        facets={facets}
-        activeRowId={keyed ? position.activeId : null}
-        onRowClick={(row) => open(row.id)}
-        rowActions={companyRowMenu({
-          open,
-          remove: (id) => remove.mutate({ collection, ids: [id] }),
-        })}
-        selection={{
-          state: list.selection,
-          rowLabel: (row) => row.name,
-          actions: (
-            <BulkActionsMenu pending={remove.isPending}>
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => {
-                  remove.mutate({ collection, ids: list.selection.ids });
-                  list.selection.clear();
-                }}
-              >
-                {`Delete ${list.selection.count} ${list.selection.count === 1 ? "company" : "companies"}`}
-              </DropdownMenuItem>
-            </BulkActionsMenu>
-          ),
-        }}
-      />
-    </div>
+    <RecordTable
+      archive={(ids, archived) => archive.mutate({ ids, archived })}
+      blank={{ title: "No companies yet", description: "Press ⌥⇧C to add your first company." }}
+      columns={[...columns, ...custom.columns]}
+      facetOf={{
+        ...custom.facetOf,
+        owner: (row) => row.owner_id ?? "none",
+        industry: (row) => row.industry ?? "",
+        enrichment: (row) => row.enrichment_status,
+        activity: (row) => activityBuckets(row.last_activity_at, today),
+        status: statusOf,
+      }}
+      facets={[
+        ownerFacet(members),
+        {
+          id: "industry",
+          label: "Industry",
+          options: industries.map((industry) => ({ value: industry, label: industry })),
+        },
+        {
+          id: "enrichment",
+          label: "Enrichment",
+          options: ENRICHMENT_STATUSES.map((status) => ({ value: status.id, label: status.label })),
+        },
+        ACTIVITY_FACET,
+        STATUS_FACET,
+        ...custom.facets,
+      ]}
+      haystack={(row) =>
+        `${row.name} ${row.domain ?? ""} ${row.industry ?? ""} ${nameOf(row.owner_id) ?? ""}`
+      }
+      renderBulkActions={(ids, clear) => (
+        <AssignOwnerMenu
+          members={members}
+          onAssign={(ownerId) => {
+            assignOwner.mutate({ ids, ownerId });
+            clear();
+          }}
+        />
+      )}
+      deleteImpact={deleteImpact}
+      kind="company"
+      label={(row) => row.name}
+      loading={loading}
+      noun={{ one: "company", many: "companies" }}
+      remove={(ids) => remove.mutate(ids)}
+      removing={remove.isPending || archive.isPending || assignOwner.isPending}
+      rows={companies}
+      saved={{ workspaceId, userId }}
+      searchParams={custom.searchParams}
+      searchPlaceholder="Search companies by name or domain…"
+      sortValues={{
+        ...custom.sortValues,
+        name: (row) => row.name.toLowerCase(),
+        domain: (row) => row.domain ?? "",
+        industry: (row) => row.industry ?? "",
+        owner: (row) => nameOf(row.owner_id) ?? "",
+        contacts: (row) => contactCounts.get(row.id) ?? 0,
+        openDeals: (row) => openDealCounts.get(row.id) ?? 0,
+        createdAt: (row) => row.created_at,
+        lastActivity: activityAt,
+        enrichment: (row) => row.enrichment_status,
+      }}
+      tableId="companies"
+    />
   );
 }

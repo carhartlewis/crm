@@ -3,7 +3,7 @@ import { createId } from "@crm/core/ids";
 import { Cause, Effect, Exit, Option, References } from "effect";
 import { authorizeWorkspace, parseCompanyPatch, parseNewCompany } from "./companies-rules.ts";
 import { type Actor, makeCompanies } from "./Companies.ts";
-import { createMemoryCompanyStore } from "./company-store-memory.ts";
+import { createMemoryCompanyStore } from "./record-store-memory.ts";
 
 const alice: Actor = { userId: "user_alice", activeWorkspaceId: "ws_a" };
 const bob: Actor = { userId: "user_bob", activeWorkspaceId: "ws_b" };

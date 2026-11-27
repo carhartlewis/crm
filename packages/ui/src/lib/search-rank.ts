@@ -1,7 +1,7 @@
 import uFuzzy from "@leeoniya/ufuzzy";
 
 /**
- * Ranking for ⌘K, in tiers: the exact label, then labels that start with the query, then labels
+ * Ranking for ⌘K and data table search, in tiers: the exact label, then labels that start with the query, then labels
  * where every typed word starts a word, then labels that contain every typed word, then labels
  * one typo away (at a word start), then items found only through their section or keywords.
  * Words may come in any order. Within a label tier, uFuzzy's order (denser, earlier matches
@@ -21,6 +21,8 @@ export interface Ranked<T> {
   readonly item: T;
   /** Matched [start, end) offsets in the label, flat; null when only keywords matched. */
   readonly ranges: readonly number[] | null;
+  /** How well it matched, best first: 0 for the exact label up to 5 for keywords only. */
+  readonly tier: number;
 }
 
 const Tier = {
@@ -128,13 +130,13 @@ function exactTier(label: string, needle: string, terms: readonly string[], hit:
     : { tier: Tier.substring, ranges: hit.ranges };
 }
 
-export function rankCommands<T extends Searchable>(
+export function rankSearch<T extends Searchable>(
   items: readonly T[],
   query: string,
 ): readonly Ranked<T>[] {
   const needle = query.trim().toLowerCase();
 
-  if (needle === "") return items.map((item) => ({ item, ranges: null }));
+  if (needle === "") return items.map((item) => ({ item, ranges: null, tier: Tier.exact }));
 
   const terms = needle.split(/\s+/);
   const labels = items.map((item) => item.label);
@@ -166,9 +168,9 @@ export function rankCommands<T extends Searchable>(
   // The sort is stable: within a tier, uFuzzy's order stays.
   return ranked
     .toSorted((a, b) => a.tier - b.tier)
-    .flatMap(({ idx, ranges }) => {
+    .flatMap(({ tier, idx, ranges }) => {
       const item = items[idx];
 
-      return item ? [{ item, ranges }] : [];
+      return item ? [{ item, ranges, tier }] : [];
     });
 }

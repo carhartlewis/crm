@@ -1,6 +1,8 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createLazyFileRoute } from "@tanstack/react-router";
+import { CurrencySettings } from "../../../../components/settings/currency-settings.tsx";
 import { SettingsPage } from "../../../../components/settings/settings-page.tsx";
+import { TrackingSettings } from "../../../../components/settings/tracking-settings.tsx";
 import { WorkspaceSettings } from "../../../../components/settings/workspace-settings.tsx";
 import { workspaceQuery } from "../../../../lib/session.ts";
 
@@ -24,6 +26,12 @@ function WorkspaceGeneral() {
           website: String(workspace.website ?? ""),
           logo: workspace.logo ?? null,
         }}
+      />
+      <CurrencySettings key={`currency:${workspace.id}`} workspaceId={workspace.id} />
+      <TrackingSettings
+        key={`tracking:${workspace.id}`}
+        userId={session.user.id}
+        workspaceId={workspace.id}
       />
     </SettingsPage>
   );

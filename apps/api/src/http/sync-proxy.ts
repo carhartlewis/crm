@@ -127,6 +127,26 @@ export function companiesSync(workspaceId: string): SyncSpec {
   return { table: "company", where: "workspace_id = $1", params: [workspaceId] };
 }
 
+/** Contacts of one workspace. */
+export function contactsSync(workspaceId: string): SyncSpec {
+  return { table: "contact", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/** Deals of one workspace. */
+export function dealsSync(workspaceId: string): SyncSpec {
+  return { table: "deal", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/** Who is on each deal in one workspace (the row carries its workspace, so no join). */
+export function dealContactsSync(workspaceId: string): SyncSpec {
+  return { table: "deal_contact", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/** Activity of one workspace: notes, calls, emails, meetings, tasks and stage changes. */
+export function activitiesSync(workspaceId: string): SyncSpec {
+  return { table: "activity", where: "workspace_id = $1", params: [workspaceId] };
+}
+
 /**
  * One user's connections in one workspace. `credentials` (encrypted upstream tokens) is left
  * out, so it never reaches a browser.
@@ -209,6 +229,8 @@ export function chatsSync(workspaceId: string, userId: string): SyncSpec {
       "updated_at",
       "last_message_at",
       "permission_mode",
+      "record_kind",
+      "record_id",
     ],
   };
 }
@@ -228,6 +250,62 @@ export function sidebarSync(workspaceId: string, userId: string): SyncSpec {
   return {
     table: "sidebar",
     where: "workspace_id = $1 AND user_id = $2",
+    params: [workspaceId, userId],
+  };
+}
+
+/** Custom field definitions of one workspace, archived ones included (settings restore them). */
+export function fieldDefinitionsSync(workspaceId: string): SyncSpec {
+  return { table: "field_definition", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/** The options of one workspace's select fields. */
+export function fieldOptionsSync(workspaceId: string): SyncSpec {
+  return { table: "field_option", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/** Custom field values of one workspace's companies, contacts and deals. */
+export function fieldValuesSync(workspaceId: string): SyncSpec {
+  return { table: "field_value", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/** The agent's proposed facts on the contacts of one workspace (ADR 0024). */
+export function contactFactsSync(workspaceId: string): SyncSpec {
+  return { table: "contact_fact", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/** The agent's briefs on the contacts of one workspace (ADR 0024). */
+export function contactBriefsSync(workspaceId: string): SyncSpec {
+  return { table: "contact_brief", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/**
+ * One workspace's settings row: its reporting currency (ADR 0024). The tracking key is left to
+ * the tracking screen.
+ */
+export function workspaceSettingsSync(workspaceId: string): SyncSpec {
+  return {
+    table: "workspace_setting",
+    where: "workspace_id = $1",
+    params: [workspaceId],
+    columns: ["workspace_id", "reporting_currency", "updated_at"],
+  };
+}
+
+/** Exchange rates: the fetched ones every workspace shares, plus one workspace's own. */
+export function exchangeRatesSync(workspaceId: string): SyncSpec {
+  return {
+    table: "exchange_rate",
+    where: "workspace_id IS NULL OR workspace_id = $1",
+    params: [workspaceId],
+  };
+}
+
+/** One workspace's shared views and one user's own. */
+export function savedViewsSync(workspaceId: string, userId: string): SyncSpec {
+  return {
+    table: "saved_view",
+    where: "workspace_id = $1 AND (shared = true OR owner_id = $2)",
     params: [workspaceId, userId],
   };
 }

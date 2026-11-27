@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { LocalTool } from "@crm/integrations/gateway";
 import { makeCompanies } from "./Companies.ts";
-import { createMemoryCompanyStore } from "./company-store-memory.ts";
+import { makeRecords } from "./Records.ts";
+import { createMemoryCompanyStore } from "./record-store-memory.ts";
 import { type CrmDirectory, type CrmToolDeps, crmTools } from "./crm-tools.ts";
 
 const caller = { userId: "user_ana", workspaceId: "ws_a" };
@@ -14,12 +15,22 @@ const directory: CrmDirectory = {
             id: "com_1",
             name: "Acme",
             domain: "acme.com",
+            industry: null,
+            location: null,
+            description: null,
             ownerName: "Ana",
+            contacts: 0,
+            openDeals: 0,
+            lastActivityAt: null,
             createdAt: "2026-11-26T00:00:00.000Z",
           },
         ]
       : [],
   company: async () => null,
+  contacts: async () => [],
+  contact: async () => null,
+  deals: async () => [],
+  deal: async () => null,
   members: async () => [{ name: "Ana", email: "ana@example.com", role: "owner" }],
 };
 
@@ -45,7 +56,14 @@ function setup() {
   return {
     store,
     tools: crmTools(
-      { directory, companies: makeCompanies(store.store), memory, web: null, jev: null },
+      {
+        directory,
+        companies: makeCompanies(store.store),
+        records: makeRecords(store.store),
+        memory,
+        web: null,
+        jev: null,
+      },
       caller,
     ),
   };
@@ -131,6 +149,7 @@ describe("CRM tools", () => {
       {
         directory,
         companies: makeCompanies(createMemoryCompanyStore([]).store),
+        records: makeRecords(createMemoryCompanyStore([]).store),
         memory,
         jev: null,
         web: {

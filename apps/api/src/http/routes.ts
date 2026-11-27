@@ -1,14 +1,21 @@
 import {
+  ACTIVITIES_SYNC_PATH,
   AgentUnavailable,
   CHAT_SPACE_MEMBERS_SYNC_PATH,
   CHAT_SPACES_SYNC_PATH,
   CHATS_SYNC_PATH,
   COMPANIES_SYNC_PATH,
   CONNECTIONS_SYNC_PATH,
+  CONTACTS_SYNC_PATH,
   CrmApi,
   CUSTOM_CONNECTORS_SYNC_PATH,
   CurrentSession,
   CurrentUser,
+  DEAL_CONTACTS_SYNC_PATH,
+  DEALS_SYNC_PATH,
+  FIELD_DEFINITIONS_SYNC_PATH,
+  FIELD_OPTIONS_SYNC_PATH,
+  FIELD_VALUES_SYNC_PATH,
   Forbidden,
   Invalid,
   NoActiveWorkspace,
@@ -16,6 +23,11 @@ import {
   SKILLS_SYNC_PATH,
   MEMORY_FACTS_SYNC_PATH,
   SIDEBAR_SYNC_PATH,
+  WORKSPACE_SETTINGS_SYNC_PATH,
+  EXCHANGE_RATES_SYNC_PATH,
+  SAVED_VIEWS_SYNC_PATH,
+  CONTACT_BRIEFS_SYNC_PATH,
+  CONTACT_FACTS_SYNC_PATH,
   Unauthorized,
 } from "@crm/core/api";
 import { createGateway } from "@crm/integrations/gateway";
@@ -29,22 +41,40 @@ import { Companies } from "../services/Companies.ts";
 import { CrmTools } from "../services/crm-tools.ts";
 import { type Actor, Connections } from "../services/Connections.ts";
 import { Electric } from "../services/Electric.ts";
+import { Fields } from "../services/Fields.ts";
 import { ChatFiles, Images } from "../services/Images.ts";
+import { Records } from "../services/Records.ts";
+import { Intel } from "../services/Intel.ts";
 import { type AgentResult, Memory } from "../services/Memory.ts";
 import { Skills } from "../services/Skills.ts";
+import { Money } from "../services/Money.ts";
+import { SavedViews } from "../services/SavedViews.ts";
 import { AuthenticationLive } from "./Authentication.ts";
+import { TrackingHandlers, TrackingRoutes } from "./tracking-routes.ts";
 import { clientIp, withClientIp } from "./client-ip.ts";
 import { callbackFromUrl, startFromUrl } from "./desktop.ts";
 import {
+  activitiesSync,
   chatSpaceMembersSync,
   chatSpacesSync,
   chatsSync,
   companiesSync,
   connectionsSync,
+  contactsSync,
   customConnectorsSync,
+  dealContactsSync,
+  dealsSync,
+  fieldDefinitionsSync,
+  fieldOptionsSync,
+  fieldValuesSync,
   skillsSync,
   memoryFactsSync,
   sidebarSync,
+  workspaceSettingsSync,
+  exchangeRatesSync,
+  savedViewsSync,
+  contactBriefsSync,
+  contactFactsSync,
   type SyncSpec,
 } from "./sync-proxy.ts";
 
@@ -103,6 +133,105 @@ const CompaniesHandlers = HttpApiBuilder.group(
       )
       .handle("remove", ({ params }) =>
         Effect.flatMap(actor, (who) => companies.remove(who, params.id)),
+      )
+      .handle("enrich", ({ params }) =>
+        Effect.flatMap(actor, (who) => companies.enrich(who, params.id)),
+      );
+  }),
+);
+
+const ContactsHandlers = HttpApiBuilder.group(
+  CrmApi,
+  "contacts",
+  Effect.fn(function* (handlers) {
+    const { contacts } = yield* Records;
+
+    return handlers
+      .handle("create", ({ payload }) =>
+        Effect.flatMap(actor, (who) => contacts.create(who, payload)),
+      )
+      .handle("update", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => contacts.update(who, params.id, payload)),
+      )
+      .handle("remove", ({ params }) =>
+        Effect.flatMap(actor, (who) => contacts.remove(who, params.id)),
+      );
+  }),
+);
+
+const DealsHandlers = HttpApiBuilder.group(
+  CrmApi,
+  "deals",
+  Effect.fn(function* (handlers) {
+    const { deals } = yield* Records;
+
+    return handlers
+      .handle("create", ({ payload }) => Effect.flatMap(actor, (who) => deals.create(who, payload)))
+      .handle("update", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => deals.update(who, params.id, payload)),
+      )
+      .handle("remove", ({ params }) =>
+        Effect.flatMap(actor, (who) => deals.remove(who, params.id)),
+      )
+      .handle("attachContact", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) =>
+          deals.attachContact(who, params.id, params.contactId, payload.role),
+        ),
+      )
+      .handle("detachContact", ({ params }) =>
+        Effect.flatMap(actor, (who) => deals.detachContact(who, params.id, params.contactId)),
+      );
+  }),
+);
+
+const ActivitiesHandlers = HttpApiBuilder.group(
+  CrmApi,
+  "activities",
+  Effect.fn(function* (handlers) {
+    const { activities } = yield* Records;
+
+    return handlers
+      .handle("create", ({ payload }) =>
+        Effect.flatMap(actor, (who) => activities.create(who, payload)),
+      )
+      .handle("update", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => activities.update(who, params.id, payload)),
+      )
+      .handle("remove", ({ params }) =>
+        Effect.flatMap(actor, (who) => activities.remove(who, params.id)),
+      );
+  }),
+);
+
+const FieldsHandlers = HttpApiBuilder.group(
+  CrmApi,
+  "fields",
+  Effect.fn(function* (handlers) {
+    const fields = yield* Fields;
+
+    return handlers
+      .handle("create", ({ payload }) =>
+        Effect.flatMap(actor, (who) => fields.create(who, payload)),
+      )
+      .handle("update", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => fields.update(who, params.id, payload)),
+      )
+      .handle("reorder", ({ payload }) =>
+        Effect.flatMap(actor, (who) => fields.reorder(who, payload.entity, payload.ids)),
+      )
+      .handle("createOption", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => fields.createOption(who, params.id, payload)),
+      )
+      .handle("updateOption", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) =>
+          fields.updateOption(who, params.id, params.optionId, payload),
+        ),
+      )
+      .handle("reorderOptions", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => fields.reorderOptions(who, params.id, payload.ids)),
+      )
+      .handle("putValue", ({ payload }) =>
+        Effect.flatMap(actor, (who) => fields.putValue(who, payload)),
       );
   }),
 );
@@ -187,8 +316,6 @@ const ChatsHandlers = HttpApiBuilder.group(CrmApi, "chats", (handlers) =>
   }),
 );
 
-const ChatsHandlersWithFiles = ChatsHandlers.pipe(Layer.provide(ChatFiles.layer));
-
 const ChatSpacesHandlers = HttpApiBuilder.group(CrmApi, "chatSpaces", (handlers) =>
   Effect.gen(function* () {
     const chats = yield* Chats;
@@ -219,6 +346,47 @@ const SidebarHandlers = HttpApiBuilder.group(CrmApi, "sidebar", (handlers) =>
     return handlers.handle("save", ({ payload }) =>
       Effect.flatMap(chatActor, (who) => chats.saveSidebar(who, payload)),
     );
+  }),
+);
+
+const WorkspaceSettingsHandlers = HttpApiBuilder.group(CrmApi, "workspaceSettings", (handlers) =>
+  Effect.gen(function* () {
+    const money = yield* Money;
+
+    return handlers
+      .handle("get", () => Effect.flatMap(actor, money.settings))
+      .handle("save", ({ payload }) =>
+        Effect.flatMap(actor, (who) => money.saveSettings(who, payload)),
+      );
+  }),
+);
+
+const ExchangeRatesHandlers = HttpApiBuilder.group(CrmApi, "exchangeRates", (handlers) =>
+  Effect.gen(function* () {
+    const money = yield* Money;
+
+    return handlers
+      .handle("setManual", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => money.setManualRate(who, params.currency, payload.rate)),
+      )
+      .handle("clearManual", ({ params }) =>
+        Effect.flatMap(actor, (who) => money.clearManualRate(who, params.currency)),
+      );
+  }),
+);
+
+const SavedViewsHandlers = HttpApiBuilder.group(CrmApi, "savedViews", (handlers) =>
+  Effect.gen(function* () {
+    const views = yield* SavedViews;
+
+    return handlers
+      .handle("create", ({ payload }) => Effect.flatMap(actor, (who) => views.create(who, payload)))
+      .handle("update", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => views.update(who, params.id, payload)),
+      )
+      .handle("remove", ({ params }) =>
+        Effect.flatMap(actor, (who) => views.remove(who, params.id)),
+      );
   }),
 );
 
@@ -305,17 +473,39 @@ const MemoryHandlers = HttpApiBuilder.group(CrmApi, "memory", (handlers) =>
   }),
 );
 
+/** A member applies or dismisses a fact the agent proposed (ADR 0024). */
+const IntelHandlers = HttpApiBuilder.group(
+  CrmApi,
+  "intel",
+  Effect.fn(function* (handlers) {
+    const intel = yield* Intel;
+
+    return handlers.handle("decideFact", ({ params, payload }) =>
+      Effect.flatMap(actor, (who) => intel.decideFact(who, params.id, payload.status)),
+    );
+  }),
+);
+
 const ApiRoutes = HttpApiBuilder.layer(CrmApi).pipe(
   Layer.provide([
+    IntelHandlers,
     SystemHandlers,
     AccountHandlers,
     CompaniesHandlers,
+    ContactsHandlers,
+    DealsHandlers,
+    ActivitiesHandlers,
+    FieldsHandlers,
     ConnectionsHandlers,
     SkillsHandlers,
     MemoryHandlers,
-    ChatsHandlersWithFiles,
+    ChatsHandlers,
     ChatSpacesHandlers,
     SidebarHandlers,
+    WorkspaceSettingsHandlers,
+    ExchangeRatesHandlers,
+    SavedViewsHandlers,
+    TrackingHandlers,
   ]),
   Layer.provide(AuthenticationLive),
 );
@@ -381,6 +571,13 @@ const synced: ReadonlyArray<
   readonly [HttpRouter.PathInput, (workspaceId: string, userId: string) => SyncSpec]
 > = [
   [COMPANIES_SYNC_PATH, (workspaceId) => companiesSync(workspaceId)],
+  [CONTACTS_SYNC_PATH, (workspaceId) => contactsSync(workspaceId)],
+  [DEALS_SYNC_PATH, (workspaceId) => dealsSync(workspaceId)],
+  [DEAL_CONTACTS_SYNC_PATH, (workspaceId) => dealContactsSync(workspaceId)],
+  [ACTIVITIES_SYNC_PATH, (workspaceId) => activitiesSync(workspaceId)],
+  [FIELD_DEFINITIONS_SYNC_PATH, (workspaceId) => fieldDefinitionsSync(workspaceId)],
+  [FIELD_OPTIONS_SYNC_PATH, (workspaceId) => fieldOptionsSync(workspaceId)],
+  [FIELD_VALUES_SYNC_PATH, (workspaceId) => fieldValuesSync(workspaceId)],
   [CONNECTIONS_SYNC_PATH, (workspaceId, userId) => connectionsSync(workspaceId, userId)],
   [CUSTOM_CONNECTORS_SYNC_PATH, (workspaceId) => customConnectorsSync(workspaceId)],
   [SKILLS_SYNC_PATH, (workspaceId) => skillsSync(workspaceId)],
@@ -389,6 +586,11 @@ const synced: ReadonlyArray<
   [CHAT_SPACES_SYNC_PATH, (workspaceId) => chatSpacesSync(workspaceId)],
   [CHAT_SPACE_MEMBERS_SYNC_PATH, (workspaceId) => chatSpaceMembersSync(workspaceId)],
   [SIDEBAR_SYNC_PATH, (workspaceId, userId) => sidebarSync(workspaceId, userId)],
+  [WORKSPACE_SETTINGS_SYNC_PATH, (workspaceId) => workspaceSettingsSync(workspaceId)],
+  [EXCHANGE_RATES_SYNC_PATH, (workspaceId) => exchangeRatesSync(workspaceId)],
+  [SAVED_VIEWS_SYNC_PATH, (workspaceId, userId) => savedViewsSync(workspaceId, userId)],
+  [CONTACT_FACTS_SYNC_PATH, (workspaceId) => contactFactsSync(workspaceId)],
+  [CONTACT_BRIEFS_SYNC_PATH, (workspaceId) => contactBriefsSync(workspaceId)],
 ];
 
 /**
@@ -707,11 +909,12 @@ const AgentProxyRoutes = Layer.effectDiscard(
 );
 
 /**
- * Every HTTP route, still requiring `Auth`, `Companies`, `Electric` and `Connections`. `main.ts`
+ * Every HTTP route, still requiring `Auth`, `Companies`, `Records`, `Electric` and `Connections`. `main.ts`
  * provides the real services; tests provide fakes.
  */
 export const Routes = Layer.mergeAll(
   ApiRoutes,
+  TrackingRoutes,
   AuthRoutes,
   SyncRoutes,
   ConnectionRoutes,

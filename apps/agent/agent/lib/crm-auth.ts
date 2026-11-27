@@ -14,6 +14,9 @@ type CallerAttributes = {
   email: string;
   workspaceId?: string;
   permissionMode?: string;
+  /** The record a chat from a record sheet is about (ADR 0024). */
+  recordKind?: string;
+  recordId?: string;
 };
 
 export function crmProxy(secret: string | undefined): AuthFn<Request> {
@@ -53,6 +56,14 @@ export function crmProxy(secret: string | undefined): AuthFn<Request> {
     if (workspaceId) attributes.workspaceId = workspaceId;
 
     if (permissionMode) attributes.permissionMode = permissionMode;
+
+    const recordKind = request.headers.get("x-crm-record-kind") ?? "";
+    const recordId = request.headers.get("x-crm-record-id") ?? "";
+
+    if (recordKind && recordId) {
+      attributes.recordKind = recordKind;
+      attributes.recordId = recordId;
+    }
 
     return {
       authenticator: "crm-proxy",

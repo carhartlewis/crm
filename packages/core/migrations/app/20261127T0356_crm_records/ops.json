@@ -1,0 +1,3398 @@
+[
+  {
+    "id": "table.activity",
+    "label": "Create table \"activity\"",
+    "summary": "Creates table \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"activity\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"activity\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"activity\"",
+        "sql": "CREATE TABLE \"public\".\"activity\" (\n  \"body\" text,\n  \"company_id\" text,\n  \"completed_at\" timestamptz(3),\n  \"contact_id\" text,\n  \"created_at\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"created_by_id\" text,\n  \"deal_id\" text,\n  \"due_at\" timestamptz(3),\n  \"id\" text NOT NULL,\n  \"meta\" jsonb,\n  \"occurred_at\" timestamptz(3) NOT NULL,\n  \"subject\" text,\n  \"type\" text NOT NULL,\n  \"updated_at\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"activity\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"activity\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"activity\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.contact",
+    "label": "Create table \"contact\"",
+    "summary": "Creates table \"contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"contact\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"contact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"contact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"contact\"",
+        "sql": "CREATE TABLE \"public\".\"contact\" (\n  \"archived_at\" timestamptz(3),\n  \"company_id\" text,\n  \"created_at\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"email\" text,\n  \"enriched_at\" timestamptz(3),\n  \"enrichment_error\" text,\n  \"enrichment_status\" text DEFAULT 'pending' NOT NULL,\n  \"first_name\" text NOT NULL,\n  \"function\" text,\n  \"github_url\" text,\n  \"id\" text NOT NULL,\n  \"image_url\" text,\n  \"last_activity_at\" timestamptz(3),\n  \"last_name\" text,\n  \"linkedin_url\" text,\n  \"owner_id\" text,\n  \"phone\" text,\n  \"seniority\" text,\n  \"source\" text DEFAULT 'manual' NOT NULL,\n  \"title\" text,\n  \"twitter_url\" text,\n  \"updated_at\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"contact\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"contact\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"contact\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.deal",
+    "label": "Create table \"deal\"",
+    "summary": "Creates table \"deal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "deal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"deal\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"deal\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"deal\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"deal\"",
+        "sql": "CREATE TABLE \"public\".\"deal\" (\n  \"amount\" numeric(14,2),\n  \"archived_at\" timestamptz(3),\n  \"closed_at\" timestamptz(3),\n  \"closed_reason\" text,\n  \"company_id\" text NOT NULL,\n  \"created_at\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"currency\" text DEFAULT 'USD' NOT NULL,\n  \"description\" text,\n  \"expected_close_date\" date,\n  \"id\" text NOT NULL,\n  \"last_activity_at\" timestamptz(3),\n  \"name\" text NOT NULL,\n  \"owner_id\" text,\n  \"stage\" text DEFAULT 'demo_booked' NOT NULL,\n  \"stage_changed_at\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"updated_at\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"deal\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"deal\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"deal\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.deal_contact",
+    "label": "Create table \"deal_contact\"",
+    "summary": "Creates table \"deal_contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "deal_contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"deal_contact\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"deal_contact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"deal_contact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"deal_contact\"",
+        "sql": "CREATE TABLE \"public\".\"deal_contact\" (\n  \"contact_id\" text NOT NULL,\n  \"created_at\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"deal_id\" text NOT NULL,\n  \"role\" text,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"deal_id\", \"contact_id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"deal_contact\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"deal_contact\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"deal_contact\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.archived_at",
+    "label": "Add column \"archived_at\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "archived_at",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"archived_at\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "archived_at"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"archived_at\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"archived_at\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"archived_at\" timestamptz(3)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"archived_at\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "archived_at"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"archived_at\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"archived_at\" has type \"timestamp(3) with time zone\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "archived_at",
+          "timestamp(3) with time zone"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.brand_color",
+    "label": "Add column \"brand_color\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "brand_color",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"brand_color\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "brand_color"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"brand_color\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"brand_color\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"brand_color\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"brand_color\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "brand_color"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"brand_color\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"brand_color\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "brand_color",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.careers_url",
+    "label": "Add column \"careers_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "careers_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"careers_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "careers_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"careers_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"careers_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"careers_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"careers_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "careers_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"careers_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"careers_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "careers_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.city",
+    "label": "Add column \"city\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "city",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"city\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "city"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"city\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"city\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"city\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"city\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "city"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"city\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"city\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "city",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.country",
+    "label": "Add column \"country\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "country",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"country\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "country"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"country\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"country\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"country\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"country\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "country"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"country\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"country\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "country",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.country_code",
+    "label": "Add column \"country_code\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "country_code",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"country_code\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "country_code"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"country_code\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"country_code\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"country_code\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"country_code\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "country_code"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"country_code\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"country_code\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "country_code",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.description",
+    "label": "Add column \"description\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "description",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"description\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "description"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"description\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"description\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"description\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"description\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "description"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"description\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"description\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "description",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.email",
+    "label": "Add column \"email\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "email",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"email\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "email"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"email\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"email\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"email\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"email\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "email"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"email\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"email\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "email",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.enriched_at",
+    "label": "Add column \"enriched_at\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "enriched_at",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"enriched_at\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enriched_at"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"enriched_at\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"enriched_at\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"enriched_at\" timestamptz(3)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"enriched_at\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enriched_at"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"enriched_at\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"enriched_at\" has type \"timestamp(3) with time zone\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enriched_at",
+          "timestamp(3) with time zone"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.enrichment_error",
+    "label": "Add column \"enrichment_error\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "enrichment_error",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"enrichment_error\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enrichment_error"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"enrichment_error\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"enrichment_error\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"enrichment_error\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"enrichment_error\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enrichment_error"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"enrichment_error\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"enrichment_error\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enrichment_error",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.enrichment_status",
+    "label": "Add column \"enrichment_status\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "enrichment_status",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"enrichment_status\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enrichment_status"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"enrichment_status\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"enrichment_status\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"enrichment_status\" text DEFAULT 'pending' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"enrichment_status\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enrichment_status"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"enrichment_status\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"enrichment_status\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enrichment_status",
+          "text"
+        ]
+      },
+      {
+        "description": "verify column \"enrichment_status\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "enrichment_status",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.github_url",
+    "label": "Add column \"github_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "github_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"github_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "github_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"github_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"github_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"github_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"github_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "github_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"github_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"github_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "github_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.icon_dark_url",
+    "label": "Add column \"icon_dark_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "icon_dark_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"icon_dark_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_dark_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"icon_dark_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"icon_dark_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"icon_dark_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"icon_dark_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_dark_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"icon_dark_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"icon_dark_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_dark_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.icon_tone",
+    "label": "Add column \"icon_tone\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "icon_tone",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"icon_tone\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_tone"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"icon_tone\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"icon_tone\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"icon_tone\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"icon_tone\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_tone"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"icon_tone\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"icon_tone\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_tone",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.icon_url",
+    "label": "Add column \"icon_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "icon_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"icon_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"icon_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"icon_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"icon_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"icon_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"icon_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"icon_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "icon_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.industry",
+    "label": "Add column \"industry\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "industry",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"industry\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "industry"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"industry\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"industry\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"industry\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"industry\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "industry"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"industry\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"industry\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "industry",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.last_activity_at",
+    "label": "Add column \"last_activity_at\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "last_activity_at",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"last_activity_at\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "last_activity_at"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"last_activity_at\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"last_activity_at\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"last_activity_at\" timestamptz(3)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"last_activity_at\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "last_activity_at"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"last_activity_at\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"last_activity_at\" has type \"timestamp(3) with time zone\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "last_activity_at",
+          "timestamp(3) with time zone"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.linkedin_url",
+    "label": "Add column \"linkedin_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "linkedin_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"linkedin_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "linkedin_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"linkedin_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"linkedin_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"linkedin_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"linkedin_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "linkedin_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"linkedin_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"linkedin_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "linkedin_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.logo_dark_url",
+    "label": "Add column \"logo_dark_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "logo_dark_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"logo_dark_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "logo_dark_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"logo_dark_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"logo_dark_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"logo_dark_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"logo_dark_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "logo_dark_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"logo_dark_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"logo_dark_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "logo_dark_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.logo_url",
+    "label": "Add column \"logo_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "logo_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"logo_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "logo_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"logo_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"logo_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"logo_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"logo_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "logo_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"logo_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"logo_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "logo_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.phone",
+    "label": "Add column \"phone\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "phone",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"phone\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "phone"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"phone\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"phone\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"phone\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"phone\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "phone"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"phone\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"phone\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "phone",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.pricing_url",
+    "label": "Add column \"pricing_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "pricing_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"pricing_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "pricing_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"pricing_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"pricing_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"pricing_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"pricing_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "pricing_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"pricing_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"pricing_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "pricing_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.primary_contact_id",
+    "label": "Add column \"primary_contact_id\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "primary_contact_id",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"primary_contact_id\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "primary_contact_id"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"primary_contact_id\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"primary_contact_id\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"primary_contact_id\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"primary_contact_id\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "primary_contact_id"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"primary_contact_id\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"primary_contact_id\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "primary_contact_id",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.source",
+    "label": "Add column \"source\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "source",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"source\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "source"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"source\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"source\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"source\" text DEFAULT 'manual' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"source\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "source"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"source\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"source\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "source",
+          "text"
+        ]
+      },
+      {
+        "description": "verify column \"source\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "source",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.state_code",
+    "label": "Add column \"state_code\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "state_code",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"state_code\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "state_code"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"state_code\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"state_code\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"state_code\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"state_code\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "state_code"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"state_code\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"state_code\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "state_code",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.sub_industry",
+    "label": "Add column \"sub_industry\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "sub_industry",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"sub_industry\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "sub_industry"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"sub_industry\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"sub_industry\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"sub_industry\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"sub_industry\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "sub_industry"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"sub_industry\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"sub_industry\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "sub_industry",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.twitter_url",
+    "label": "Add column \"twitter_url\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "twitter_url",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"twitter_url\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "twitter_url"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"twitter_url\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"twitter_url\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"twitter_url\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"twitter_url\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "twitter_url"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"twitter_url\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"twitter_url\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "twitter_url",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.company.website",
+    "label": "Add column \"website\" to \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "website",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"website\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "website"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"website\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"website\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD COLUMN \"website\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"website\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "website"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"website\" on \"company\""
+        }
+      },
+      {
+        "description": "verify column \"website\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "company",
+          "website",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.company.company_primary_contact_id_key",
+    "label": "Add unique constraint on \"company\" (primary_contact_id)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "company_primary_contact_id_key",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"company_primary_contact_id_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "company_primary_contact_id_key",
+          "public",
+          "\"public\".\"company\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "constraint \"company_primary_contact_id_key\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"company_primary_contact_id_key\"",
+        "sql": "ALTER TABLE \"public\".\"company\" ADD CONSTRAINT \"company_primary_contact_id_key\" UNIQUE (\"primary_contact_id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify unique constraint \"company_primary_contact_id_key\" exists on (primary_contact_id)",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb)) AS \"result\"",
+        "params": [
+          "company_primary_contact_id_key",
+          "public",
+          "\"public\".\"company\"",
+          "u",
+          "[\"primary_contact_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity.activity_company_id_idx_1303a718",
+    "label": "Create index \"activity_company_id_idx_1303a718\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_company_id_idx_1303a718",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_company_id_idx_1303a718\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_company_id_idx_1303a718\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"activity_company_id_idx_1303a718\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_company_id_idx_1303a718\"",
+        "sql": "CREATE INDEX \"activity_company_id_idx_1303a718\" ON \"public\".\"activity\" (\"company_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_company_id_idx_1303a718\" exists on \"activity\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"activity_company_id_idx_1303a718\"",
+          "i",
+          "I",
+          "\"public\".\"activity\"",
+          "btree",
+          "[\"company_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity.activity_contact_id_idx_f6f6ad79",
+    "label": "Create index \"activity_contact_id_idx_f6f6ad79\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_contact_id_idx_f6f6ad79",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_contact_id_idx_f6f6ad79\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_contact_id_idx_f6f6ad79\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"activity_contact_id_idx_f6f6ad79\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_contact_id_idx_f6f6ad79\"",
+        "sql": "CREATE INDEX \"activity_contact_id_idx_f6f6ad79\" ON \"public\".\"activity\" (\"contact_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_contact_id_idx_f6f6ad79\" exists on \"activity\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"activity_contact_id_idx_f6f6ad79\"",
+          "i",
+          "I",
+          "\"public\".\"activity\"",
+          "btree",
+          "[\"contact_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity.activity_created_by_id_idx_2b1d9a03",
+    "label": "Create index \"activity_created_by_id_idx_2b1d9a03\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_created_by_id_idx_2b1d9a03",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_created_by_id_idx_2b1d9a03\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_created_by_id_idx_2b1d9a03\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"activity_created_by_id_idx_2b1d9a03\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_created_by_id_idx_2b1d9a03\"",
+        "sql": "CREATE INDEX \"activity_created_by_id_idx_2b1d9a03\" ON \"public\".\"activity\" (\"created_by_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_created_by_id_idx_2b1d9a03\" exists on \"activity\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"activity_created_by_id_idx_2b1d9a03\"",
+          "i",
+          "I",
+          "\"public\".\"activity\"",
+          "btree",
+          "[\"created_by_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity.activity_deal_id_idx_ca15613b",
+    "label": "Create index \"activity_deal_id_idx_ca15613b\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_deal_id_idx_ca15613b",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_deal_id_idx_ca15613b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_deal_id_idx_ca15613b\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"activity_deal_id_idx_ca15613b\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_deal_id_idx_ca15613b\"",
+        "sql": "CREATE INDEX \"activity_deal_id_idx_ca15613b\" ON \"public\".\"activity\" (\"deal_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_deal_id_idx_ca15613b\" exists on \"activity\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"activity_deal_id_idx_ca15613b\"",
+          "i",
+          "I",
+          "\"public\".\"activity\"",
+          "btree",
+          "[\"deal_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity.activity_workspace_id_idx_90a9f461",
+    "label": "Create index \"activity_workspace_id_idx_90a9f461\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_workspace_id_idx_90a9f461",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"activity_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"activity_workspace_id_idx_90a9f461\" ON \"public\".\"activity\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_workspace_id_idx_90a9f461\" exists on \"activity\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"activity_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"activity\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.contact.contact_company_id_idx_1303a718",
+    "label": "Create index \"contact_company_id_idx_1303a718\" on \"contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "contact_company_id_idx_1303a718",
+        "table": "contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"contact_company_id_idx_1303a718\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"contact_company_id_idx_1303a718\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"contact_company_id_idx_1303a718\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"contact_company_id_idx_1303a718\"",
+        "sql": "CREATE INDEX \"contact_company_id_idx_1303a718\" ON \"public\".\"contact\" (\"company_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"contact_company_id_idx_1303a718\" exists on \"contact\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"contact_company_id_idx_1303a718\"",
+          "i",
+          "I",
+          "\"public\".\"contact\"",
+          "btree",
+          "[\"company_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.contact.contact_owner_id_idx_ade9f347",
+    "label": "Create index \"contact_owner_id_idx_ade9f347\" on \"contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "contact_owner_id_idx_ade9f347",
+        "table": "contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"contact_owner_id_idx_ade9f347\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"contact_owner_id_idx_ade9f347\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"contact_owner_id_idx_ade9f347\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"contact_owner_id_idx_ade9f347\"",
+        "sql": "CREATE INDEX \"contact_owner_id_idx_ade9f347\" ON \"public\".\"contact\" (\"owner_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"contact_owner_id_idx_ade9f347\" exists on \"contact\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"contact_owner_id_idx_ade9f347\"",
+          "i",
+          "I",
+          "\"public\".\"contact\"",
+          "btree",
+          "[\"owner_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.contact.contact_workspace_id_idx_90a9f461",
+    "label": "Create index \"contact_workspace_id_idx_90a9f461\" on \"contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "contact_workspace_id_idx_90a9f461",
+        "table": "contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"contact_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"contact_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"contact_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"contact_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"contact_workspace_id_idx_90a9f461\" ON \"public\".\"contact\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"contact_workspace_id_idx_90a9f461\" exists on \"contact\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"contact_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"contact\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.deal.deal_company_id_idx_1303a718",
+    "label": "Create index \"deal_company_id_idx_1303a718\" on \"deal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "deal_company_id_idx_1303a718",
+        "table": "deal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"deal_company_id_idx_1303a718\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"deal_company_id_idx_1303a718\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"deal_company_id_idx_1303a718\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"deal_company_id_idx_1303a718\"",
+        "sql": "CREATE INDEX \"deal_company_id_idx_1303a718\" ON \"public\".\"deal\" (\"company_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"deal_company_id_idx_1303a718\" exists on \"deal\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"deal_company_id_idx_1303a718\"",
+          "i",
+          "I",
+          "\"public\".\"deal\"",
+          "btree",
+          "[\"company_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.deal.deal_owner_id_idx_ade9f347",
+    "label": "Create index \"deal_owner_id_idx_ade9f347\" on \"deal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "deal_owner_id_idx_ade9f347",
+        "table": "deal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"deal_owner_id_idx_ade9f347\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"deal_owner_id_idx_ade9f347\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"deal_owner_id_idx_ade9f347\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"deal_owner_id_idx_ade9f347\"",
+        "sql": "CREATE INDEX \"deal_owner_id_idx_ade9f347\" ON \"public\".\"deal\" (\"owner_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"deal_owner_id_idx_ade9f347\" exists on \"deal\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"deal_owner_id_idx_ade9f347\"",
+          "i",
+          "I",
+          "\"public\".\"deal\"",
+          "btree",
+          "[\"owner_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.deal.deal_workspace_id_idx_90a9f461",
+    "label": "Create index \"deal_workspace_id_idx_90a9f461\" on \"deal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "deal_workspace_id_idx_90a9f461",
+        "table": "deal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"deal_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"deal_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"deal_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"deal_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"deal_workspace_id_idx_90a9f461\" ON \"public\".\"deal\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"deal_workspace_id_idx_90a9f461\" exists on \"deal\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"deal_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"deal\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.deal_contact.deal_contact_contact_id_idx_f6f6ad79",
+    "label": "Create index \"deal_contact_contact_id_idx_f6f6ad79\" on \"deal_contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "deal_contact_contact_id_idx_f6f6ad79",
+        "table": "deal_contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"deal_contact_contact_id_idx_f6f6ad79\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"deal_contact_contact_id_idx_f6f6ad79\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"deal_contact_contact_id_idx_f6f6ad79\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"deal_contact_contact_id_idx_f6f6ad79\"",
+        "sql": "CREATE INDEX \"deal_contact_contact_id_idx_f6f6ad79\" ON \"public\".\"deal_contact\" (\"contact_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"deal_contact_contact_id_idx_f6f6ad79\" exists on \"deal_contact\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"deal_contact_contact_id_idx_f6f6ad79\"",
+          "i",
+          "I",
+          "\"public\".\"deal_contact\"",
+          "btree",
+          "[\"contact_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.deal_contact.deal_contact_deal_id_idx_ca15613b",
+    "label": "Create index \"deal_contact_deal_id_idx_ca15613b\" on \"deal_contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "deal_contact_deal_id_idx_ca15613b",
+        "table": "deal_contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"deal_contact_deal_id_idx_ca15613b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"deal_contact_deal_id_idx_ca15613b\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"deal_contact_deal_id_idx_ca15613b\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"deal_contact_deal_id_idx_ca15613b\"",
+        "sql": "CREATE INDEX \"deal_contact_deal_id_idx_ca15613b\" ON \"public\".\"deal_contact\" (\"deal_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"deal_contact_deal_id_idx_ca15613b\" exists on \"deal_contact\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"deal_contact_deal_id_idx_ca15613b\"",
+          "i",
+          "I",
+          "\"public\".\"deal_contact\"",
+          "btree",
+          "[\"deal_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.deal_contact.deal_contact_workspace_id_idx_90a9f461",
+    "label": "Create index \"deal_contact_workspace_id_idx_90a9f461\" on \"deal_contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "deal_contact_workspace_id_idx_90a9f461",
+        "table": "deal_contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"deal_contact_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"deal_contact_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"deal_contact_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"deal_contact_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"deal_contact_workspace_id_idx_90a9f461\" ON \"public\".\"deal_contact\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"deal_contact_workspace_id_idx_90a9f461\" exists on \"deal_contact\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"deal_contact_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"deal_contact\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activity.activity_workspace_id_fkey",
+    "label": "Add foreign key \"activity_workspace_id_fkey\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activity_workspace_id_fkey",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activity_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_workspace_id_fkey",
+          "public",
+          "\"public\".\"activity\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"activity_workspace_id_fkey\" on \"activity\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activity_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activity\"\nADD CONSTRAINT \"activity_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activity_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "activity_workspace_id_fkey",
+          "public",
+          "\"public\".\"activity\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activity.activity_company_id_fkey",
+    "label": "Add foreign key \"activity_company_id_fkey\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activity_company_id_fkey",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activity_company_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_company_id_fkey",
+          "public",
+          "\"public\".\"activity\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"activity_company_id_fkey\" on \"activity\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activity_company_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activity\"\nADD CONSTRAINT \"activity_company_id_fkey\"\nFOREIGN KEY (\"company_id\")\nREFERENCES \"public\".\"company\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activity_company_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "activity_company_id_fkey",
+          "public",
+          "\"public\".\"activity\"",
+          "f",
+          "[\"company_id\"]",
+          "\"public\".\"company\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activity.activity_contact_id_fkey",
+    "label": "Add foreign key \"activity_contact_id_fkey\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activity_contact_id_fkey",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activity_contact_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_contact_id_fkey",
+          "public",
+          "\"public\".\"activity\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"activity_contact_id_fkey\" on \"activity\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activity_contact_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activity\"\nADD CONSTRAINT \"activity_contact_id_fkey\"\nFOREIGN KEY (\"contact_id\")\nREFERENCES \"public\".\"contact\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activity_contact_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "activity_contact_id_fkey",
+          "public",
+          "\"public\".\"activity\"",
+          "f",
+          "[\"contact_id\"]",
+          "\"public\".\"contact\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activity.activity_deal_id_fkey",
+    "label": "Add foreign key \"activity_deal_id_fkey\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activity_deal_id_fkey",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activity_deal_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_deal_id_fkey",
+          "public",
+          "\"public\".\"activity\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"activity_deal_id_fkey\" on \"activity\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activity_deal_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activity\"\nADD CONSTRAINT \"activity_deal_id_fkey\"\nFOREIGN KEY (\"deal_id\")\nREFERENCES \"public\".\"deal\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activity_deal_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "activity_deal_id_fkey",
+          "public",
+          "\"public\".\"activity\"",
+          "f",
+          "[\"deal_id\"]",
+          "\"public\".\"deal\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activity.activity_created_by_id_fkey",
+    "label": "Add foreign key \"activity_created_by_id_fkey\" on \"activity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activity_created_by_id_fkey",
+        "table": "activity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activity_created_by_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_created_by_id_fkey",
+          "public",
+          "\"public\".\"activity\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"activity_created_by_id_fkey\" on \"activity\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activity_created_by_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activity\"\nADD CONSTRAINT \"activity_created_by_id_fkey\"\nFOREIGN KEY (\"created_by_id\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activity_created_by_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "activity_created_by_id_fkey",
+          "public",
+          "\"public\".\"activity\"",
+          "f",
+          "[\"created_by_id\"]",
+          "\"public\".\"user\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.contact.contact_workspace_id_fkey",
+    "label": "Add foreign key \"contact_workspace_id_fkey\" on \"contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "contact_workspace_id_fkey",
+        "table": "contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"contact_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "contact_workspace_id_fkey",
+          "public",
+          "\"public\".\"contact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"contact_workspace_id_fkey\" on \"contact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"contact_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"contact\"\nADD CONSTRAINT \"contact_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"contact_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "contact_workspace_id_fkey",
+          "public",
+          "\"public\".\"contact\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.contact.contact_company_id_fkey",
+    "label": "Add foreign key \"contact_company_id_fkey\" on \"contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "contact_company_id_fkey",
+        "table": "contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"contact_company_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "contact_company_id_fkey",
+          "public",
+          "\"public\".\"contact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"contact_company_id_fkey\" on \"contact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"contact_company_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"contact\"\nADD CONSTRAINT \"contact_company_id_fkey\"\nFOREIGN KEY (\"company_id\")\nREFERENCES \"public\".\"company\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"contact_company_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "contact_company_id_fkey",
+          "public",
+          "\"public\".\"contact\"",
+          "f",
+          "[\"company_id\"]",
+          "\"public\".\"company\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.contact.contact_owner_id_fkey",
+    "label": "Add foreign key \"contact_owner_id_fkey\" on \"contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "contact_owner_id_fkey",
+        "table": "contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"contact_owner_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "contact_owner_id_fkey",
+          "public",
+          "\"public\".\"contact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"contact_owner_id_fkey\" on \"contact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"contact_owner_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"contact\"\nADD CONSTRAINT \"contact_owner_id_fkey\"\nFOREIGN KEY (\"owner_id\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"contact_owner_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "contact_owner_id_fkey",
+          "public",
+          "\"public\".\"contact\"",
+          "f",
+          "[\"owner_id\"]",
+          "\"public\".\"user\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.company.company_primary_contact_id_fkey",
+    "label": "Add foreign key \"company_primary_contact_id_fkey\" on \"company\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "company_primary_contact_id_fkey",
+        "table": "company"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"company_primary_contact_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "company_primary_contact_id_fkey",
+          "public",
+          "\"public\".\"company\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"company_primary_contact_id_fkey\" on \"company\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"company_primary_contact_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"company\"\nADD CONSTRAINT \"company_primary_contact_id_fkey\"\nFOREIGN KEY (\"primary_contact_id\")\nREFERENCES \"public\".\"contact\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"company_primary_contact_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "company_primary_contact_id_fkey",
+          "public",
+          "\"public\".\"company\"",
+          "f",
+          "[\"primary_contact_id\"]",
+          "\"public\".\"contact\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.deal.deal_workspace_id_fkey",
+    "label": "Add foreign key \"deal_workspace_id_fkey\" on \"deal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "deal_workspace_id_fkey",
+        "table": "deal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"deal_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "deal_workspace_id_fkey",
+          "public",
+          "\"public\".\"deal\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"deal_workspace_id_fkey\" on \"deal\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"deal_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"deal\"\nADD CONSTRAINT \"deal_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"deal_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "deal_workspace_id_fkey",
+          "public",
+          "\"public\".\"deal\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.deal.deal_company_id_fkey",
+    "label": "Add foreign key \"deal_company_id_fkey\" on \"deal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "deal_company_id_fkey",
+        "table": "deal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"deal_company_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "deal_company_id_fkey",
+          "public",
+          "\"public\".\"deal\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"deal_company_id_fkey\" on \"deal\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"deal_company_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"deal\"\nADD CONSTRAINT \"deal_company_id_fkey\"\nFOREIGN KEY (\"company_id\")\nREFERENCES \"public\".\"company\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"deal_company_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "deal_company_id_fkey",
+          "public",
+          "\"public\".\"deal\"",
+          "f",
+          "[\"company_id\"]",
+          "\"public\".\"company\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.deal.deal_owner_id_fkey",
+    "label": "Add foreign key \"deal_owner_id_fkey\" on \"deal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "deal_owner_id_fkey",
+        "table": "deal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"deal_owner_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "deal_owner_id_fkey",
+          "public",
+          "\"public\".\"deal\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"deal_owner_id_fkey\" on \"deal\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"deal_owner_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"deal\"\nADD CONSTRAINT \"deal_owner_id_fkey\"\nFOREIGN KEY (\"owner_id\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"deal_owner_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "deal_owner_id_fkey",
+          "public",
+          "\"public\".\"deal\"",
+          "f",
+          "[\"owner_id\"]",
+          "\"public\".\"user\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.deal_contact.deal_contact_deal_id_fkey",
+    "label": "Add foreign key \"deal_contact_deal_id_fkey\" on \"deal_contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "deal_contact_deal_id_fkey",
+        "table": "deal_contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"deal_contact_deal_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "deal_contact_deal_id_fkey",
+          "public",
+          "\"public\".\"deal_contact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"deal_contact_deal_id_fkey\" on \"deal_contact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"deal_contact_deal_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"deal_contact\"\nADD CONSTRAINT \"deal_contact_deal_id_fkey\"\nFOREIGN KEY (\"deal_id\")\nREFERENCES \"public\".\"deal\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"deal_contact_deal_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "deal_contact_deal_id_fkey",
+          "public",
+          "\"public\".\"deal_contact\"",
+          "f",
+          "[\"deal_id\"]",
+          "\"public\".\"deal\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.deal_contact.deal_contact_contact_id_fkey",
+    "label": "Add foreign key \"deal_contact_contact_id_fkey\" on \"deal_contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "deal_contact_contact_id_fkey",
+        "table": "deal_contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"deal_contact_contact_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "deal_contact_contact_id_fkey",
+          "public",
+          "\"public\".\"deal_contact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"deal_contact_contact_id_fkey\" on \"deal_contact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"deal_contact_contact_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"deal_contact\"\nADD CONSTRAINT \"deal_contact_contact_id_fkey\"\nFOREIGN KEY (\"contact_id\")\nREFERENCES \"public\".\"contact\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"deal_contact_contact_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "deal_contact_contact_id_fkey",
+          "public",
+          "\"public\".\"deal_contact\"",
+          "f",
+          "[\"contact_id\"]",
+          "\"public\".\"contact\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.deal_contact.deal_contact_workspace_id_fkey",
+    "label": "Add foreign key \"deal_contact_workspace_id_fkey\" on \"deal_contact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "deal_contact_workspace_id_fkey",
+        "table": "deal_contact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"deal_contact_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "deal_contact_workspace_id_fkey",
+          "public",
+          "\"public\".\"deal_contact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"deal_contact_workspace_id_fkey\" on \"deal_contact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"deal_contact_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"deal_contact\"\nADD CONSTRAINT \"deal_contact_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"deal_contact_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "deal_contact_workspace_id_fkey",
+          "public",
+          "\"public\".\"deal_contact\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  }
+]

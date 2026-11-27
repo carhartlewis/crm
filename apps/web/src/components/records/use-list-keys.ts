@@ -33,7 +33,7 @@ export interface ListKeysOptions {
 /**
  * A record list's keys, Linear/Gmail style:
  * j k ↓ ↑ move · g g / ⇧G first / last · Enter or o open · x select · ⇧j ⇧k extend ·
- * Escape clear selection · / filter. Creating is global (⌘C, components/shell/shortcuts.tsx).
+ * Escape clear selection · / filter. Creating is global (⌥⇧C, ⌥⇧P, ⌥⇧D; components/shell/shortcuts.tsx).
  * Plain keys never fire in text fields (react-hotkeys-hook's default).
  */
 export function useListKeys({

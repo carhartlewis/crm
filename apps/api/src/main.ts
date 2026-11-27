@@ -9,9 +9,15 @@ import { Chats } from "./services/Chats.ts";
 import { Companies } from "./services/Companies.ts";
 import { CrmTools } from "./services/crm-tools.ts";
 import { Electric } from "./services/Electric.ts";
-import { Images } from "./services/Images.ts";
+import { Fields } from "./services/Fields.ts";
+import { ChatFiles, Images } from "./services/Images.ts";
+import { Intel } from "./services/Intel.ts";
 import { Memory } from "./services/Memory.ts";
+import { Money } from "./services/Money.ts";
+import { Records } from "./services/Records.ts";
+import { SavedViews } from "./services/SavedViews.ts";
 import { Skills } from "./services/Skills.ts";
+import { Tracking } from "./services/Tracking.ts";
 
 const Server = Layer.unwrap(
   Effect.gen(function* () {
@@ -23,13 +29,20 @@ const Server = Layer.unwrap(
       Layer.provide([
         Auth.layer,
         Companies.layer,
+        Records.layer,
+        Intel.layer,
+        Fields.layer,
         Chats.layer,
         CrmTools.layer,
         Electric.layer,
         Connections.layer,
         Skills.layer,
         Memory.layer,
+        Money.layer,
+        SavedViews.layer,
         Images.layer,
+        ChatFiles.layer,
+        Tracking.layer,
       ]),
       Layer.provide(BunHttpServer.layer({ port: config.port })),
     );
