@@ -109,6 +109,12 @@ Three tables, each workspace-scoped, synced through the API proxy (ADR 0012):
   written, and saves it through `POST /api/agent/chats/title` with its agent token. The API keeps
   it only while `chat.auto_title` is on; a person's rename turns it off.
 
+- **The open web:** `web_search` is eve's built-in tool with Exa on the AI Gateway (no Exa key);
+  `web_fetch` stays eve's default. context.dev is two CRM tools, so its key stays in the API:
+  `crm__lookup_company` (a company profile from a domain, name or work email) and
+  `crm__read_web_page` (any page as Markdown). They are listed only when the API has
+  `CONTEXT_DEV_API_KEY`.
+
 ### Fast
 
 - **The sidebar and chat lists are local.** Chats, spaces and the sidebar row sync through

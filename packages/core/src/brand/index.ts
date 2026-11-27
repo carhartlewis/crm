@@ -83,6 +83,23 @@ export interface BrandResearch {
   readonly homepage: string | null;
 }
 
+/** Who to look up: a company's website domain, its name, or a work email at it. */
+export type BrandQuery =
+  | { readonly domain: string }
+  | { readonly name: string }
+  | { readonly email: string };
+
+/**
+ * context.dev for the agent's CRM tools (ADR 0018): a company profile, and any page as Markdown.
+ * The key stays in the API; the agent calls these through the MCP gateway.
+ */
+export interface WebReader {
+  /** `POST /brand/retrieve` (10 credits, free when no brand is found). Null when none is found. */
+  readonly lookup: (query: BrandQuery) => Promise<Omit<BrandResearch, "homepage"> | null>;
+  /** `GET /web/scrape/markdown` (1 credit): the page's main content, cut at `maxChars`. */
+  readonly readPage: (url: string, maxChars?: number) => Promise<string | null>;
+}
+
 export interface CompanyResearcher {
   /**
    * Public facts about the company at a website: `POST /brand/retrieve` (10 credits) and
@@ -103,6 +120,7 @@ const addressPart = text.catch(null);
 const Full = z.object({
   brand: z
     .object({
+      domain: text,
       title: text,
       description: text,
       slogan: text,
@@ -184,7 +202,7 @@ export function createContextDev({
   apiKey,
   fetch: fetchImpl = fetch,
   timeoutMs = 20_000,
-}: ContextDevOptions): BrandLogos & CompanyResearcher {
+}: ContextDevOptions): BrandLogos & CompanyResearcher & WebReader {
   const headers = { authorization: `Bearer ${apiKey}`, accept: "application/json" };
 
   /** A context.dev JSON body, or null on any failure: research is best effort. */
@@ -211,6 +229,55 @@ export function createContextDev({
   };
 
   return {
+    async lookup(query) {
+      let body: Record<string, string> | null = null;
+
+      if ("domain" in query) {
+        const domain = brandDomain(query.domain);
+
+        if (domain) body = { type: "by_domain", domain };
+      } else if ("name" in query) {
+        const name = query.name.trim();
+
+        // context.dev looks names up between 3 and 30 characters.
+        if (name.length >= 3 && name.length <= 30) body = { type: "by_name", name };
+      } else if (query.email.includes("@")) {
+        body = { type: "by_email", email: query.email.trim() };
+      }
+
+      if (!body) return null;
+
+      const full = await get(Full, `${BASE}/brand/retrieve`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+
+      if (!full?.brand) return null;
+
+      const { homepage: _homepage, ...profile } = researchOf(
+        "domain" in body ? (body["domain"] ?? "") : (full.brand.domain ?? ""),
+        full.brand,
+        null,
+      );
+
+      return profile;
+    },
+
+    async readPage(url, maxChars = 40_000) {
+      if (!URL.canParse(url) || !/^https?:$/.test(new URL(url).protocol)) return null;
+
+      const page = await get(
+        Markdown,
+        `${BASE}/web/scrape/markdown?${new URLSearchParams({ url, useMainContentOnly: "true" })}`,
+      );
+
+      const markdown = page?.markdown?.trim();
+
+      if (!markdown) return null;
+
+      return markdown.length > maxChars ? `${markdown.slice(0, maxChars)}\n\n[cut]` : markdown;
+    },
+
     async research(website) {
       const domain = brandDomain(website);
 

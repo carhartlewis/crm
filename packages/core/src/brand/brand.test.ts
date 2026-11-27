@@ -87,3 +87,58 @@ describe("context.dev icons", () => {
     expect(brandDomain("not a domain")).toBeNull();
   });
 });
+
+describe("context.dev for the agent", () => {
+  test("looks a company up by name and reads its profile", async () => {
+    const bodies: unknown[] = [];
+
+    const reader = createContextDev({
+      apiKey: "key-1",
+      fetch: async (_url, init) => {
+        bodies.push(JSON.parse(String(init.body)));
+
+        return Response.json({
+          brand: { domain: "acme.com", title: "Acme", description: "Rockets.", socials: [] },
+        });
+      },
+    });
+
+    expect(await reader.lookup({ name: "Acme" })).toMatchObject({
+      domain: "acme.com",
+      name: "Acme",
+      description: "Rockets.",
+    });
+    expect(bodies).toEqual([{ type: "by_name", name: "Acme" }]);
+  });
+
+  test("refuses a lookup context.dev can't answer, without calling it", async () => {
+    let calls = 0;
+
+    const reader = createContextDev({
+      apiKey: "key-1",
+      fetch: async () => {
+        calls += 1;
+
+        return Response.json({});
+      },
+    });
+
+    expect(await reader.lookup({ name: "AB" })).toBeNull();
+    expect(await reader.lookup({ domain: "not a domain" })).toBeNull();
+    expect(await reader.readPage("ftp://example.com/file")).toBeNull();
+    expect(calls).toBe(0);
+  });
+
+  test("reads a page's main content and cuts it at the limit", async () => {
+    const reader = createContextDev({
+      apiKey: "key-1",
+      fetch: async (url) => {
+        expect(new URL(url).searchParams.get("url")).toBe("https://acme.com/pricing");
+
+        return Response.json({ success: true, markdown: "# Pricing\n\nTwo plans." });
+      },
+    });
+
+    expect(await reader.readPage("https://acme.com/pricing", 9)).toBe("# Pricing\n\n[cut]");
+  });
+});

@@ -40,7 +40,10 @@ function setup() {
 
   return {
     store,
-    tools: crmTools({ directory, companies: makeCompanies(store.store), memory }, caller),
+    tools: crmTools(
+      { directory, companies: makeCompanies(store.store), memory, web: null },
+      caller,
+    ),
   };
 }
 
@@ -106,4 +109,45 @@ describe("CRM tools", () => {
     expect(memoryCalls).toContain("search ws_a renewal");
     expect(text(await byName(tools, "forget").call({ factId: "f1" }))).toBe("No such fact");
   });
+
+  test("context.dev tools appear only with a key, and read what the agent asks", async () => {
+    expect(setup().tools.some((entry) => entry.tool.name === "crm__lookup_company")).toBe(false);
+
+    const tools = crmTools(
+      {
+        directory,
+        companies: makeCompanies(createMemoryCompanyStore([]).store),
+        memory,
+        web: {
+          lookup: async (query) =>
+            "domain" in query ? { ...EMPTY_PROFILE, domain: query.domain, name: "Acme" } : null,
+          readPage: async (url) => `# Page at ${url}`,
+        },
+      },
+      caller,
+    );
+
+    expect(
+      JSON.parse(text(await byName(tools, "lookup_company").call({ domain: "acme.com" }))),
+    ).toMatchObject({ domain: "acme.com", name: "Acme" });
+    expect((await byName(tools, "lookup_company").call({})).isError).toBe(true);
+    expect(text(await byName(tools, "read_web_page").call({ url: "https://acme.com" }))).toContain(
+      "# Page at https://acme.com",
+    );
+    expect(byName(tools, "read_web_page").tool.annotations?.readOnlyHint).toBe(true);
+  });
 });
+
+const EMPTY_PROFILE = {
+  domain: "",
+  name: null,
+  description: null,
+  slogan: null,
+  industries: [],
+  address: null,
+  socials: [],
+  links: {},
+  email: null,
+  phone: null,
+  stock: null,
+};

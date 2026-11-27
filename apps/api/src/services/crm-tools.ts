@@ -1,6 +1,8 @@
 import { createId, ID_PREFIXES } from "@crm/core/ids";
 import type { LocalTool } from "@crm/integrations/gateway";
-import { Context, Effect, Exit, Layer, Option, Schema } from "effect";
+import { createContextDev, type WebReader } from "@crm/core/brand";
+import { Context, Effect, Exit, Layer, Option, Redacted, Schema } from "effect";
+import { AppConfig } from "../config.ts";
 import { Companies, type CompaniesService } from "./Companies.ts";
 import { postgresDirectory } from "./crm-directory.ts";
 import { type AgentCaller, type AgentResult, Memory, type MemoryService } from "./Memory.ts";
@@ -41,6 +43,8 @@ export interface CrmToolDeps {
   readonly directory: CrmDirectory;
   readonly companies: CompaniesService;
   readonly memory: Pick<MemoryService["agent"], "search" | "remember" | "forget">;
+  /** context.dev, when the API has a key; without it the web tools aren't listed. */
+  readonly web: WebReader | null;
 }
 
 /** The tool's answer: JSON the model reads. A type alias: MCP results need an index signature. */
@@ -117,10 +121,63 @@ const MemoryTarget = {
 };
 
 /** The caller's tools. `caller` comes from a verified token (OAuth MCP or agent token). */
+/** context.dev, for any company or page on the web (ADR 0018). */
+function webTools(web: WebReader): readonly LocalTool[] {
+  return [
+    tool(
+      {
+        name: "lookup_company",
+        description:
+          "Look up any company on the web (context.dev): name, description, industries, address, social profiles, key pages, public email and phone, stock ticker. Pass its website domain (best), its name, or a work email at it. Use it to research a company before adding it to the CRM or meeting it.",
+        readOnly: true,
+        input: Schema.Struct({
+          domain: Schema.optional(Schema.String).annotate({ description: "Such as acme.com." }),
+          name: Schema.optional(Schema.String).annotate({ description: "3 to 30 characters." }),
+          email: Schema.optional(Schema.String).annotate({ description: "A work email." }),
+        }),
+      },
+      async (input) => {
+        const query = input.domain
+          ? { domain: input.domain }
+          : input.name
+            ? { name: input.name }
+            : input.email
+              ? { email: input.email }
+              : null;
+
+        if (!query) return refuse("Pass a domain, a name or a work email.");
+
+        const profile = await web.lookup(query);
+
+        return profile ? answer(profile) : refuse("context.dev found no company for that.");
+      },
+    ),
+    tool(
+      {
+        name: "read_web_page",
+        description:
+          "Read one web page as clean Markdown (context.dev renders it, so pages that need JavaScript work too): a company's pricing, about, careers or blog page, a news article, a document. Long pages are cut.",
+        readOnly: true,
+        input: Schema.Struct({
+          url: Schema.String.annotate({ description: "The full http(s) URL." }),
+        }),
+      },
+      async (input) => {
+        const markdown = await web.readPage(input.url);
+
+        return markdown
+          ? answer({ url: input.url, markdown })
+          : refuse("The page couldn't be read. Check the URL, or try another page.");
+      },
+    ),
+  ];
+}
+
 export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly LocalTool[] {
   const actor = { userId: caller.userId, activeWorkspaceId: caller.workspaceId };
 
   return [
+    ...(deps.web ? webTools(deps.web) : []),
     tool(
       {
         name: "list_companies",
@@ -254,10 +311,16 @@ export class CrmTools extends Context.Service<
   static readonly layer = Layer.effect(
     CrmTools,
     Effect.gen(function* () {
+      const config = yield* AppConfig;
+
       const deps: CrmToolDeps = {
         directory: postgresDirectory(yield* Postgres),
         companies: yield* Companies,
         memory: (yield* Memory).agent,
+        web: Option.match(config.contextDevApiKey, {
+          onNone: () => null,
+          onSome: (apiKey) => createContextDev({ apiKey: Redacted.value(apiKey) }),
+        }),
       };
 
       return { forCaller: (caller) => crmTools(deps, caller) };
