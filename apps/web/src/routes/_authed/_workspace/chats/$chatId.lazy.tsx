@@ -6,7 +6,7 @@ import {
   PageShellHeading,
   PageShellTitle,
 } from "@crm/ui/patterns/page-shell";
-import { createLazyFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -19,11 +19,16 @@ import { ChatView } from "../../../../components/chat/chat-view.tsx";
 import { NameDialog } from "../../../../components/chat/name-dialog.tsx";
 import { useChats } from "../../../../components/chat/use-chats.ts";
 import { WorkspacePageHeader } from "../../../../components/shell/page-header.tsx";
-import { peekFirstMessage } from "../../../../lib/chat-api.ts";
-import { updateChatMutation } from "../../../../lib/chats.ts";
+import {
+  branchMessage,
+  peekFirstMessage,
+  queueFirstMessage,
+  seedNewChat,
+} from "../../../../lib/chat-api.ts";
+import { startChatMutation, updateChatMutation } from "../../../../lib/chats.ts";
 import { rememberPermissionMode } from "../../../../lib/permission-mode.ts";
-import { chatTitleError, folderNameError } from "@crm/core/chat";
-import { useMutation } from "@tanstack/react-query";
+import { chatTitleError, folderNameError, isPermissionMode } from "@crm/core/chat";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const Route = createLazyFileRoute("/_authed/_workspace/chats/$chatId")({
   component: ChatPage,
@@ -43,6 +48,20 @@ function ChatPage() {
 
   const rename = useMutation({
     ...updateChatMutation,
+    onError: (error) => toast.error(error.message),
+  });
+
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  // "New chat from here": the same space and mode, the earlier conversation as its first message.
+  const branch = useMutation({
+    ...startChatMutation,
+    onSuccess: ({ id, sessionId }, { text }) => {
+      seedNewChat(queryClient, userId, id, sessionId);
+      queueFirstMessage(id, text);
+      void navigate({ to: "/chats/$chatId", params: { chatId: id } });
+    },
     onError: (error) => toast.error(error.message),
   });
 
@@ -86,6 +105,19 @@ function ChatPage() {
         }}
         history={history}
         firstMessage={peekFirstMessage(chatId)}
+        onBranch={(transcript) => {
+          const title = chat?.title ?? "Chat";
+          const mode = chat?.permission_mode ?? "";
+
+          branch.mutate({
+            workspaceId,
+            userId,
+            text: branchMessage(title, transcript),
+            title: `${title} (continued)`,
+            spaceId: chat?.space_id ?? null,
+            permissionMode: isPermissionMode(mode) ? mode : "manual",
+          });
+        }}
       />
       {dialog?.kind === "rename" && (
         <NameDialog

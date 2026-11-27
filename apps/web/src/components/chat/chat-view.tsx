@@ -4,7 +4,17 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from "@crm/ui/components/ai-elements/conversation";
-import { Message, MessageContent } from "@crm/ui/components/ai-elements/message";
+import copy from "@carbon/icons/es/copy/16.js";
+import edit from "@carbon/icons/es/edit/16.js";
+import fork from "@carbon/icons/es/fork/16.js";
+import renew from "@carbon/icons/es/renew/16.js";
+import {
+  Message,
+  MessageAction,
+  MessageActions,
+  MessageContent,
+} from "@crm/ui/components/ai-elements/message";
+import { carbonIcon } from "@crm/ui/components/icon";
 import {
   Reasoning,
   ReasoningContent,
@@ -23,8 +33,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { activeTurn } from "eve/events";
 import { useEveAgent } from "eve/react";
 import { useHotkeys } from "react-hotkeys-hook";
+import { useRef } from "react";
 import { toast } from "sonner";
-import { chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
+import { branchOf, chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { ReplyResponse } from "./reply-islands.tsx";
 import { Composer } from "./composer.tsx";
@@ -36,8 +47,10 @@ import {
   shownCall,
   stepDetail,
   stepLabel,
+  messageText,
   stepState,
   type ToolPart,
+  transcriptUpTo,
   turnSummaries,
 } from "./tool-steps.ts";
 
@@ -67,6 +80,8 @@ export interface ChatViewProps {
   readonly history: ChatHistory;
   /** Typed on New chat: sent once, as soon as the view mounts. */
   readonly firstMessage?: string;
+  /** Starts a new chat that continues this one up to a reply (its words as a transcript). */
+  readonly onBranch?: (transcript: string) => void;
 }
 
 /**
@@ -80,7 +95,10 @@ export function ChatView({
   onPermissionModeChange,
   history,
   firstMessage,
+  onBranch,
 }: ChatViewProps) {
+  // The composer's text box, for Edit to put a message back.
+  const field = useRef<HTMLTextAreaElement | null>(null);
   const queryClient = useQueryClient();
 
   // The saved history is behind once the chat moves on; the next visit reads it again.
@@ -142,6 +160,40 @@ export function ChatView({
     ),
   );
 
+  const lastUser = agent.messages.findLast((message) => message.role === "user");
+  const lastReply = agent.messages.findLast((message) => message.role === "assistant");
+
+  /** Copy for every message; Retry and Edit on the latest ones while the agent is idle. */
+  const messageActions = (message: EveMessage): MessageActionsSpec => {
+    const text = messageText(message);
+    const idle = !working;
+
+    return {
+      copy: text ? () => void copyText(text) : undefined,
+      retry:
+        idle && message.id === lastReply?.id && lastUser
+          ? () => send.mutate({ text: messageText(lastUser) })
+          : undefined,
+      edit:
+        idle && message.id === lastUser?.id && text
+          ? () => {
+              const box = field.current;
+
+              if (!box) return;
+
+              box.value = text;
+              box.dispatchEvent(new Event("input", { bubbles: true }));
+              box.focus();
+              box.setSelectionRange(text.length, text.length);
+            }
+          : undefined,
+      branch:
+        onBranch && message.role === "assistant" && text
+          ? () => onBranch(transcriptUpTo(agent.messages, message.id))
+          : undefined,
+    };
+  };
+
   // "Worked for 14s · 5 steps" under each finished turn.
   const summaries = turnSummaries(agent.events, agent.messages);
 
@@ -176,6 +228,7 @@ export function ChatView({
                 message={message}
                 summary={summaries.get(message.id)}
                 onAnswer={answer}
+                actions={messageActions(message)}
               />
             ))
           )}
@@ -205,6 +258,7 @@ export function ChatView({
         )}
         <Composer
           focusOnMount
+          fieldRef={field}
           status={working ? "streaming" : "ready"}
           disabled={agent.status === "resuming"}
           onSend={(text) => send.mutate({ text })}
@@ -216,16 +270,54 @@ export function ChatView({
   );
 }
 
+const CopyIcon = carbonIcon(copy);
+const EditIcon = carbonIcon(edit);
+const BranchIcon = carbonIcon(fork);
+const RetryIcon = carbonIcon(renew);
+
+/** What a message's hover actions do; an absent one isn't shown. */
+interface MessageActionsSpec {
+  readonly copy: (() => void) | undefined;
+  readonly retry: (() => void) | undefined;
+  readonly edit: (() => void) | undefined;
+  readonly branch: (() => void) | undefined;
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success("Copied");
+  } catch {
+    toast.error("Couldn't copy that");
+  }
+}
+
 function ChatMessage({
   message,
   summary,
   onAnswer,
+  actions,
 }: {
   message: EveMessage;
   /** How long the finished turn took and how many steps it ran. */
   summary: string | undefined;
   onAnswer: (interactionId: string, optionId: string) => void;
+  actions: MessageActionsSpec;
 }) {
+  const branchedFrom = message.role === "user" ? branchOf(messageText(message)) : null;
+  const any = actions.copy ?? actions.retry ?? actions.edit ?? actions.branch;
+
+  // A branch's first message holds the earlier conversation: it shows as one line.
+  if (branchedFrom !== null) {
+    return (
+      <Message from="user">
+        <MessageContent>
+          <p className="text-sm text-muted-foreground">Continued from “{branchedFrom}”</p>
+        </MessageContent>
+      </Message>
+    );
+  }
+
   return (
     <Message from={message.role}>
       <MessageContent>
@@ -238,6 +330,30 @@ function ChatMessage({
         )}
       </MessageContent>
       {summary && <p className="text-xs text-muted-foreground select-none">{summary}</p>}
+      {any && (
+        <MessageActions>
+          {actions.copy && (
+            <MessageAction tooltip="Copy" onClick={actions.copy}>
+              <CopyIcon />
+            </MessageAction>
+          )}
+          {actions.edit && (
+            <MessageAction tooltip="Edit and resend" onClick={actions.edit}>
+              <EditIcon />
+            </MessageAction>
+          )}
+          {actions.retry && (
+            <MessageAction tooltip="Retry" onClick={actions.retry}>
+              <RetryIcon />
+            </MessageAction>
+          )}
+          {actions.branch && (
+            <MessageAction tooltip="New chat from here" onClick={actions.branch}>
+              <BranchIcon />
+            </MessageAction>
+          )}
+        </MessageActions>
+      )}
     </Message>
   );
 }

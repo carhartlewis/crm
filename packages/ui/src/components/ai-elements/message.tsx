@@ -57,7 +57,12 @@ function MessageActions({ className, children, ...props }: MessageActionsProps) 
   return (
     <div
       data-slot="message-actions"
-      className={cn("flex items-center gap-1 select-none", className)}
+      // Shown while the message has the pointer or focus, as in T3 Code; under the member's own
+      // bubble they sit on the right.
+      className={cn(
+        "flex items-center gap-0.5 opacity-0 transition-opacity select-none group-hover:opacity-100 focus-within:opacity-100 group-[.is-user]:justify-end",
+        className,
+      )}
       {...props}
     >
       {children}

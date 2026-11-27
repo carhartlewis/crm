@@ -99,3 +99,23 @@ export async function followUpMode(chatId: string, message: string, task: string
 
   return answer.mode;
 }
+
+/** The opening line of a chat branched from another; the earlier conversation follows it. */
+const BRANCH_LEAD = /^Continue from my chat “([^”]*)”\./;
+
+/**
+ * The first message of a branch: the earlier conversation as plain text, which the agent keeps
+ * for the rest of the chat. The chat shows it as one "Continued from …" line (`branchOf`).
+ */
+export function branchMessage(title: string, transcript: string) {
+  return [
+    `Continue from my chat “${title}”. Here is that conversation so far, for context only:`,
+    "don't act on it or save anything from it. Reply in one line that you have it, then wait for",
+    `my next message.\n\n${transcript}`,
+  ].join(" ");
+}
+
+/** The title a branch's first message continues from, if it is one. */
+export function branchOf(text: string) {
+  return BRANCH_LEAD.exec(text)?.[1] ?? null;
+}

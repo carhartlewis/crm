@@ -3,6 +3,7 @@ import type { EveMessagePart } from "eve/client";
 import {
   formatWorked,
   messageBlocks,
+  transcriptUpTo,
   runDetail,
   runState,
   turnSummaries,
@@ -112,5 +113,19 @@ describe("tool step runs", () => {
     // Still running: no line yet.
     expect(summaries.has("m2")).toBe(false);
     expect(formatWorked(125_000)).toBe("2m 5s");
+  });
+
+  test("a branch carries the conversation up to the chosen message, words only", () => {
+    const messages = [
+      { id: "u1", role: "user" as const, parts: [text("Find Capgo")] },
+      {
+        id: "a1",
+        role: "assistant" as const,
+        parts: [call("x", "Lookup company"), text("Found it")],
+      },
+      { id: "u2", role: "user" as const, parts: [text("Now Docspring")] },
+    ];
+
+    expect(transcriptUpTo(messages, "a1")).toBe("Me: Find Capgo\n\nAssistant: Found it");
   });
 });

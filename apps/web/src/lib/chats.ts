@@ -308,6 +308,8 @@ interface StartChat {
   readonly text: string;
   readonly spaceId: string | null;
   readonly permissionMode: PermissionMode;
+  /** The chat's title when it isn't the start of `text` (a branch). */
+  readonly title?: string;
 }
 
 /**
@@ -317,7 +319,7 @@ interface StartChat {
  */
 export const startChatMutation = mutationOptions({
   mutationKey: ["chats", "start"],
-  mutationFn: async ({ workspaceId, userId, text, spaceId, permissionMode }: StartChat) => {
+  mutationFn: async ({ workspaceId, userId, text, spaceId, permissionMode, title }: StartChat) => {
     const id = createId(ID_PREFIXES.chat);
     const now = new Date().toISOString();
     const session = Promise.withResolvers<string>();
@@ -329,7 +331,7 @@ export const startChatMutation = mutationOptions({
       workspace_id: workspaceId,
       space_id: spaceId,
       created_by_id: userId,
-      title: titleFromMessage(text),
+      title: title ?? titleFromMessage(text),
       created_at: now,
       updated_at: now,
       last_message_at: now,

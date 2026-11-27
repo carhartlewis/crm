@@ -203,3 +203,28 @@ export function turnSummaries(events: readonly unknown[], messages: readonly Eve
 
   return summaries;
 }
+
+/** A message's own words: its text parts, without steps or thinking. */
+export function messageText(message: EveMessage) {
+  return message.parts
+    .flatMap((part) => (part.type === "text" ? [part.text] : []))
+    .join("\n\n")
+    .trim();
+}
+
+/**
+ * The conversation up to and including one message, as plain text for a branch: each turn's
+ * words with who said them. Steps and thinking are left out; the replies already report them.
+ */
+export function transcriptUpTo(messages: readonly EveMessage[], messageId: string) {
+  const end = messages.findIndex((message) => message.id === messageId);
+
+  return messages
+    .slice(0, end === -1 ? messages.length : end + 1)
+    .flatMap((message) => {
+      const text = messageText(message);
+
+      return text ? [`${message.role === "user" ? "Me" : "Assistant"}: ${text}`] : [];
+    })
+    .join("\n\n");
+}

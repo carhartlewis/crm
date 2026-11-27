@@ -10,6 +10,7 @@ import {
 } from "@crm/ui/components/dropdown-menu";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { Kbd } from "@crm/ui/components/kbd";
+import { useRef, useState } from "react";
 import { PERMISSION_MODE_OPTIONS, permissionModeLabel } from "../../lib/permission-mode.ts";
 
 const ChevronIcon = carbonIcon(chevronDown);
@@ -23,15 +24,27 @@ export interface PermissionModeMenuProps {
 /**
  * How much the agent may do without asking (ADR 0019), beside Send as in comp-neo. The trigger
  * names the mode; the menu lists each with what it does. Pressing 1–3 while it is open picks one.
+ * Picking closes the menu and puts the caret back in the composer it sits in: the next thing
+ * is typing.
  */
 export function PermissionModeMenu({ value, onChange, disabled = false }: PermissionModeMenuProps) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+
   const pick = (next: string) => {
     if (isPermissionMode(next) && next !== value) onChange(next);
+
+    setOpen(false);
+    // After the menu returns focus to its trigger, move it on to the composer's text box.
+    requestAnimationFrame(() =>
+      trigger.current?.closest("form")?.querySelector("textarea")?.focus({ preventScroll: true }),
+    );
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
+        ref={trigger}
         disabled={disabled}
         render={
           <Button

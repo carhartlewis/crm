@@ -8,7 +8,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@crm/ui/components/ai-elements/prompt-input";
-import { type KeyboardEvent, type ReactNode, useState } from "react";
+import { type KeyboardEvent, type ReactNode, type RefObject, useCallback, useState } from "react";
 
 export interface ComposerProps {
   readonly onSend: (text: string) => void;
@@ -24,6 +24,8 @@ export interface ComposerProps {
   readonly tools?: ReactNode;
   /** Runs once when the person starts typing, such as prewarming a session. */
   readonly onTypingStart?: () => void;
+  /** The text field, for putting a message back to edit. */
+  readonly fieldRef?: RefObject<HTMLTextAreaElement | null>;
 }
 
 /**
@@ -48,7 +50,17 @@ export function Composer({
   focusOnMount = false,
   tools,
   onTypingStart,
+  fieldRef,
 }: ComposerProps) {
+  const setField = useCallback(
+    (field: HTMLTextAreaElement | null) => {
+      if (fieldRef) fieldRef.current = field;
+
+      if (focusOnMount) focusField(field);
+    },
+    [fieldRef, focusOnMount],
+  );
+
   const working = status === "streaming" || status === "submitted";
   const [hasText, setHasText] = useState(false);
 
@@ -75,7 +87,7 @@ export function Composer({
           name="message"
           placeholder={working ? "Add to this, or ask something else" : "Work on anything"}
           aria-label="Message"
-          ref={focusOnMount ? focusField : undefined}
+          ref={setField}
           disabled={disabled}
           onKeyDown={onKeyDown}
           onInput={(event) => {
