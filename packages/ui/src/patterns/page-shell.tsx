@@ -8,6 +8,7 @@ import {
 import { UI_COPY } from "@crm/ui/patterns/ui-copy";
 import { VisuallyHidden } from "@crm/ui/patterns/visually-hidden";
 import type * as React from "react";
+import { observeReflow } from "@crm/ui/lib/reflow";
 
 export type PageWidth = "standard" | "full" | "narrow";
 
@@ -19,6 +20,8 @@ function PageShell({
 }: React.ComponentProps<"div"> & { contained?: boolean; width?: PageWidth }) {
   return (
     <main
+      // Width changes (the sidebar, a resize) mark a reflow, so narrow switches fade only then.
+      ref={observeReflow}
       className={cn(
         "relative flex min-w-0 flex-1 flex-col outline-none",
         contained ? "min-h-0 overflow-hidden" : "overflow-y-auto",

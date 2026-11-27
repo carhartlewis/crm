@@ -1,6 +1,6 @@
 import { cn } from "cn";
 import { type ReactNode, useCallback } from "react";
-import { type GridSpot, reflowOffsets } from "../lib/grid-reflow";
+import { type GridSpot, reflowOffsets } from "@crm/ui/lib/grid-reflow";
 
 const REFLOW_MS = 200;
 

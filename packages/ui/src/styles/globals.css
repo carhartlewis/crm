@@ -225,48 +225,43 @@
 }
 
 /*
- * Narrow switches: below 42rem of its container (a table, a toolbar), an element hides or shows,
- * fading as it goes and comes. `allow-discrete` keeps it displayed for the fade out and
- * `@starting-style` fades it in. Opacity only, so they hold under reduced motion. `wide-only`
- * hides when narrow, `narrow-only` hides when wide, and `wide-slot` is a wrapper's half: it stays
- * displayed for its child's fade, then leaves the layout. They set `display` only while hidden,
- * so never pair them with a display utility (`flex`, a Button's `inline-flex`) on the same element:
- * wrap it instead. Not `!important` either: an important `display` beats the transition and the
- * element vanishes without fading.
+ * Narrow switches: below 42rem of its container (a table, a toolbar), an element hides or shows.
+ * What leaves goes at once, so the layout changes exactly once; what arrives fades in, and only
+ * while the page is reflowing from a width change (`data-reflowing`, `@crm/ui/lib/reflow`), never
+ * when it first mounts. Opacity only, so it holds under reduced motion. `wide-only` hides when
+ * narrow, `narrow-only` hides when wide, `wide-slot` hides a wrapper without fading (so its child
+ * fades once, not twice). They set `display` only while hidden: never pair them with a display
+ * utility (`flex`, a Button's `inline-flex`) on the same element; wrap it instead.
  */
 @utility wide-only {
-  transition:
-    opacity 150ms var(--ease-out),
-    display 150ms allow-discrete;
-
-  @starting-style {
-    opacity: 0;
-  }
-
   @container (width < 42rem) {
     display: none;
-    opacity: 0;
+  }
+
+  :root[data-reflowing] & {
+    transition: opacity 200ms var(--ease-fade);
+
+    @starting-style {
+      opacity: 0;
+    }
   }
 }
 
 @utility narrow-only {
-  transition:
-    opacity 150ms var(--ease-out),
-    display 150ms allow-discrete;
-
-  @starting-style {
-    opacity: 0;
-  }
-
   @container (width >= 42rem) {
     display: none;
-    opacity: 0;
+  }
+
+  :root[data-reflowing] & {
+    transition: opacity 200ms var(--ease-fade);
+
+    @starting-style {
+      opacity: 0;
+    }
   }
 }
 
 @utility wide-slot {
-  transition: display 150ms allow-discrete;
-
   @container (width < 42rem) {
     display: none;
   }
@@ -585,6 +580,9 @@ body[data-sidebar-resizing] [data-slot="tooltip-content"] {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* strong ease-out: UI enter/exit, presses */
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* on-screen movement */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* sheets and drawers */
+  /* Opacity-only fades of chrome that hides as a page narrows: an even fade, where the strong
+     ease-out would finish in the first frames and read as a blink. */
+  --ease-fade: cubic-bezier(0, 0, 0.58, 1);
 
   /* Bare `transition-*` utilities default to the house curve. */
   --default-transition-duration: 150ms;
