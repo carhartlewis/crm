@@ -7,17 +7,36 @@ import { createClient } from "redis";
  */
 export function createNodeRedisKv(url: string, prefix: string): Kv {
   const client = createClient({ url });
-  const ready = client.connect().then(() => client);
+  // node-redis emits connection errors as events; unhandled, one would end the process.
+  client.on("error", () => {});
+
+  // Connect on first use, not on import: `eve build` loads this module with no Redis running.
+  let connecting: Promise<typeof client> | undefined;
+
+  // A failed attempt is forgotten, so the next call tries again.
+  const ready = () =>
+    (connecting ??= client.connect().then(
+      () => client,
+      (error: Error) => {
+        connecting = undefined;
+        throw error;
+      },
+    ));
+
   const key = (name: string) => `${prefix}:${name}`;
 
   return {
-    get: async (name) => (await ready).get(key(name)),
+    get: async (name) => (await ready()).get(key(name)),
     async set(name, value, ttlSeconds) {
-      await (await ready).set(key(name), value, ttlSeconds === undefined ? {} : { EX: ttlSeconds });
+      await (await ready()).set(
+        key(name),
+        value,
+        ttlSeconds === undefined ? {} : { EX: ttlSeconds },
+      );
     },
-    take: async (name) => (await ready).getDel(key(name)),
+    take: async (name) => (await ready()).getDel(key(name)),
     async increment(name, ttlSeconds) {
-      const redis = await ready;
+      const redis = await ready();
 
       const [count] = await redis
         .multi()
@@ -28,7 +47,7 @@ export function createNodeRedisKv(url: string, prefix: string): Kv {
       return Number(count);
     },
     async delete(name) {
-      await (await ready).del(key(name));
+      await (await ready()).del(key(name));
     },
   };
 }

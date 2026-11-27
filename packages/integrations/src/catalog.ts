@@ -5,7 +5,7 @@
  * discovered from `mcpUrl` at connect time, and the read/write choice is applied to the tools
  * the server publishes (see `access.ts`).
  *
- * To add an app, add one entry. Remote MCP servers are listed at https://integrations.sh/?kind=mcp.
+ * To add an app, add one entry, and its square logo (180 px PNG) to `logos/` and `logos.ts`. Remote MCP servers are listed at https://integrations.sh/?kind=mcp.
  */
 export interface Integration {
   /**
@@ -14,6 +14,8 @@ export interface Integration {
    */
   readonly id: string;
   readonly name: string;
+  /** Who publishes the MCP server, shown as "by <vendor>". */
+  readonly vendor: string;
   /** The vendor's domain; `https://integrations.sh/<domain>/` is its directory entry. */
   readonly domain: string;
   /** One line for people choosing what to connect. */
@@ -28,6 +30,7 @@ export const integrations = [
   {
     id: "granola",
     name: "Granola",
+    vendor: "Granola",
     domain: "granola.ai",
     summary: "Meeting notes and transcripts.",
     description:
@@ -37,6 +40,7 @@ export const integrations = [
   {
     id: "superhuman",
     name: "Superhuman",
+    vendor: "Superhuman",
     domain: "superhuman.com",
     summary: "Email: search, read, draft and send.",
     description:

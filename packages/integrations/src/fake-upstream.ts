@@ -10,6 +10,7 @@ import type { Integration } from "./catalog.ts";
 export const fakeIntegration: Integration = {
   id: "notes",
   name: "Notes",
+  vendor: "Notes",
   domain: "notes.example",
   summary: "Notes.",
   description: "Notes.",

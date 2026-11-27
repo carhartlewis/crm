@@ -79,6 +79,7 @@ export function gatewayAuth(options: GatewayAuthOptions) {
   const gateway: Integration = {
     id: CONNECTION_NAME,
     name: "CRM connections",
+    vendor: "CRM",
     domain: new URL(options.gatewayUrl).host,
     summary: "",
     description: "",

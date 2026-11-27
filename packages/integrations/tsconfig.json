@@ -11,5 +11,5 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["bun"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "node_modules/@crm/typescript-config/assets.d.ts"]
 }

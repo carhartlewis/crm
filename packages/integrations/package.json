@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./oauth": "./src/oauth.ts",
     "./gateway": "./src/gateway.ts",
+    "./logos": "./src/logos.ts",
     "./testing": "./src/fake-upstream.ts"
   },
   "scripts": {
