@@ -41,7 +41,7 @@ export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
     return () => cancelIdleCallback(idle);
   });
 
-  // Tooltips and URL state (nuqs: ?company=…, filters) are only used in here; providing them at
+  // Tooltips and URL state (nuqs: ?sheet=…, filters) are only used in here; providing them at
   // the root would put their code in the cold-entry bundle.
   return (
     <NuqsAdapter>

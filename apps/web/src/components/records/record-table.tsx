@@ -10,10 +10,9 @@ import { useListTable } from "@crm/ui/patterns/data-table/use-list-table";
 import type { SortValues } from "@crm/ui/patterns/data-table/client-table";
 import type { TableView } from "@crm/ui/patterns/data-table/table-views";
 import { RecordRowMenu } from "@crm/ui/patterns/record-sheet/record-sheet";
-import { useRecordSheetParams } from "@crm/ui/patterns/record-sheet/use-record-sheet-params";
 import { type ReactNode, useRef, useState } from "react";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
-import { RECORD_TABS, type RecordKind } from "../../lib/records.ts";
+import { type RecordKind, useRecordSheet } from "../../lib/records.ts";
 import { listKeys } from "../../lib/saved-views.ts";
 import { ConfirmDeleteDialog, type DeleteImpact } from "./confirm-delete-dialog.tsx";
 import { SavedViewsMenu } from "./saved-views.tsx";
@@ -71,7 +70,7 @@ export function RecordTable<
   Column extends string,
 >(props: RecordTableProps<R, Tab, Facet, Column>) {
   const [createKind] = useCreateSheet();
-  const record = useRecordSheetParams({ recordKey: props.kind, tabs: RECORD_TABS[props.kind] });
+  const record = useRecordSheet(props.kind);
   const [position, setPosition] = useState<ListPosition>(noPosition);
   const [deleting, setDeleting] = useState<readonly string[] | null>(null);
   const frame = useRef<HTMLDivElement>(null);
@@ -118,7 +117,7 @@ export function RecordTable<
     position,
     setPosition: moveTo,
     selection: list.selection,
-    enabled: record.id === null && createKind === null && deleting === null,
+    enabled: !record.anyOpen && createKind === null && deleting === null,
     onOpen: openWith(true),
     onFilter: () => frame.current?.querySelector<HTMLInputElement>('input[type="search"]')?.focus(),
   });

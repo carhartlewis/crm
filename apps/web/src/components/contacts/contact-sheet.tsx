@@ -12,7 +12,6 @@ import {
   EntitySheet,
   EntityStats,
 } from "@crm/ui/patterns/entity-sheet";
-import { useRecordSheetParams } from "@crm/ui/patterns/record-sheet/use-record-sheet-params";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -21,7 +20,7 @@ import { type Contact, contactsCollection } from "../../lib/contacts.ts";
 import { useOpenCreate } from "../../lib/create-sheet.ts";
 import { type Deal, dealsCollection } from "../../lib/deals.ts";
 import { momentDate, plural, relativeTime } from "../../lib/record-format.ts";
-import { RECORD_TABS, useOpenRecord } from "../../lib/records.ts";
+import { useOpenRecord, useRecordSheet } from "../../lib/records.ts";
 import { deleteRecords, saveRecord } from "../../lib/synced-records.ts";
 import { CustomFieldRows, FieldsSettingsLink } from "../fields/custom-field-rows.tsx";
 import { ConfirmDeleteDialog } from "../records/confirm-delete-dialog.tsx";
@@ -67,7 +66,7 @@ type TextColumn = {
 }[keyof Contact];
 
 /**
- * A contact's sheet (`?contact=<id>`), mounted once in the shell. Synced, so it renders with no
+ * A contact's sheet (`?sheet=contact:<id>`), mounted once in the shell. Synced, so it renders with no
  * request; every edit saves optimistically.
  */
 export default function ContactSheet({
@@ -77,7 +76,7 @@ export default function ContactSheet({
   userId: string;
   workspaceId: string;
 }) {
-  const record = useRecordSheetParams({ recordKey: "contact", tabs: RECORD_TABS.contact });
+  const record = useRecordSheet("contact");
   const { contacts, loading } = useContacts(workspaceId);
   const { companies } = useCompanies(workspaceId);
   const { deals } = useDeals(workspaceId);

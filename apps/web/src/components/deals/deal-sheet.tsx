@@ -15,7 +15,6 @@ import {
   EntitySheet,
   EntityStats,
 } from "@crm/ui/patterns/entity-sheet";
-import { useRecordSheetParams } from "@crm/ui/patterns/record-sheet/use-record-sheet-params";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -28,7 +27,7 @@ import {
   dealsCollection,
 } from "../../lib/deals.ts";
 import { calendarDate, durationSince, momentDate, plural } from "../../lib/record-format.ts";
-import { RECORD_TABS, useOpenRecord } from "../../lib/records.ts";
+import { useOpenRecord, useRecordSheet } from "../../lib/records.ts";
 import { deleteRecords, saveRecord } from "../../lib/synced-records.ts";
 import { CustomFieldRows, FieldsSettingsLink } from "../fields/custom-field-rows.tsx";
 import { ConfirmDeleteDialog } from "../records/confirm-delete-dialog.tsx";
@@ -102,7 +101,7 @@ function StageStepper({
 }
 
 /**
- * A deal's sheet (`?deal=<id>`), mounted once in the shell. Synced, so it renders with no request;
+ * A deal's sheet (`?sheet=deal:<id>`), mounted once in the shell. Synced, so it renders with no request;
  * stage changes and edits save optimistically, and the API logs each stage change.
  */
 export default function DealSheet({
@@ -112,7 +111,7 @@ export default function DealSheet({
   userId: string;
   workspaceId: string;
 }) {
-  const record = useRecordSheetParams({ recordKey: "deal", tabs: RECORD_TABS.deal });
+  const record = useRecordSheet("deal");
   const { deals, loading } = useDeals(workspaceId);
   const { companies } = useCompanies(workspaceId);
   const { contacts } = useContacts(workspaceId);

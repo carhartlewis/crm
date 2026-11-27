@@ -12,7 +12,6 @@ import {
   EntityStats,
 } from "@crm/ui/patterns/entity-sheet";
 import { RailLink } from "@crm/ui/patterns/record-sheet/record-rail";
-import { useRecordSheetParams } from "@crm/ui/patterns/record-sheet/use-record-sheet-params";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -22,7 +21,7 @@ import { type Deal, dealsCollection } from "../../lib/deals.ts";
 import { useOpenCreate } from "../../lib/create-sheet.ts";
 import { notCountedNote, useReportingCurrency } from "../../lib/money.ts";
 import { calendarDate, plural } from "../../lib/record-format.ts";
-import { RECORD_TABS, useOpenRecord } from "../../lib/records.ts";
+import { useOpenRecord, useRecordSheet } from "../../lib/records.ts";
 import { deleteRecords, saveRecord } from "../../lib/synced-records.ts";
 import { CustomFieldRows, FieldsSettingsLink } from "../fields/custom-field-rows.tsx";
 import { ConfirmDeleteDialog } from "../records/confirm-delete-dialog.tsx";
@@ -65,12 +64,12 @@ export interface CompanySheetProps {
 }
 
 /**
- * A company's sheet (`?company=<id>`), mounted once in the shell so it opens over any page: from
+ * A company's sheet (`?sheet=company:<id>`), mounted once in the shell so it opens over any page: from
  * a table, ⌘K or a chat. Everything it shows is synced, so it renders with no request, and every
  * edit saves optimistically.
  */
 export default function CompanySheet({ userId, workspaceId }: CompanySheetProps) {
-  const record = useRecordSheetParams({ recordKey: "company", tabs: RECORD_TABS.company });
+  const record = useRecordSheet("company");
   const { companies, loading } = useCompanies(workspaceId);
   const { contacts } = useContacts(workspaceId);
   const { deals } = useDeals(workspaceId);

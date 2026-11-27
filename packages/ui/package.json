@@ -53,7 +53,7 @@
     "./patterns/record-sheet/record-sheet": "./src/patterns/record-sheet/record-sheet.tsx",
     "./patterns/record-sheet/record-tabs": "./src/patterns/record-sheet/record-tabs.tsx",
     "./patterns/record-sheet/sheet-params": "./src/patterns/record-sheet/sheet-params.ts",
-    "./patterns/record-sheet/use-record-sheet-params": "./src/patterns/record-sheet/use-record-sheet-params.ts",
+    "./patterns/record-sheet/use-sheet-stack": "./src/patterns/record-sheet/use-sheet-stack.ts",
     "./patterns/skeleton-lines": "./src/patterns/skeleton-lines.tsx",
     "./patterns/ui-copy": "./src/patterns/ui-copy.ts",
     "./patterns/visually-hidden": "./src/patterns/visually-hidden.tsx",

@@ -15,7 +15,7 @@ const sheets = {
 } satisfies { readonly [K in RecordKind]: ComponentType<SheetProps> };
 
 /**
- * Every record sheet, mounted once in the shell so `?<kind>=<id>` opens it over any page (from a
+ * Every record sheet, mounted once in the shell so `?sheet=<kind>:<id>` opens it over any page (from a
  * table, ⌘K or a link). Kept mounted (closed) so a sheet animates out instead of vanishing.
  */
 export function RecordSheets(props: SheetProps) {

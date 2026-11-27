@@ -11,6 +11,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { companiesCollection, createCompanyMutation } from "../../lib/companies.ts";
+import { recordUrl } from "../../lib/records.ts";
 import { CompanyForm } from "./company-form.tsx";
 
 export interface CreateCompanySheetProps {
@@ -39,7 +40,7 @@ export default function CreateCompanySheet({
       toast.success(`${input.name} added`, {
         action: {
           label: "View",
-          onClick: () => void navigate({ href: `/companies?company=${encodeURIComponent(id)}` }),
+          onClick: () => void navigate({ href: recordUrl("/companies", "company", id) }),
         },
       });
     },
