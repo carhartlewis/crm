@@ -1,3 +1,4 @@
+import add from "@carbon/icons/es/add/16.js";
 import home from "@carbon/icons/es/home/16.js";
 import link from "@carbon/icons/es/link/16.js";
 import logout from "@carbon/icons/es/logout/16.js";
@@ -20,18 +21,35 @@ import { useTheme } from "@crm/ui/components/theme-provider";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { pageById, pageForPath } from "../../lib/pages.ts";
+import { pageById, pageForPath, type Page } from "../../lib/pages.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
 import { sessionQuery, signOutMutation, workspacesQuery } from "../../lib/session.ts";
+import { settingsGroups, type SettingsPath } from "../../lib/settings.ts";
 import { pinnedShortcut, shortcutKeys, shortcuts, type Shortcut } from "../../lib/shortcuts.ts";
 import { switchWorkspaceMutation } from "../../lib/workspaces.ts";
+import type { FileRoutesByTo } from "../../routeTree.gen.ts";
 
+const AddIcon = carbonIcon(add);
 const HomeIcon = carbonIcon(home);
 const LinkIcon = carbonIcon(link);
 const LogoutIcon = carbonIcon(logout);
 const ThemeIcon = carbonIcon(screen);
 const SwitchIcon = carbonIcon(arrowsHorizontal);
 const SidebarIcon = carbonIcon(sidePanelOpen);
+
+/** Every page ⌘K can go to: Home, the pinned pages, settings, and a new workspace. */
+type Listed = "/" | Page["to"] | SettingsPath | "/new-workspace";
+
+/** Routes ⌘K leaves out: signed-out and first-run pages, and an old URL that redirects. */
+type Unlisted = "/sign-in" | "/setup-workspace" | "/connections";
+
+type Fails<Missing extends never> = Missing;
+
+/**
+ * Fails type checking, naming the route, when a page is added that ⌘K neither lists nor
+ * leaves out on purpose. List it (a pinned page or a settings group does that) or add it above.
+ */
+export type EveryRouteInPalette = Fails<Exclude<keyof FileRoutesByTo, Listed | Unlisted>>;
 
 export interface CommandPaletteProps {
   readonly open: boolean;
@@ -137,9 +155,28 @@ export default function CommandPalette({ open, onOpenChange, userId }: CommandPa
               );
             })}
           </CommandGroup>
-          {workspaces.length > 1 && (
-            <CommandGroup heading="Workspaces">
-              {workspaces.map((workspace) => (
+          {settingsGroups.map((group) => (
+            <CommandGroup key={group.label} heading={`${group.label} settings`}>
+              {group.pages.map((page) => {
+                const PageIcon = page.icon;
+
+                return (
+                  <CommandItem
+                    key={page.to}
+                    value={`${group.label} settings ${page.label}`}
+                    keywords={["settings", "preferences"]}
+                    onSelect={run(() => void navigate({ to: page.to }))}
+                  >
+                    <PageIcon />
+                    {page.label}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          ))}
+          <CommandGroup heading="Workspaces">
+            {workspaces.length > 1 &&
+              workspaces.map((workspace) => (
                 <CommandItem
                   key={workspace.id}
                   value={`workspace ${workspace.name}`}
@@ -151,8 +188,14 @@ export default function CommandPalette({ open, onOpenChange, userId }: CommandPa
                   {`Switch to ${workspace.name}`}
                 </CommandItem>
               ))}
-            </CommandGroup>
-          )}
+            <CommandItem
+              value="create a new workspace"
+              onSelect={run(() => void navigate({ to: "/new-workspace" }))}
+            >
+              <AddIcon />
+              Create a workspace
+            </CommandItem>
+          </CommandGroup>
           <CommandGroup heading="Actions">
             <CommandItem value="toggle sidebar" onSelect={run(toggleSidebar)}>
               <SidebarIcon />

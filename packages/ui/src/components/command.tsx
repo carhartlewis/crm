@@ -52,10 +52,11 @@ function CommandDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
-      {/* Opened from the keyboard, so it appears at once: no enter or exit animation. */}
+      {/* Opened from the keyboard, so it appears at once: no enter or exit animation. Wide and
+          tall enough to show most of its commands without scrolling, within the window. */}
       <DialogContent
         className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! bg-transparent p-0 data-open:animate-none data-closed:animate-none",
+          "top-[18%] translate-y-0 overflow-hidden rounded-xl! bg-transparent p-0 sm:max-w-2xl data-open:animate-none data-closed:animate-none **:data-[slot=command-list]:max-h-[min(32rem,64vh)]",
           className,
         )}
         overlayClassName="bg-black/5 data-open:animate-none data-closed:animate-none"
