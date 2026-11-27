@@ -4,7 +4,8 @@ const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matche
 
 /**
  * Callback ref for a scroll container: pulling past either end (wheel or trackpad) stretches
- * the first child with resistance, and letting go springs it back. Only when the content
+ * all of its content with resistance, and letting go springs it back. Every child moves as one;
+ * moving only the first would slide it over the rest. Only when the content
  * overflows: a list that fits stays still. Native overscroll is off
  * (`overscroll-none` on the container) so the two don't fight. Style writes only: no renders.
  * With reduced motion the edge simply stops.
@@ -16,17 +17,18 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
   let release: ReturnType<typeof setTimeout> | undefined;
 
   const content = () =>
-    scroller.firstElementChild instanceof HTMLElement ? scroller.firstElementChild : null;
+    [...scroller.children].filter((child): child is HTMLElement => child instanceof HTMLElement);
+
+  const move = (transform: string, transition: string) => {
+    for (const child of content()) {
+      child.style.transition = transition;
+      child.style.transform = transform;
+    }
+  };
 
   const settle = () => {
-    const target = content();
-
     overscroll = 0;
-
-    if (!target) return;
-
-    target.style.transition = "transform 300ms var(--ease-out)";
-    target.style.transform = "";
+    move("", "transform 300ms var(--ease-out)");
   };
 
   const onWheel = (event: WheelEvent) => {
@@ -42,9 +44,7 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
     const pulling =
       overscroll !== 0 || (event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom);
 
-    const target = content();
-
-    if (!pulling || !target) return;
+    if (!pulling || content().length === 0) return;
 
     event.preventDefault();
 
@@ -52,8 +52,7 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
 
     // Pushing back through the resting point hands control back to normal scrolling.
     overscroll = Math.sign(next) !== Math.sign(overscroll) && overscroll !== 0 ? 0 : next;
-    target.style.transition = "none";
-    target.style.transform = `translate3d(0, ${rubberBand(overscroll, scroller.clientHeight)}px, 0)`;
+    move(`translate3d(0, ${rubberBand(overscroll, scroller.clientHeight)}px, 0)`, "none");
 
     clearTimeout(release);
     // Wheel events have no "finger lifted": a short gap in them is the release.
