@@ -5,7 +5,7 @@ function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
     <kbd
       data-slot="kbd"
       className={cn(
-        "pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm bg-muted px-1 font-sans text-xs font-medium text-muted-foreground select-none group-data-[variant=default]/button:bg-primary-foreground/15 group-data-[variant=default]/button:text-primary-foreground/80 in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background dark:in-data-[slot=tooltip-content]:bg-background/10 [&_svg:not([class*='size-'])]:size-3",
+        "pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm bg-muted px-1 font-sans text-xs font-medium text-muted-foreground select-none in-data-[slot=button]:h-4 in-data-[slot=button]:min-w-4 in-data-[slot=button]:rounded-[4px] in-data-[slot=button]:bg-transparent in-data-[slot=button]:px-1 in-data-[slot=button]:text-[11px] in-data-[slot=button]:text-current/60 in-data-[slot=button]:ring-1 in-data-[slot=button]:ring-current/20 in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background dark:in-data-[slot=tooltip-content]:bg-background/10 [&_svg:not([class*='size-'])]:size-3",
         className,
       )}
       {...props}
