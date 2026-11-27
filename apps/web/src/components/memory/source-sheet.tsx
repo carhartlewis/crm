@@ -1,7 +1,9 @@
 import type { MemoryGraph } from "@crm/core/api";
 import { Markdown } from "@crm/ui/components/markdown";
-import { StaticTable, type StaticTableColumn } from "@crm/ui/patterns/data-table/data-table";
+import { DataTable, type DataTableColumn } from "@crm/ui/patterns/data-table/data-table";
+import { createListSearchParams } from "@crm/ui/patterns/data-table/list-search-params";
 import { DayCell, StatusCell } from "@crm/ui/patterns/data-table/table-cells";
+import { useListTable } from "@crm/ui/patterns/data-table/use-list-table";
 import { RailFacts } from "@crm/ui/patterns/record-sheet/record-rail";
 import { RecordSection } from "@crm/ui/patterns/record-sheet/record-section";
 import {
@@ -28,18 +30,30 @@ const TABS = ["facts", "text"] as const;
 
 const onError = (error: Error) => toast.error(error.message);
 
-const FACT_COLUMNS: StaticTableColumn<Fact>[] = [
+/** The facts table's search, sort and page, scoped so they never collide with the page's table. */
+const FACT_PARAMS = createListSearchParams({
+  scope: "fact",
+  defaultSort: "learned",
+  defaultDir: "desc",
+});
+
+type FactColumn = "fact" | "learned";
+
+const FACT_COLUMNS: DataTableColumn<Fact, FactColumn>[] = [
   {
     id: "fact",
     kind: "title",
     header: "Fact",
+    sortable: true,
+    hideable: false,
     // Facts are sentences: they wrap instead of truncating.
-    cell: (fact) => <span className="block py-1 text-pretty">{fact.memory}</span>,
+    cell: (fact) => <span className="block py-1 text-pretty select-text">{fact.memory}</span>,
   },
   {
     id: "learned",
     kind: "date",
     header: "Learned",
+    sortable: true,
     cell: (fact) => <DayCell value={fact.createdAt} />,
   },
 ];
@@ -107,6 +121,24 @@ export default function SourceSheet({
   const facts = (source?.memories ?? []).filter((fact) => fact.isLatest && !fact.isForgotten);
   const status = detail.data ? STATUS[detail.data.status] : null;
 
+  const list = useListTable({
+    tableId: "source-facts",
+    searchParams: FACT_PARAMS,
+    rows: facts,
+    loading: false,
+    getRowId: (fact) => fact.id,
+    haystack: (fact) => fact.memory,
+    sortValues: { fact: (fact) => fact.memory, learned: (fact) => fact.createdAt },
+    facetOf: {},
+    noun: "facts",
+    searchPlaceholder: "Search facts",
+    blank: {
+      title: "No facts yet",
+      description: "No facts read from this source yet. New sources take up to a minute.",
+    },
+    filtered: "No matching facts.",
+  });
+
   return (
     <RecordSheet
       open={source !== null}
@@ -137,15 +169,13 @@ export default function SourceSheet({
         {
           id: "facts",
           label: `Facts ${facts.length}`,
+          // The table fills the tab and pages what fits, like a page's table.
+          fills: true,
           content: (
-            <StaticTable<Fact>
-              label="Facts"
-              rows={facts}
-              getRowId={(fact) => fact.id}
-              empty="No facts read from this source yet. New sources take up to a minute."
+            <DataTable
+              {...list.tableProps}
+              meta={null}
               columns={FACT_COLUMNS}
-              // The sheet scrolls and facts wrap, so pages hold a fixed count.
-              fit={false}
               rowActions={factMenu((fact) => forget.mutate({ ...target, factId: fact.id }))}
             />
           ),
