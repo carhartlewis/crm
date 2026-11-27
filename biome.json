@@ -30,7 +30,8 @@
       "!**/migrations/**",
       "!bun.lock",
       "!skills-lock.json",
-      "!AGENTS.md"
+      "!AGENTS.md",
+      "!apps/agent/agent/skills/**/*.md"
     ]
   },
   "formatter": {
