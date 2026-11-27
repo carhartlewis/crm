@@ -2,7 +2,6 @@ import add from "@carbon/icons/es/add/16.js";
 import document from "@carbon/icons/es/document/16.js";
 import launch from "@carbon/icons/es/launch/16.js";
 import overflow from "@carbon/icons/es/overflow-menu--horizontal/16.js";
-import search16 from "@carbon/icons/es/search/16.js";
 import type { SkillsShResult, SkillSummary } from "@crm/core/api";
 import { skillsShUrl } from "@crm/integrations";
 import { Badge } from "@crm/ui/components/badge";
@@ -14,10 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@crm/ui/components/dropdown-menu";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@crm/ui/components/empty";
 import { carbonIcon } from "@crm/ui/components/icon";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@crm/ui/components/input-group";
-import { Tabs, TabsList, TabsTrigger } from "@crm/ui/components/tabs";
 import {
   AdaptiveSheet,
   AdaptiveSheetContent,
@@ -28,7 +24,7 @@ import {
 } from "@crm/ui/patterns/adaptive-sheet";
 import { FormattedDate } from "@crm/ui/patterns/formatted-date";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
+import { parseAsString, useQueryState } from "nuqs";
 import { toast } from "sonner";
 import {
   discoverQuery,
@@ -37,14 +33,12 @@ import {
   setSkillEnabledMutation,
   skillQuery,
 } from "../../lib/skills.ts";
+import { SectionHeading } from "./connectors-panel.tsx";
 
 const AddIcon = carbonIcon(add);
 const SkillIcon = carbonIcon(document);
 const LaunchIcon = carbonIcon(launch);
 const MoreIcon = carbonIcon(overflow);
-const SearchIcon = carbonIcon(search16);
-
-const VIEWS = ["yours", "discover"] as const;
 
 const onError = (error: Error) => toast.error(error.message);
 
@@ -54,69 +48,71 @@ interface Scope {
 }
 
 /**
- * Skills shared by everyone in the workspace. "Yours" lists them; "Discover" searches skills.sh.
- * An added skill starts disabled: open it (`?skill=<id>`), read it, then enable it.
+ * Skills shared by everyone in the workspace. "Yours" lists them, filtered by `query` as you
+ * type; "Discover" searches skills.sh with `settledQuery` (the URL value, which waits for a pause
+ * in typing). An added skill starts disabled: open it (`?skill=<id>`), read it, then enable it.
  */
 export function SkillsPanel({
   userId,
   workspaceId,
   skills,
-}: Scope & { skills: readonly SkillSummary[] }) {
-  const [view, setView] = useQueryState("view", parseAsStringLiteral(VIEWS).withDefault("yours"));
+  view,
+  query,
+  settledQuery,
+}: Scope & {
+  skills: readonly SkillSummary[];
+  view: "yours" | "discover";
+  query: string;
+  settledQuery: string;
+}) {
   const [open, setOpen] = useQueryState("skill", parseAsString);
   const scope = { userId, workspaceId };
 
   return (
-    <div className="flex flex-col gap-4">
-      <Tabs value={view} onValueChange={(next: (typeof VIEWS)[number]) => void setView(next)}>
-        <TabsList>
-          <TabsTrigger value="yours">Yours</TabsTrigger>
-          <TabsTrigger value="discover">Discover</TabsTrigger>
-        </TabsList>
-      </Tabs>
+    <>
       {view === "yours" ? (
-        <YourSkills skills={skills} onOpen={(id) => void setOpen(id)} />
+        <YourSkills skills={skills} query={query} onOpen={(id) => void setOpen(id)} />
       ) : (
-        <DiscoverSkills scope={scope} onOpen={(id) => void setOpen(id)} />
+        <DiscoverSkills scope={scope} query={settledQuery} onOpen={(id) => void setOpen(id)} />
       )}
       {open ? (
         <SkillSheet key={open} scope={scope} id={open} onClose={() => void setOpen(null)} />
       ) : null}
-    </div>
+    </>
   );
 }
 
 function YourSkills({
   skills,
+  query,
   onOpen,
 }: {
   skills: readonly SkillSummary[];
+  query: string;
   onOpen: (id: string) => void;
 }) {
-  if (skills.length === 0) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>No skills yet</EmptyTitle>
-          <EmptyDescription>
-            Skills teach the assistant how your workspace works. Find one in Discover.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
+  const needle = query.trim().toLowerCase();
+
+  const shown = skills.filter((skill) =>
+    `${skill.name} ${skill.description}`.toLowerCase().includes(needle),
+  );
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="flex items-center gap-2 text-base font-medium select-none">
-        Shared in this workspace
-        <Badge variant="secondary">{skills.length}</Badge>
-      </h2>
-      <ul className="flex flex-col divide-y divide-border">
-        {skills.map((skill) => (
-          <SkillRow key={skill.id} skill={skill} onOpen={onOpen} />
-        ))}
-      </ul>
+      <SectionHeading count={shown.length}>Shared in this workspace</SectionHeading>
+      {shown.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {needle
+            ? `No skills match “${query.trim()}”.`
+            : "No skills yet. Skills teach the assistant how your workspace works. Find one in Discover."}
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border">
+          {shown.map((skill) => (
+            <SkillRow key={skill.id} skill={skill} onOpen={onOpen} />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -190,44 +186,37 @@ function SkillRow({ skill, onOpen }: { skill: SkillSummary; onOpen: (id: string)
   );
 }
 
-function DiscoverSkills({ scope, onOpen }: { scope: Scope; onOpen: (id: string) => void }) {
-  // The search runs when the person submits, so each keystroke doesn't call skills.sh.
-  const [query, setQuery] = useQueryState("q", parseAsString.withDefault(""));
-  const results = useQuery(discoverQuery(scope.userId, scope.workspaceId, query));
+function DiscoverSkills({
+  scope,
+  query,
+  onOpen,
+}: {
+  scope: Scope;
+  query: string;
+  onOpen: (id: string) => void;
+}) {
+  const text = query.trim();
+  const results = useQuery(discoverQuery(scope.userId, scope.workspaceId, text));
+  const found = results.data ?? [];
 
   return (
-    <div className="flex flex-col gap-3">
-      <form
-        className="w-full sm:w-80"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void setQuery(String(new FormData(event.currentTarget).get("q") ?? "").trim());
-        }}
-      >
-        <InputGroup>
-          <InputGroupAddon>
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            name="q"
-            type="search"
-            autoComplete="off"
-            aria-label="Search skills.sh"
-            placeholder="Search skills.sh, then press Enter"
-            defaultValue={query}
-          />
-        </InputGroup>
-      </form>
+    <section className="flex flex-col gap-2">
+      <SectionHeading count={found.length}>From skills.sh</SectionHeading>
       {results.isError ? <p className="text-sm text-destructive">{results.error.message}</p> : null}
-      {query.length >= 2 && results.data?.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No skills on skills.sh match “{query}”.</p>
+      {text.length < 2 ? (
+        <p className="text-sm text-muted-foreground">
+          Search skills.sh for skills to share with your workspace.
+        </p>
+      ) : null}
+      {text.length >= 2 && results.isSuccess && found.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No skills on skills.sh match “{text}”.</p>
       ) : null}
       <ul className="flex flex-col divide-y divide-border">
-        {(results.data ?? []).map((result) => (
+        {found.map((result) => (
           <DiscoverRow key={result.id} result={result} onOpen={onOpen} />
         ))}
       </ul>
-    </div>
+    </section>
   );
 }
 

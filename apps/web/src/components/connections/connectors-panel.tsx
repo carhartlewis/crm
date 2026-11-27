@@ -41,36 +41,74 @@ const accessHints: Record<Access, string> = {
 
 const onError = (error: Error) => toast.error(error.message);
 
-/** The apps people can connect, as a grid of cards. */
+/** Lowercased name, summary, vendor and domain, for search. */
+function haystack(integration: Integration) {
+  return [integration.name, integration.summary, integration.vendor, integration.domain]
+    .join(" ")
+    .toLowerCase();
+}
+
+/**
+ * The apps people can connect, as a grid of cards. "Yours" shows the connected ones; "Discover"
+ * shows every app. `query` filters both as you type.
+ */
 export function ConnectorsPanel({
   connections,
   userId,
   workspaceId,
+  view,
+  query,
 }: {
   connections: readonly Connection[];
   userId: string;
   workspaceId: string;
+  view: "yours" | "discover";
+  query: string;
 }) {
   const byIntegration = new Map(connections.map((entry) => [entry.integration, entry]));
   const { data: logos } = useQuery(connectionLogosQuery(userId, workspaceId));
+  const needle = query.trim().toLowerCase();
+
+  const shown = integrations.filter(
+    (integration) =>
+      (view === "discover" || byIntegration.has(integration.id)) &&
+      haystack(integration).includes(needle),
+  );
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground select-none">
-        The assistant can use the apps you connect. Read lets it look things up; read and write also
-        lets it act, and it asks you before each action.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {integrations.map((integration) => (
-          <IntegrationCard
-            key={integration.id}
-            integration={integration}
-            logo={logos?.[integration.id] ?? null}
-            connection={byIntegration.get(integration.id)}
-          />
-        ))}
-      </div>
-    </div>
+    <section className="flex flex-col gap-3">
+      <SectionHeading count={shown.length}>
+        {view === "yours" ? "Connected" : "All connectors"}
+      </SectionHeading>
+      {shown.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {needle
+            ? `No connectors match “${query.trim()}”.`
+            : "Nothing connected yet. Connect an app from Discover."}
+        </p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {shown.map((integration) => (
+            <IntegrationCard
+              key={integration.id}
+              integration={integration}
+              logo={logos?.[integration.id] ?? null}
+              connection={byIntegration.get(integration.id)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** A section title with its item count, as on the Connections page. */
+export function SectionHeading({ count, children }: { count: number; children: string }) {
+  return (
+    <h2 className="flex items-center gap-2 text-base font-medium select-none">
+      {children}
+      <Badge variant="secondary">{count}</Badge>
+    </h2>
   );
 }
 
