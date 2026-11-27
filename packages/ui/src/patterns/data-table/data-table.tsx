@@ -250,7 +250,8 @@ const END_COLUMN_CLASS = cn(
   "[tbody>tr:hover>&]:bg-linear-to-r [tbody>tr:hover>&]:from-muted/50 [tbody>tr:hover>&]:to-muted/50",
   "[tbody>tr:has([aria-expanded=true])>&]:bg-linear-to-r [tbody>tr:has([aria-expanded=true])>&]:from-muted/50 [tbody>tr:has([aria-expanded=true])>&]:to-muted/50",
   "[tbody>tr[data-state=selected]>&]:bg-muted",
-  "[tbody>tr[data-active]>&]:bg-linear-to-r [tbody>tr[data-active]>&]:from-accent/60 [tbody>tr[data-active]>&]:to-accent/60",
+  // As on the row, selection's colour wins over the active tint; stacking both made this cell lighter.
+  "[tbody>tr[data-active]:not([data-state=selected])>&]:bg-linear-to-r [tbody>tr[data-active]:not([data-state=selected])>&]:from-accent/60 [tbody>tr[data-active]:not([data-state=selected])>&]:to-accent/60",
 );
 
 const TABLE_CONTAINER_CLASS = "min-h-0 overflow-auto rounded-md bg-card shadow-hairline";

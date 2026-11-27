@@ -159,14 +159,22 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
 
   const ids = list.visible.map((row) => row.id);
 
-  const open = (id: string) => {
+  // Only the keys show the active row. A row opened with the pointer keeps the list's place for
+  // j/k, but stays unmarked when its sheet closes.
+  const [keyed, setKeyed] = useState(false);
+
+  const openWith = (fromKeys: boolean) => (id: string) => {
     setPosition({ activeId: id, anchorId: null });
+    setKeyed(fromKeys);
     void record.open(id);
   };
+
+  const open = openWith(false);
 
   // Keyboard moves turn the page with the active row.
   const moveTo = (next: ListPosition) => {
     setPosition(next);
+    setKeyed(true);
     list.reveal(next.activeId);
   };
 
@@ -179,7 +187,7 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
     setPosition: moveTo,
     selection: list.selection,
     enabled: !sheetOpen && createKind === null,
-    onOpen: open,
+    onOpen: openWith(true),
     onFilter: () => frame.current?.querySelector<HTMLInputElement>('input[type="search"]')?.focus(),
   });
 
@@ -190,7 +198,7 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
         columns={columns}
         facetCounts={{}}
         facets={facets}
-        activeRowId={position.activeId}
+        activeRowId={keyed ? position.activeId : null}
         onRowClick={(row) => open(row.id)}
         rowActions={companyRowMenu({
           open,
