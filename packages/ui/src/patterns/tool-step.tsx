@@ -113,15 +113,59 @@ export function ToolStepGroup({
 }) {
   return (
     <Collapsible defaultOpen={defaultOpen} data-slot="tool-step-group" data-state={state}>
-      <CollapsibleTrigger className="group/steps flex w-full min-w-0 items-center gap-2 text-left text-sm">
-        <StepIcon state={state} />
-        <StepLabel label={label} detail={detail} state={state} />
-        <ChevronIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover/steps:opacity-100 group-focus-visible/steps:opacity-100 group-data-panel-open/steps:rotate-90 group-data-panel-open/steps:opacity-100" />
-      </CollapsibleTrigger>
+      <StepTrigger label={label} detail={detail} state={state} />
       <CollapsibleContent>
         <div className="mt-1.5 ml-1.75 flex min-w-0 flex-col gap-1.5 border-l pl-4">{children}</div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/**
+ * One call with what it showed beneath it, such as a list call's table. The step opens and closes
+ * it; `defaultOpen` sets where it starts (the chat opens only the turn's latest result).
+ */
+export function ToolStepResult({
+  label,
+  detail,
+  state,
+  defaultOpen = true,
+  children,
+}: {
+  label: ReactNode;
+  /** Text only: the step is a button, so it can't hold a link or another button. */
+  detail?: ReactNode;
+  state: ToolStepState;
+  defaultOpen?: boolean;
+  /** The result, such as a table. */
+  children: ReactNode;
+}) {
+  return (
+    <Collapsible defaultOpen={defaultOpen} data-slot="tool-step-result" data-state={state}>
+      <StepTrigger label={label} detail={detail} state={state} />
+      <CollapsibleContent>
+        <div className="mt-2 min-w-0">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/** A step's line as the button that opens what is beneath it, with a chevron on hover. */
+function StepTrigger({
+  label,
+  detail,
+  state,
+}: {
+  label: ReactNode;
+  detail?: ReactNode;
+  state: ToolStepState;
+}) {
+  return (
+    <CollapsibleTrigger className="group/steps flex w-full min-w-0 items-center gap-2 text-left text-sm">
+      <StepIcon state={state} />
+      <StepLabel label={label} detail={detail} state={state} />
+      <ChevronIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover/steps:opacity-100 group-focus-visible/steps:opacity-100 group-data-panel-open/steps:rotate-90 group-data-panel-open/steps:opacity-100" />
+    </CollapsibleTrigger>
   );
 }
 

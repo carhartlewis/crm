@@ -612,7 +612,9 @@ function ChatPart({
       );
     case "reasoning":
       return (
-        <Reasoning isStreaming={part.state === "streaming"}>
+        // Closed while the agent thinks too: the row shimmers "Thinking", and the thinking itself
+        // (long with GLM) opens only on a click.
+        <Reasoning isStreaming={part.state === "streaming"} defaultOpen={false}>
           <ReasoningTrigger />
           <ReasoningContent>{part.text}</ReasoningContent>
         </Reasoning>
