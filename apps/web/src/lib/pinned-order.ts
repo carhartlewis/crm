@@ -42,15 +42,15 @@ function toPinKey(entry: string): PinKey | undefined {
  * Pages are always pinned; spaces and chats only when the user pinned them.
  */
 export function normalizeOrder(saved: readonly string[]): readonly PinKey[] {
-  const keys: PinKey[] = [];
+  const keys = new Set<PinKey>();
 
   for (const entry of saved) {
     const key = toPinKey(entry);
 
-    if (key && !keys.includes(key)) keys.push(key);
+    if (key) keys.add(key);
   }
 
-  return [...keys, ...DEFAULT_ORDER.filter((key) => !keys.includes(key))];
+  return [...keys, ...DEFAULT_ORDER.filter((key) => !keys.has(key))];
 }
 
 /** Moves the item at `from` to `to`, shifting the items between. */

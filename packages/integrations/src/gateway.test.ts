@@ -14,13 +14,27 @@ const signedIn: Credentials = {
   tokens: { access_token: "access-1", token_type: "Bearer", refresh_token: "refresh-1", issuer },
 };
 
-function setup(access: Access, credentials: Credentials = signedIn) {
+function setup(access: Access, credentials: Credentials = signedIn, withLocal = false) {
   const upstream = fakeUpstream();
   const errors: string[] = [];
   const saved: Credentials[] = [];
 
   const gateway = createGateway<{ userId: string }>({
     fetch: upstream.fetch,
+    local: ({ userId }) =>
+      withLocal
+        ? [
+            {
+              tool: {
+                name: "crm__whoami",
+                description: "The caller.",
+                inputSchema: { type: "object" },
+                annotations: { readOnlyHint: true },
+              },
+              call: async () => ({ content: [{ type: "text", text: userId }] }),
+            },
+          ]
+        : [],
     onError: (_error, integration) => errors.push(integration),
     connections: async ({ userId }) =>
       userId === "user-1"
@@ -143,5 +157,15 @@ describe("gateway", () => {
 
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain("connected again");
+  });
+
+  test("lists the host's own tools first and runs them as the caller", async () => {
+    const client = await setup("read", signedIn, true).connect("user-2");
+    const { tools } = await client.listTools();
+
+    expect(tools.map((tool) => tool.name)).toEqual(["crm__whoami"]);
+    expect(await client.callTool({ name: "crm__whoami" })).toMatchObject({
+      content: [{ type: "text", text: "user-2" }],
+    });
   });
 });

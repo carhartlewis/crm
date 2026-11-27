@@ -11,6 +11,7 @@ import { HttpRouter, HttpServer } from "effect/http";
 import { Auth, AuthError } from "../services/Auth.ts";
 import { Chats, makeChats } from "../services/Chats.ts";
 import { createMemoryChatStore } from "../services/chat-store-memory.ts";
+import { CrmTools } from "../services/crm-tools.ts";
 import { Companies, makeCompanies } from "../services/Companies.ts";
 import { Images } from "../services/Images.ts";
 import { makeMemory, Memory } from "../services/Memory.ts";
@@ -239,6 +240,7 @@ const app = HttpRouter.toWebHandler(
       FakeConnections,
       FakeCompanies,
       FakeChats,
+      Layer.succeed(CrmTools, { forCaller: () => [] }),
       FakeElectric,
       Layer.succeed(
         Skills,

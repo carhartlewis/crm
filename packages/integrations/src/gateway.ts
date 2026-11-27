@@ -26,9 +26,21 @@ export interface GatewayConnection {
   readonly auth: OAuthClientProvider;
 }
 
+/**
+ * A tool the host itself serves, such as the CRM's own records (`crm__list_companies`). It runs
+ * in the host with the verified principal; no upstream is involved.
+ */
+export interface LocalTool {
+  /** The tool as the agent lists it; its name already carries the host's prefix. */
+  readonly tool: Tool;
+  readonly call: (args: NonNullable<CallToolRequestParams["arguments"]>) => Promise<CallToolResult>;
+}
+
 export interface GatewayOptions<Principal> {
   /** The caller's connections, read once per MCP request. */
   readonly connections: (principal: Principal) => Promise<readonly GatewayConnection[]>;
+  /** The host's own tools for this caller, listed before the apps' tools. */
+  readonly local?: (principal: Principal) => readonly LocalTool[];
   readonly fetch?: FetchLike;
   /** Upstream failures; the gateway leaves the app's tools out (list) or returns a tool error (call). */
   readonly onError?: (cause: unknown, integration: string) => void;
@@ -113,13 +125,14 @@ export function createGateway<Principal>(options: GatewayOptions<Principal>): Ga
     if (principal === undefined) throw new Error("Gateway request without a principal");
 
     const connections = await options.connections(principal);
+    const local = options.local?.(principal) ?? [];
 
     const server = new Server(
       { name: "crm-connections", version: "1.0.0" },
       {
         capabilities: { tools: {} },
         instructions:
-          "Tools from the apps this user connected to the CRM, named <app>__<tool>. Each app is read-only or read-write, as the user chose.",
+          "The CRM's own tools (crm__…: companies, members, memory) and tools from the apps this user connected to the CRM, named <app>__<tool>. Each app is read-only or read-write, as the user chose.",
       },
     );
 
@@ -140,10 +153,22 @@ export function createGateway<Principal>(options: GatewayOptions<Principal>): Ga
         }),
       );
 
-      return { tools: lists.flat() };
+      return { tools: [...local.map((entry) => entry.tool), ...lists.flat()] };
     });
 
     server.setRequestHandler("tools/call", async ({ params }) => {
+      const own = local.find((entry) => entry.tool.name === params.name);
+
+      if (own) {
+        try {
+          return await own.call(params.arguments ?? {});
+        } catch (error) {
+          report(error, params.name);
+
+          return toolError(`${params.name} failed. Try again later.`);
+        }
+      }
+
       const target = splitToolName(params.name);
 
       const connection =

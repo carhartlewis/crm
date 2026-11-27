@@ -100,7 +100,8 @@ function ConversationScrollButton({ className, onClick, ...props }: Conversation
       }}
       size="icon"
       type="button"
-      variant="outline"
+      // Filled, so it stands out over the conversation in both themes.
+      variant="default"
       {...props}
     >
       <ArrowDownIcon className="size-4" />

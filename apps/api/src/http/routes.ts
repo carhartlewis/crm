@@ -25,6 +25,7 @@ import { HttpApiBuilder } from "effect/http-api";
 import { Auth, type McpPrincipal } from "../services/Auth.ts";
 import { type ChatActor, Chats } from "../services/Chats.ts";
 import { Companies } from "../services/Companies.ts";
+import { CrmTools } from "../services/crm-tools.ts";
 import { type Actor, Connections } from "../services/Connections.ts";
 import { Electric } from "../services/Electric.ts";
 import { Images } from "../services/Images.ts";
@@ -415,9 +416,12 @@ const ConnectionRoutes = Layer.effectDiscard(
     const auth = yield* Auth;
     const connections = yield* Connections;
     const skills = yield* Skills;
+    const crmTools = yield* CrmTools;
 
     const gateway = createGateway<McpPrincipal>({
       connections: connections.gatewayConnections,
+      // The CRM's own records and memory, as `crm__<tool>` (ADR 0018).
+      local: crmTools.forCaller,
       fetch: connections.oauth.fetch,
       onError: (error, integration) => {
         Effect.runFork(Effect.logWarning(`gateway: ${integration} failed`, error));

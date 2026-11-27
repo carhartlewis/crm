@@ -3,11 +3,20 @@ import { crmCaller, crmToken } from "../lib/crm-token.ts";
 import { gatewayAuthorization, gatewayUrl } from "../lib/gateway.ts";
 
 const description =
-  "Apps the user connected to the CRM: Granola meeting notes and transcripts, Superhuman email, and others. Search here for meetings, emails and other context about people and companies.";
+  "The CRM itself (crm__: companies, workspace members, memory) and the apps the user connected to it: Granola meeting notes and transcripts, Superhuman email, and others. Search here for companies, people, meetings, emails and what the CRM remembers.";
 
-// Read-only tools run freely; anything else (send, delete, update) asks the user first.
-const approval = ({ toolAnnotations }: { toolAnnotations?: { readOnlyHint?: boolean } }) =>
-  toolAnnotations?.readOnlyHint === true ? "not-applicable" : "user-approval";
+// Read-only tools run freely, and so does saving a memory (as before); anything else (send,
+// delete, update, forget) asks the user first.
+const approval = ({
+  toolName,
+  toolAnnotations,
+}: {
+  toolName: string;
+  toolAnnotations?: { readOnlyHint?: boolean };
+}) =>
+  toolAnnotations?.readOnlyHint === true || toolName.endsWith("crm__remember")
+    ? "not-applicable"
+    : "user-approval";
 
 /**
  * The apps the user connected in Personal settings → Connections (Granola, Superhuman, …),

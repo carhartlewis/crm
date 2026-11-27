@@ -204,6 +204,8 @@ function PinnedGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps
 }
 
 function SpacesGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps) {
+  const pinned = new Set(api.layout.pinned);
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Spaces</SidebarGroupLabel>
@@ -219,7 +221,7 @@ function SpacesGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps
         </SidebarMenuItem>
         {/* A pinned space shows once, in Pinned. */}
         {api.spaces
-          .filter((space) => !api.layout.pinned.includes(pinKey("space", space.id)))
+          .filter((space) => !pinned.has(pinKey("space", space.id)))
           .map((space) => (
             <SpaceRow
               key={space.id}
@@ -243,6 +245,7 @@ function SpacesGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps
 }
 
 function FoldersGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps) {
+  const pinned = new Set(api.layout.pinned);
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
 
   if (api.layout.folders.length === 0) return null;
@@ -271,7 +274,7 @@ function FoldersGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
 
           // A pinned chat shows once, in Pinned.
           const chats = folder.chatIds.flatMap((id) =>
-            api.layout.pinned.includes(pinKey("chat", id)) ? [] : (api.chatById(id) ?? []),
+            pinned.has(pinKey("chat", id)) ? [] : (api.chatById(id) ?? []),
           );
 
           return (

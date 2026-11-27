@@ -7,6 +7,7 @@ import { Auth } from "./services/Auth.ts";
 import { Connections } from "./services/Connections.ts";
 import { Chats } from "./services/Chats.ts";
 import { Companies } from "./services/Companies.ts";
+import { CrmTools } from "./services/crm-tools.ts";
 import { Electric } from "./services/Electric.ts";
 import { Images } from "./services/Images.ts";
 import { Memory } from "./services/Memory.ts";
@@ -23,6 +24,7 @@ const Server = Layer.unwrap(
         Auth.layer,
         Companies.layer,
         Chats.layer,
+        CrmTools.layer,
         Electric.layer,
         Connections.layer,
         Skills.layer,

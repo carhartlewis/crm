@@ -10,16 +10,8 @@ import {
 } from "@crm/memory/jev";
 import { formatRecall } from "@crm/memory/recall";
 import { defineMemoryProvider, type MemoryOperationContext } from "eve/memory";
-import { always } from "eve/tools/approval";
-import { defineTool } from "eve/tools";
 import { z } from "zod";
-import type {
-  CrmCompany,
-  CrmMemory,
-  MemoryForget,
-  MemoryNote,
-  MemorySearch,
-} from "./crm-memory.ts";
+import type { CrmCompany, CrmMemory, MemoryNote, MemorySearch } from "./crm-memory.ts";
 import {
   type TurnCandidate,
   type TurnMessage,
@@ -36,7 +28,8 @@ import {
  * - capture: after each turn, the whole chat is saved to workspace memory, and Jev judges the
  *   member's messages and sent emails one by one; what it keeps is noted in their words on the
  *   workspace or the company it is about, replacing a fact it makes out of date.
- * - tools: search, remember and forget, scoped to the caller's workspace by their CRM token.
+ * - tools: none here. Search, remember and forget are CRM tools on the MCP gateway
+ *   (`crm__search_memory`, `crm__remember`, `crm__forget`; ADR 0018).
  */
 
 export interface CrmMemoryProviderOptions {
@@ -230,73 +223,6 @@ export function crmMemoryProvider(options: CrmMemoryProviderOptions) {
           log("memory: learning from the turn failed", cause);
         }
       },
-    },
-
-    async tools(ctx) {
-      const user = userOf(ctx.session.auth.current);
-
-      if (!user) return null;
-
-      const memory = options.memoryFor(user.crm);
-
-      const companyId = z
-        .string()
-        .optional()
-        .describe(
-          "The CRM company id the fact is about (from the recalled memory or the CRM). Leave it out for the member's own company.",
-        );
-
-      return {
-        search: defineTool({
-          description:
-            "Search what the CRM remembers: website research, members' notes, past chats and sent emails. Search one company, or the member's own company.",
-          inputSchema: z.object({ query: z.string().min(1).max(500), companyId }),
-          execute: async (input) => {
-            const search: MemorySearch = { query: input.query };
-
-            if (input.companyId) search.companyId = input.companyId;
-
-            return { facts: await memory.search(search) };
-          },
-        }),
-        remember: defineTool({
-          description:
-            "Save one lasting fact the member told you or asked you to remember, in their words. Pass `replaces` with a fact id when it corrects that fact. Never save secrets or private personal data.",
-          inputSchema: z.object({
-            text: z.string().min(1).max(4_000),
-            companyId,
-            replaces: z
-              .string()
-              .optional()
-              .describe("The id of a fact this one makes out of date."),
-          }),
-          execute: async (input) => {
-            const note: MemoryNote = { kind: "agent_fact", text: input.text };
-
-            if (input.companyId) note.companyId = input.companyId;
-
-            if (input.replaces) note.replaces = input.replaces;
-
-            await memory.remember(note);
-
-            return { saved: true, note: "Facts appear in memory a few seconds after saving." };
-          },
-        }),
-        forget: defineTool({
-          description: "Forget one remembered fact by its id, when the member says it is wrong.",
-          inputSchema: z.object({ factId: z.string().min(1), companyId }),
-          approval: always(),
-          execute: async (input) => {
-            const request: MemoryForget = { factId: input.factId };
-
-            if (input.companyId) request.companyId = input.companyId;
-
-            await memory.forget(request);
-
-            return { forgotten: true };
-          },
-        }),
-      };
     },
   });
 }

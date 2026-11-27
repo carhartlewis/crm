@@ -95,6 +95,14 @@ Three tables, each workspace-scoped, synced through the API proxy (ADR 0012):
   expiry and the membership on every call, then treats the token like the agent's MCP token
   (ADR 0013). Callers without a workspace, such as `eve dev`, keep the MCP sign-in.
 
+- **Everything the agent does in the CRM is an MCP tool on our gateway.** Besides connected
+  apps, `/api/mcp` serves the CRM's own tools as `crm__<tool>` (`@crm/integrations` gateway
+  `local` tools, `apps/api/src/services/crm-tools.ts`): list, get, create and update companies,
+  list members, and search, remember and forget memory. Reads carry `readOnlyHint`; the agent
+  asks before writes, except `crm__remember`. The memory slot keeps only recall before a turn
+  and saving the chat after it. Add a CRM capability as a tool here, never as an agent-local
+  tool.
+
 ### Fast
 
 - **The sidebar and chat lists are local.** Chats, spaces and the sidebar row sync through
