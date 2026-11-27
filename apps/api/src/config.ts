@@ -1,4 +1,4 @@
-import { Config, Schema } from "effect";
+import { Config, Redacted, Schema } from "effect";
 
 /** Process configuration, read once at startup through Effect's ConfigProvider (env by default). */
 export const AppConfig = Config.all({
@@ -24,4 +24,20 @@ export const AppConfig = Config.all({
     Schema.Redacted(Schema.String.check(Schema.isMinLength(16))),
     "ELECTRIC_SECRET",
   ),
+  // Image storage: Vercel Blob when its token is set, otherwise the S3-compatible store. The
+  // S3 defaults match the local RustFS container in compose.yaml.
+  blobToken: Config.option(Config.Redacted("BLOB_READ_WRITE_TOKEN")),
+  s3: Config.all({
+    bucket: Config.String("S3_BUCKET").pipe(Config.withDefault("crm")),
+    endpoint: Config.String("S3_ENDPOINT").pipe(Config.withDefault("http://127.0.0.1:59000")),
+    region: Config.String("S3_REGION").pipe(Config.withDefault("us-east-1")),
+    accessKeyId: Config.String("S3_ACCESS_KEY_ID").pipe(Config.withDefault("crm-local")),
+    secretAccessKey: Config.Redacted("S3_SECRET_ACCESS_KEY").pipe(
+      Config.withDefault(Redacted.make("crm-local-secret")),
+    ),
+    // The URL browsers load objects from: the bucket's base URL.
+    publicUrl: Config.String("S3_PUBLIC_URL").pipe(
+      Config.withDefault("http://127.0.0.1:59000/crm"),
+    ),
+  }),
 });

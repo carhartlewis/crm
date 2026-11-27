@@ -9,6 +9,7 @@
     "./auth/client": "./src/auth/client.ts",
     "./db": "./src/prisma/db.ts",
     "./kv": "./src/kv/index.ts",
+    "./storage": "./src/storage/index.ts",
     "./desktop": "./src/desktop/index.ts",
     "./workspace": "./src/workspace/index.ts",
     "./company": "./src/company/index.ts",
@@ -21,6 +22,7 @@
   },
   "dependencies": {
     "@prisma/orm-postgres": "8.0.0-rc.25",
+    "@vercel/blob": "2.9.0",
     "better-auth": "1.7.28",
     "effect": "4.1.6",
     "pg": "8.23.1",

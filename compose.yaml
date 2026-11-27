@@ -43,6 +43,34 @@ services:
         ]
       interval: 2s
       retries: 60
+  # S3-compatible object storage for images (profile pictures, workspace favicons). RustFS,
+  # because MinIO no longer publishes community images. Deployments use Vercel Blob instead.
+  storage:
+    image: rustfs/rustfs@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff
+    environment:
+      RUSTFS_ACCESS_KEY: crm-local
+      RUSTFS_SECRET_KEY: crm-local-secret
+      RUSTFS_VOLUMES: /data
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_OBS_LOGGER_LEVEL: warn
+    ports: ["127.0.0.1:59000:9000", "127.0.0.1:59001:9001"]
+    volumes: [storage:/data]
+    # Healthy once the `crm` bucket exists with a policy that makes only `public/` anonymously
+    # readable; the check creates both on first run (a one-shot init container would fail
+    # `docker compose up --wait`).
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          s3() { curl -fsS -o /dev/null --aws-sigv4 aws:amz:us-east-1:s3 --user crm-local:crm-local-secret "$$@"; };
+          curl -fs -o /dev/null http://localhost:9000/health &&
+          { s3 "http://localhost:9000/crm?policy" 2>/dev/null ||
+          { { s3 -I http://localhost:9000/crm 2>/dev/null || s3 -X PUT http://localhost:9000/crm; } &&
+          s3 -X PUT -H "Content-Type: application/json" "http://localhost:9000/crm?policy"
+          --data-binary '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::crm/public/*"]}]}'; }; }
+      interval: 2s
+      retries: 30
 volumes:
   postgres:
   electric:
+  storage:

@@ -4,6 +4,7 @@ import { Context, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { AppConfig } from "../config.ts";
 import type { DesktopCallback, DesktopStart } from "../http/desktop.ts";
 import { makeDesktopHandoff } from "./desktop-handoff.ts";
+import { Images } from "./Images.ts";
 import { Kv } from "./Kv.ts";
 import { Postgres } from "./Postgres.ts";
 
@@ -51,6 +52,7 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
       const config = yield* AppConfig;
       const pool = yield* Postgres;
       const kv = yield* Kv;
+      const images = yield* Images;
 
       const auth = createAuth({
         database: pool,
@@ -62,6 +64,7 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
           clientId: config.googleClientId,
           clientSecret: Redacted.value(config.googleClientSecret),
         },
+        images,
       });
 
       const session = Effect.fn("Auth.session")(function* (headers: Headers) {
@@ -129,5 +132,5 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
 
       return Auth.of({ handler: auth.handler, session, desktopStart, desktopFinish });
     }),
-  ).pipe(Layer.provide([Postgres.layer, Kv.layer]));
+  ).pipe(Layer.provide([Postgres.layer, Kv.layer, Images.layer]));
 }

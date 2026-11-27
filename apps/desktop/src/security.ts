@@ -25,7 +25,10 @@ export function contentSecurityPolicy(dev: boolean) {
     dev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
     // React `style` props and Base UI positioning set inline styles.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    // Stored images (avatars, workspace logos): Vercel Blob, or the local RustFS container in dev.
+    dev
+      ? "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com http://127.0.0.1:59000"
+      : "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
     "font-src 'self'",
     dev ? "connect-src 'self' ws://localhost:*" : "connect-src 'self'",
     "worker-src 'self' blob:",
