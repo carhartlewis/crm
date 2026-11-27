@@ -497,14 +497,12 @@
   }
 
   /* Tables look like the app's own tables (`@crm/ui/components/table`): a hairline frame with
-     rounded corners, a quiet header band, hairlines between rows, and the row hover. Words never
-     split: every column but the last keeps to one line, the last wraps, and a wider table
-     scrolls sideways inside its frame. */
+     rounded corners, a quiet header band, hairlines between rows, and the row hover. Every cell
+     keeps to one line: the table fills the reply's width, the other columns take their content's
+     width, and the last column takes what is left and ends in "…" when its text is longer. */
   & [data-markdown="table"] {
-    display: block;
-    overflow-x: auto;
-    width: max-content;
-    max-width: 100%;
+    width: 100%;
+    overflow: hidden;
     /* A border, not a hairline shadow: the reply's column clips anything drawn outside a box. */
     border: 1px solid var(--border);
     border-collapse: separate;
@@ -517,9 +515,16 @@
   & [data-markdown="table"] :is(th, td) {
     padding: 0.5rem 0.75rem;
     text-align: left;
-    vertical-align: top;
-    overflow-wrap: normal;
-    word-break: normal;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  /* The last column: the rest of the width (max-width 0 lets it shrink below its text). */
+  & [data-markdown="table"] :is(th, td):last-child {
+    width: 100%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   & [data-markdown="table"] th {
@@ -527,15 +532,10 @@
     color: var(--muted-foreground);
     font-size: 0.75rem;
     font-weight: 500;
-    white-space: nowrap;
   }
 
   & [data-markdown="table"] td {
     border-top: 1px solid var(--border);
-  }
-
-  & [data-markdown="table"] td:not(:last-child) {
-    white-space: nowrap;
   }
 
   & [data-markdown="table"] td:first-child {

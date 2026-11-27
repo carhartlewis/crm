@@ -2,6 +2,22 @@ import { type ReactiveIslands, Markdown as Words } from "@pierre/words/react";
 import { cn } from "cn";
 
 /**
+ * A table cell's text as its `title`, so a cell cut short by "…" shows in full on hover. The
+ * cell's HTML is already escaped by the renderer; only a raw `"` could end the attribute.
+ */
+function titledCell(html: string) {
+  const text = html
+    .replace(/<[^>]*>/g, "")
+    .replaceAll('"', "&quot;")
+    .trim();
+
+  return text ? html.replace(/^<td\b/, `<td title="${text}"`) : html;
+}
+
+/** Hooks on the HTML the renderer makes (trusted code). Stable, so it never resets a stream. */
+const components = { td: titledCell };
+
+/**
  * Rendered Markdown (`@pierre/words`, WebAssembly). Raw HTML is dropped, so text from third
  * parties (skills, notes, model output) can't inject markup. Load it lazily: the renderer is
  * ~130 kB of JS. Its styles live in globals.css (`[data-slot="markdown"]`), at the app's type scale.
@@ -42,6 +58,7 @@ function Markdown({
         controls={false}
         lineNumbers={false}
         islands={islands}
+        components={components}
       >
         {children}
       </Words>

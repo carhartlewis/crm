@@ -85,9 +85,11 @@ function StepLabel({
   state: ToolStepState;
 }) {
   return (
+    // `relative`: the spoken state (sr-only, absolute) stays inside the clipped label instead of
+    // sitting where the untruncated text would end and widening the conversation.
     <span
       className={cn(
-        "min-w-0 truncate",
+        "relative min-w-0 truncate",
         state === "done" || state === "failed" ? "text-foreground" : "text-muted-foreground",
       )}
     >

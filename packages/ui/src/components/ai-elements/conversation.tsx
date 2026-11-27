@@ -23,7 +23,8 @@ function Conversation({ className, ...props }: ConversationProps) {
   return (
     <StickToBottom
       data-slot="conversation"
-      className={cn("relative flex-1 overflow-y-hidden", className)}
+      // Never sideways: long content wraps or truncates; the log scrolls only up and down.
+      className={cn("relative flex-1 overflow-hidden", className)}
       initial="instant"
       resize={reduced ? "instant" : "smooth"}
       role="log"
