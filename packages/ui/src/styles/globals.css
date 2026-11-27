@@ -278,6 +278,29 @@ body[data-sidebar-resizing] [data-slot="tooltip-content"] {
 }
 
 /*
+ * Controls inside a drag region stay controls. Electron gives elements in a drag region no hover
+ * and turns their clicks into window drags, so every interactive element opts out here rather
+ * than at each call site (page headers are title bars).
+ */
+.app-region-drag
+  :is(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    label,
+    summary,
+    [role="button"],
+    [role="link"],
+    [role="menuitem"],
+    [role="tab"],
+    [tabindex]:not([tabindex="-1"])
+  ) {
+  -webkit-app-region: no-drag;
+}
+
+/*
  * Motion system. Keyframes are `crm-` prefixed: tw-animate-css also defines `enter`/`exit`,
  * and the later definition silently wins. Every animation uses these tokens; see the Motion rules in AGENTS.md.
  * Curves and durations follow the `animate` skill (.agents/skills/animate).
