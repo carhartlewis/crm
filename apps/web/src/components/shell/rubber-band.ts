@@ -1,14 +1,14 @@
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** How far the content can stretch past an edge, in px: a hint of give, as on macOS. */
-const MAX_STRETCH = 56;
+const MAX_STRETCH = 72;
 
 /** The spring that pulls the content back (per s²); damped critically, so it never wobbles. */
-const STIFFNESS = 220;
+const STIFFNESS = 130;
 const DAMPING = 2 * Math.sqrt(STIFFNESS);
 
 /** Velocity (px/s) each pixel of wheel delta past the edge adds. */
-const IMPULSE = 55;
+const IMPULSE = 60;
 
 /** A pause this long in wheel events starts a new gesture. */
 const GESTURE_GAP_MS = 50;
