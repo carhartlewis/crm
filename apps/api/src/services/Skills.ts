@@ -290,11 +290,7 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
       );
 
       const inserted = yield* run("insert", () =>
-        store.insert(
-          scope,
-          { ...skill, source: "skills.sh", sourceId, enabled: false },
-          deps.now(),
-        ),
+        store.insert(scope, { ...skill, source: "skills.sh", sourceId, enabled: true }, deps.now()),
       );
 
       if (!inserted.result) {

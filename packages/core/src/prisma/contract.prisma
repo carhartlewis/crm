@@ -358,7 +358,7 @@ model Connection {
 
 // A skill shared by everyone in a workspace (`@crm/integrations` skills). The agent loads the
 // enabled ones each turn. Installed from skills.sh (pinned copy; `source_id` is the skills.sh id)
-// or written in the CRM. New skills start disabled until someone reads and enables them.
+// or written in the CRM. New skills start enabled (ADR 0015).
 
 model Skill {
   id          String               @id

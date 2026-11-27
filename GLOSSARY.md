@@ -52,7 +52,7 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Gateway**: The MCP server at `/api/mcp` that gives the agent the tools of the user's connections, named `<app>__<tool>`. better-auth MCP issues its tokens (ADR 0013).
 
-**Skill**: Instructions the agent loads when they apply, shared by everyone in a workspace. Copied from skills.sh or written in the CRM; starts disabled until a member reads and enables it (ADR 0013).
+**Skill**: Instructions the agent loads when they apply, shared by everyone in a workspace. Copied from skills.sh or written in the CRM; starts enabled; any member can disable it (ADR 0015).
 
 **Custom connector**: A remote MCP server a workspace added by URL. It must support MCP OAuth; it then works like a built-in integration (ADR 0013).
 

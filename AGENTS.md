@@ -92,7 +92,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 
 - `@crm/integrations` holds the catalog of connectable apps (remote MCP servers), generic MCP OAuth (`./oauth`) and the gateway (`./gateway`). Add an app with one catalog entry; never add per-app scopes or tool lists.
 - Access is `read` (tools with `readOnlyHint: true`) or `write` (all tools). OAuth always asks for every scope the server offers.
-- Workspace skills: a pinned copy from skills.sh (`@crm/integrations/skills-sh`), shared by the workspace, disabled until a member enables it. The agent loads enabled ones per turn from `/api/agent/skills`.
+- Workspace skills: a pinned copy from skills.sh (`@crm/integrations/skills-sh`), shared by the workspace, enabled when added (ADR 0015). The agent loads enabled ones per turn from `/api/agent/skills`.
 - Logos for apps and workspaces come from context.dev by domain and are copied into our storage (`ImageCache.logo`); the favicon is the fallback. Never hotlink or bundle vendor logos.
 - Upstream tokens stay in the API, encrypted. The agent reaches apps only through `/api/mcp`, with a better-auth MCP token for the `crm-agent` client; keep its eve connection file named `connections`.
 

@@ -296,7 +296,7 @@ export class SkillsApi extends HttpApiGroup.make("skills")
       success: AddedSkill,
       error: [...SkillErrors, Invalid],
     }),
-    /** Copies a skill from skills.sh into the workspace, disabled until someone enables it. */
+    /** Copies a skill from skills.sh into the workspace, enabled. */
     HttpApiEndpoint.post("install", "/install", {
       payload: Schema.Struct({ sourceId: Schema.String }),
       success: AddedSkill,

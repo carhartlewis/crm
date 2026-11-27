@@ -201,7 +201,8 @@ interface Scope {
 /**
  * Skills shared by everyone in the workspace. "Yours" lists them, filtered by `query` as you
  * type; "Discover" searches skills.sh with `settledQuery` (the URL value, which waits for a pause
- * in typing). An added skill starts disabled: open it (`?skill=<id>`), read it, then enable it.
+ * in typing). An added skill starts enabled and opens
+ * (`?skill=<id>`) so you can read it.
  */
 export function SkillsPanel({
   userId,
@@ -328,7 +329,7 @@ function DiscoverSkills({
       // The new row has synced by now (the mutation awaited its txid).
       const name = collection.get(id)?.name ?? "The skill";
 
-      toast(`${name} is added, but off. Read it, then enable it.`);
+      toast(`${name} is added and on for the workspace.`);
       onOpen(id);
     },
   });

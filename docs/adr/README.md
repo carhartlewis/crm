@@ -18,3 +18,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0012](0012-electric-sync-behind-the-api.md)       | Electric behind the authenticated API proxy; workspace-scoped shapes; client ids; txids. Connections, connectors and skills sync too |
 | [0013](0013-connections-through-an-mcp-gateway.md) | Connected apps and workspace skills reach the agent through better-auth MCP tokens                                                   |
 | [0014](0014-workspace-and-company-memory.md)       | Workspace and company memory in Supermemory; Jev in the agent decides what chats add                                                 |
+| [0015](0015-skills-start-enabled.md)               | Workspace skills start enabled; any member can disable one                                                                           |

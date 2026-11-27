@@ -65,7 +65,7 @@ function setup() {
 const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
 
 describe("workspace skills", () => {
-  test("installing copies the skill from skills.sh, disabled, for the whole workspace", async () => {
+  test("installing copies the skill from skills.sh, enabled, for the whole workspace", async () => {
     const { skills } = setup();
 
     const installed = await run(skills.install(alice, "acme/skills/deep-research"));
@@ -77,17 +77,19 @@ describe("workspace skills", () => {
       description: "Research with sources.",
       source: "skills.sh",
       sourceId: "acme/skills/deep-research",
-      enabled: false,
+      enabled: true,
       addedBy: { id: "user_1", name: "Alice" },
       fileCount: 1,
     });
-    // Another member sees it, with its instructions, before anyone enables it.
+    // Another member sees it, with its instructions.
     expect((await run(skills.get(bob, installed.id))).content).toBe("Read first.");
   });
 
-  test("the agent gets only enabled skills, and any member can enable one", async () => {
+  test("the agent gets only enabled skills, and any member can disable or enable one", async () => {
     const { skills } = setup();
     const installed = await run(skills.install(alice, "acme/skills/deep-research"));
+
+    await run(skills.setEnabled(bob, installed.id, false));
 
     expect(await skills.forAgent({ workspaceId: "ws_a", userId: "user_1" })).toEqual([]);
 
