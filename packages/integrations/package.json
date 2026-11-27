@@ -1,0 +1,24 @@
+{
+  "name": "@crm/integrations",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./oauth": "./src/oauth.ts",
+    "./gateway": "./src/gateway.ts",
+    "./testing": "./src/fake-upstream.ts"
+  },
+  "scripts": {
+    "check-types": "bun check --no-script --project tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@crm/typescript-config": "workspace:*",
+    "@types/bun": "1.4.5"
+  }
+}

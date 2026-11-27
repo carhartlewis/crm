@@ -2,6 +2,7 @@ import { APIError, betterAuth, type BetterAuthOptions } from "better-auth";
 import { organization } from "better-auth/plugins/organization";
 import type { Kv } from "../kv/index.ts";
 import { desktopHandoff } from "./desktop-handoff.ts";
+import { mcpPlugins, type McpAuthOptions } from "./mcp.ts";
 import {
   isWorkspaceLogo,
   isWorkspaceSlug,
@@ -35,6 +36,8 @@ export interface AuthDependencies {
   trustedOrigins: string[];
   /** Google OAuth client. Sign-in is Google-only; accounts are created on first sign-in. */
   google: GoogleClient;
+  /** The MCP authorization server for the connections gateway (see mcp.ts). */
+  mcp: McpAuthOptions;
 }
 
 export interface GoogleClient {
@@ -157,6 +160,8 @@ export function createAuth(deps: AuthDependencies) {
       workspaces,
       // Desktop sign-in: system browser + loopback + PKCE (see desktop-handoff.ts).
       desktopHandoff(),
+      // The agent's tokens for the connections gateway at /api/mcp.
+      ...mcpPlugins(deps.mcp),
     ],
   });
 }

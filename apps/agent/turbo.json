@@ -7,7 +7,7 @@
       "outputs": [".eve/**", ".output/**"]
     },
     "dev": {
-      "env": ["CRM_API_URL"],
+      "env": ["CRM_API_URL", "REDIS_URL"],
       "with": ["@crm/api#dev"]
     }
   }

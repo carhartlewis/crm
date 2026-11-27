@@ -4,6 +4,7 @@ import { HttpRouter } from "effect/http";
 import { AppConfig } from "./config.ts";
 import { Routes } from "./http/routes.ts";
 import { Auth } from "./services/Auth.ts";
+import { Connections } from "./services/Connections.ts";
 
 const Server = Layer.unwrap(
   Effect.gen(function* () {
@@ -12,7 +13,7 @@ const Server = Layer.unwrap(
     const Cors = HttpRouter.cors({ allowedOrigins: [config.webOrigin.origin], credentials: true });
 
     return HttpRouter.serve(Layer.mergeAll(Routes, Cors)).pipe(
-      Layer.provide(Auth.layer),
+      Layer.provide([Auth.layer, Connections.layer]),
       Layer.provide(BunHttpServer.layer({ port: config.port })),
     );
   }),

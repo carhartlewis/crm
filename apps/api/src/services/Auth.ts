@@ -1,5 +1,7 @@
 import { SessionUser } from "@crm/core/api";
 import { createAuth } from "@crm/core/auth";
+import { registerAgentClient, WORKSPACE_CLAIM } from "@crm/core/auth/mcp";
+import { requireMcpAuth } from "@better-auth/mcp";
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { AppConfig } from "../config.ts";
 import type { DesktopCallback, DesktopStart } from "../http/desktop.ts";
@@ -11,11 +13,31 @@ export class AuthError extends Schema.TaggedError<AuthError>()("AuthError", {
   cause: Schema.Defect(),
 }) {}
 
+/** The signed-in user and the workspace the session acts in (not yet checked for membership). */
+export interface SessionInfo {
+  readonly user: SessionUser;
+  readonly activeWorkspaceId: string | null;
+}
+
+/** The caller of the MCP gateway, from a verified access token. */
+export interface McpPrincipal {
+  readonly userId: string;
+  readonly workspaceId: string;
+}
+
 export interface AuthService {
-  /** better-auth's Web handler for `/api/auth/*`. */
+  /** better-auth's Web handler for `/api/auth/*` and its `/.well-known/*` discovery documents. */
   readonly handler: (request: Request) => Promise<Response>;
   /** Resolves the session from request headers (cookie). `None` when signed out. */
-  readonly session: (headers: Headers) => Effect.Effect<Option.Option<SessionUser>, AuthError>;
+  readonly session: (headers: Headers) => Effect.Effect<Option.Option<SessionInfo>, AuthError>;
+  /**
+   * Guards the MCP gateway: verifies the bearer token (signature, issuer, audience, expiry) and
+   * calls `handler` with its user and workspace. Without a valid token it answers 401 with the
+   * RFC 9728 challenge that starts the agent's sign-in.
+   */
+  readonly protectMcp: (
+    handler: (request: Request, principal: McpPrincipal) => Promise<Response>,
+  ) => (request: Request) => Promise<Response>;
   /** Desktop sign-in, step 1: record the attempt and send the browser to Google. */
   readonly desktopStart: (
     request: DesktopStart,
@@ -30,6 +52,15 @@ export interface AuthService {
 }
 
 const decodeUser = Schema.decodeUnknownEffect(SessionUser);
+
+const decodeActiveWorkspace = Schema.decodeUnknownEffect(
+  Schema.Struct({ activeOrganizationId: Schema.optional(Schema.NullOr(Schema.String)) }),
+);
+
+const decodeMcpClaims = Schema.decodeUnknownOption(
+  Schema.Struct({ sub: Schema.NonEmptyString, [WORKSPACE_CLAIM]: Schema.NonEmptyString }),
+);
+
 const decodeRedirect = Schema.decodeUnknownPromise(Schema.Struct({ url: Schema.String }));
 
 /** better-auth as an Effect service. Tests provide `Auth.of(...)` with a fake instead of this layer. */
@@ -41,6 +72,13 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
       const pool = yield* Postgres;
       const kv = yield* Kv;
 
+      const gateway = new URL("/api/mcp", config.authUrl).href;
+
+      const agentCallbackPrefix = new URL(
+        "/eve/v1/connections/connections/callback/",
+        config.agentUrl,
+      ).href;
+
       const auth = createAuth({
         database: pool,
         kv,
@@ -51,7 +89,35 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
           clientId: config.googleClientId,
           clientSecret: Redacted.value(config.googleClientSecret),
         },
+        mcp: {
+          resource: gateway,
+          loginPage: new URL("/sign-in", config.webOrigin).href,
+          consentPage: new URL("/connections", config.webOrigin).href,
+          agentCallbackPrefix,
+        },
       });
+
+      yield* Effect.tryPromise({
+        try: async () =>
+          registerAgentClient((await auth.$context).adapter, {
+            resource: gateway,
+            agentCallbackPrefix,
+          }),
+        catch: (cause) => new AuthError({ cause }),
+      });
+
+      const protectMcp: AuthService["protectMcp"] = (handler) =>
+        requireMcpAuth(
+          auth,
+          async (request, claims) =>
+            Option.match(decodeMcpClaims(claims), {
+              // A token minted without a workspace (no consent reference) is not usable here.
+              onNone: () => Response.json({ error: "invalid_token" }, { status: 403 }),
+              onSome: (valid) =>
+                handler(request, { userId: valid.sub, workspaceId: valid[WORKSPACE_CLAIM] }),
+            }),
+          { resource: gateway },
+        );
 
       const session = Effect.fn("Auth.session")(function* (headers: Headers) {
         const result = yield* Effect.tryPromise({
@@ -65,7 +131,11 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
           Effect.mapError((cause) => new AuthError({ cause })),
         );
 
-        return Option.some(user);
+        const { activeOrganizationId } = yield* decodeActiveWorkspace(result.session).pipe(
+          Effect.mapError((cause) => new AuthError({ cause })),
+        );
+
+        return Option.some<SessionInfo>({ user, activeWorkspaceId: activeOrganizationId ?? null });
       });
 
       const handoff = makeDesktopHandoff({
@@ -112,7 +182,7 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
           Effect.tapError((error) => Effect.logError("desktop sign-in callback failed", error)),
         );
 
-      return Auth.of({ handler: auth.handler, session, desktopStart, desktopFinish });
+      return Auth.of({ handler: auth.handler, session, protectMcp, desktopStart, desktopFinish });
     }),
   ).pipe(Layer.provide([Postgres.layer, Kv.layer]));
 }

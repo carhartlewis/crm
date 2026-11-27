@@ -9,7 +9,9 @@
     "check-types": "bun check --no-script --project tsconfig.json"
   },
   "dependencies": {
+    "@better-auth/mcp": "1.7.28",
     "@crm/core": "workspace:*",
+    "@crm/integrations": "workspace:*",
     "@effect/platform-bun": "4.1.6",
     "better-auth": "1.7.28",
     "effect": "4.1.6",
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@crm/typescript-config": "workspace:*",
+    "@modelcontextprotocol/client": "2.4.0",
     "@types/bun": "1.4.5",
     "@types/pg": "8.23.1"
   }

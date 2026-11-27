@@ -18,12 +18,26 @@ async function setup() {
       workspace: [],
       member: [],
       invitation: [],
+      jwks: [],
+      oauthClient: [],
+      oauthResource: [],
+      oauthClientResource: [],
+      oauthRefreshToken: [],
+      oauthAccessToken: [],
+      oauthConsent: [],
+      oauthClientAssertion: [],
     }),
     kv,
     secret: "test-secret-test-secret-test-secret-0123",
     baseURL: "http://localhost:3000",
     trustedOrigins: ["http://localhost:3000"],
     google: { clientId: "id", clientSecret: "secret" },
+    mcp: {
+      resource: "http://localhost:3000/api/mcp",
+      loginPage: "http://localhost:3000/sign-in",
+      consentPage: "http://localhost:3000/connections",
+      agentCallbackPrefix: "http://localhost:3002/eve/v1/connections/connections/callback/",
+    },
   });
 
   const context = await auth.$context;

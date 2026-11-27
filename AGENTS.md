@@ -74,6 +74,12 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - Code-split components with `preloadable()` (`@crm/ui/lib/preloadable`), not `React.lazy`: call `.preload()` on deliberate hover, focus, or press (or when idle for keyboard-first tools like ⌘K), and it renders synchronously once loaded instead of waiting a scheduler tick. Load rarely used tools on demand.
 - ForesightJS runs with `setDataAttributes: false`: its default `data-active`/`data-status` attributes collide with component variants and TanStack Router.
 
+### Connections (ADR 0012)
+
+- `@crm/integrations` holds the catalog of connectable apps (remote MCP servers), generic MCP OAuth (`./oauth`) and the gateway (`./gateway`). Add an app with one catalog entry; never add per-app scopes or tool lists.
+- Access is `read` (tools with `readOnlyHint: true`) or `write` (all tools). OAuth always asks for every scope the server offers.
+- Upstream tokens stay in the API, encrypted. The agent reaches apps only through `/api/mcp`, with a better-auth MCP token for the `crm-agent` client; keep its eve connection file named `connections`.
+
 ### Desktop (Electron)
 
 - Preconnect to the app origin before the window exists (`session.preconnect`). Native addons stay external to the main bundle and are required through `createRequire(<app path>/package.json)`: Bun bakes `import.meta.url` and `__dirname` into the build as source paths.

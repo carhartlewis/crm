@@ -13,6 +13,7 @@
   "dependencies": {
     "@carbon/icons": "11.92.0",
     "@crm/core": "workspace:*",
+    "@crm/integrations": "workspace:*",
     "@crm/ui": "workspace:*",
     "@foresightjs/react": "1.0.0",
     "@tanstack/react-form": "1.33.6",

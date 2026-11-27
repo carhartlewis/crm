@@ -37,3 +37,11 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 **Peek**: The card that opens when you hover or focus a pinned page: what it holds, its shortcut, and the workspace's members. Its code and data load on hover, before it opens.
 
 **Workspace shell**: The signed-in frame: sidebar, title bar, the current page, ⌘K and the global shortcuts.
+
+**Integration**: An app a user can connect, such as Granola or Superhuman: one entry in the `@crm/integrations` catalog, backed by the app's remote MCP server.
+
+**Connection**: A user's link to an integration in one workspace, with an access level. Its OAuth tokens stay in the API, encrypted.
+
+**Access level**: `read` (only the app's read-only tools) or `write` (all its tools). Chosen per connection; nothing is configured per app.
+
+**Gateway**: The MCP server at `/api/mcp` that gives the agent the tools of the user's connections, named `<app>__<tool>`. better-auth MCP issues its tokens (ADR 0012).
