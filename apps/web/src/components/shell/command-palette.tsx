@@ -26,6 +26,8 @@ import { useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import { rankCommands, type Searchable } from "../../lib/command-search.ts";
 import { pageById, pageForPath, type Page } from "../../lib/pages.ts";
+import { useRecordHits } from "../../lib/record-search.ts";
+import { useOpenRecord, type RecordKind } from "../../lib/records.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
 import { sessionQuery, signOutMutation, workspacesQuery } from "../../lib/session.ts";
 import { settingsGroups, type SettingsPath } from "../../lib/settings.ts";
@@ -59,7 +61,16 @@ export interface CommandPaletteProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly userId: string;
+  readonly workspaceId: string;
 }
+
+/** Each record kind's results show under, and with the icon of, its page. */
+const recordPages = {
+  company: pageById("companies"),
+} satisfies { readonly [K in RecordKind]: Page };
+
+/** At most this many results render while typing; the rest are a narrower query away. */
+const RESULT_LIMIT = 50;
 
 /** One row of ⌘K. `id` is unique and is cmdk's value for it. */
 interface PaletteCommand extends Searchable {
@@ -100,7 +111,12 @@ function bySection(commands: readonly PaletteCommand[]) {
  * being keyboard-initiated, without animation). Workspaces come from the cache the route guards
  * filled and refresh every 30 s while it's open. The current page's commands come first.
  */
-export default function CommandPalette({ open, onOpenChange, userId }: CommandPaletteProps) {
+export default function CommandPalette({
+  open,
+  onOpenChange,
+  userId,
+  workspaceId,
+}: CommandPaletteProps) {
   const navigate = useNavigate();
   const { toggleSidebar } = useSidebar();
   const { setTheme } = useTheme();
@@ -124,6 +140,17 @@ export default function CommandPalette({ open, onOpenChange, userId }: CommandPa
   });
 
   const activeId = session?.session.activeOrganizationId;
+  const openRecord = useOpenRecord();
+
+  // Records are searched, never listed: a workspace can hold thousands.
+  const records: PaletteCommand[] = useRecordHits(workspaceId).map((hit) => ({
+    id: `${hit.kind}:${hit.id}`,
+    label: hit.label,
+    section: recordPages[hit.kind].label,
+    keywords: hit.keywords,
+    icon: recordPages[hit.kind].icon,
+    run: () => void openRecord(hit.kind, hit.id),
+  }));
 
   const commands: PaletteCommand[] = [
     ...(current
@@ -222,10 +249,11 @@ export default function CommandPalette({ open, onOpenChange, userId }: CommandPa
       open={open}
       onOpenChange={onOpenChange}
       title="Search"
-      description="Search pages and commands"
+      description="Search records, pages and commands"
     >
       <PaletteSearch
         commands={commands}
+        records={records}
         select={select}
         placeholder={
           current ? `Search ${current.label.toLowerCase()} and commands…` : "Search or jump to…"
@@ -237,20 +265,22 @@ export default function CommandPalette({ open, onOpenChange, userId }: CommandPa
 
 /**
  * The search box and results. Mounted only while the palette is open, so it opens empty. With
- * no query, commands show under their sections; with one, they show best match first
- * (`rankCommands`), each with its section, so cmdk's own filter is off.
+ * no query, commands show under their sections; with one, commands and records show best match
+ * first (`rankCommands`), each with its section, so cmdk's own filter is off.
  */
 function PaletteSearch({
   commands,
+  records,
   select,
   placeholder,
 }: {
   commands: readonly PaletteCommand[];
+  records: readonly PaletteCommand[];
   select: (command: PaletteCommand) => () => void;
   placeholder: string;
 }) {
   const [query, setQuery] = useState("");
-  const results = rankCommands(commands, query);
+  const results = rankCommands([...commands, ...records], query).slice(0, RESULT_LIMIT);
 
   const row = (command: PaletteCommand, ranges: readonly number[] | null, hint: boolean) => {
     const Icon = command.icon;

@@ -1,3 +1,4 @@
+import { createId, ID_PREFIXES } from "@crm/core/ids";
 import {
   Invalid,
   NoActiveWorkspace,
@@ -399,7 +400,7 @@ export function prismaSkillStore(db: Db): SkillStore {
 
         if (await rows.where({ workspaceId, name: skill.name }).first()) return null;
 
-        const id = crypto.randomUUID();
+        const id = createId(ID_PREFIXES.skill);
 
         await rows.create({
           id,

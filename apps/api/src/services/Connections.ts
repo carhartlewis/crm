@@ -1,3 +1,4 @@
+import { createId, ID_PREFIXES } from "@crm/core/ids";
 import {
   type CatalogEntry,
   type Connection,
@@ -539,7 +540,7 @@ export function prismaConnectionStore(db: Db): ConnectionStore {
       if (existing) return;
 
       await connections.create({
-        id: crypto.randomUUID(),
+        id: createId(ID_PREFIXES.connection),
         workspaceId,
         userId,
         integration: row.integration,
@@ -577,7 +578,7 @@ export function prismaConnectionStore(db: Db): ConnectionStore {
         if (await custom.where({ workspaceId, key: connector.key }).first()) return false;
 
         await custom.create({
-          id: crypto.randomUUID(),
+          id: createId(ID_PREFIXES.custom_connector),
           workspaceId,
           key: connector.key,
           name: connector.name,

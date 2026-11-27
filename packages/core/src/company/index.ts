@@ -1,6 +1,8 @@
 /**
  * Company rules shared by the API (writes) and the web forms (inline errors). Client-safe.
  */
+
+import { ID_PREFIXES, isRecordId } from "../ids/index.ts";
 import { normalizeWebsite } from "../workspace/index.ts";
 
 export const COMPANY_NAME_MAX = 200;
@@ -44,14 +46,13 @@ export function normalizeCompanyDomain(input: string | null): CompanyDomainResul
   return { ok: true, domain: host };
 }
 
-const UUID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/;
-
 /**
- * Company ids are client-generated lowercase UUIDs (`crypto.randomUUID()`). They are stored as
- * sent, so the optimistic row and the synced row share one key; other spellings are refused.
+ * Company ids are made in the browser (`createId("com")`) and stored as sent, so the optimistic
+ * row and the synced row share one key. Companies from before prefixes keep their lowercase
+ * UUIDs; any other spelling is refused.
  */
 export function isCompanyId(value: string) {
-  return UUID.test(value);
+  return isRecordId(ID_PREFIXES.company, value);
 }
 
 /** Field validators for forms: the error message, or `undefined` when the value is valid. */

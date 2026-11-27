@@ -1,3 +1,4 @@
+import { createId, ID_PREFIXES } from "@crm/core/ids";
 import { mutationOptions } from "@tanstack/react-query";
 import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 import { createCollection } from "@tanstack/react-db";
@@ -100,7 +101,7 @@ export const createCompanyMutation = mutationOptions({
   mutationKey: ["companies", "create"],
   mutationFn: async ({ collection, workspaceId, ownerId, input }: CreateCompany) => {
     const now = new Date().toISOString();
-    const id = crypto.randomUUID();
+    const id = createId(ID_PREFIXES.company);
 
     const transaction = collection.insert({
       id,

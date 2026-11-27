@@ -108,7 +108,7 @@ export type Company = typeof Company.Type;
 export const TxId = Schema.Struct({ txid: Schema.Number });
 
 export const CreateCompany = Schema.Struct({
-  /** Client-generated lowercase UUID (`crypto.randomUUID()`). */
+  /** Made in the browser: `createId("com")` from `@crm/core/ids` (or a UUID from before prefixes). */
   id: Schema.String,
   name: Schema.String,
   domain: Schema.NullOr(Schema.String),

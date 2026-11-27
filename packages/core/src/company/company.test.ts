@@ -1,3 +1,4 @@
+import { createId } from "../ids/index.ts";
 import { describe, expect, test } from "bun:test";
 import {
   COMPANY_NAME_MAX,
@@ -56,7 +57,9 @@ describe("normalizeCompanyDomain", () => {
 });
 
 describe("isCompanyId", () => {
-  test("accepts lowercase UUIDs only", () => {
+  test("accepts com_ ids, and the lowercase UUIDs of older companies", () => {
+    expect(isCompanyId(createId("com"))).toBe(true);
+    expect(isCompanyId(createId("ctc"))).toBe(false);
     expect(isCompanyId(crypto.randomUUID())).toBe(true);
     expect(isCompanyId(crypto.randomUUID().toUpperCase())).toBe(false);
     expect(isCompanyId("company_1")).toBe(false);

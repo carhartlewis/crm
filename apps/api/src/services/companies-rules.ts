@@ -21,7 +21,7 @@ export interface CompanyPatch {
 }
 
 export function parseCompanyId(id: string): Decision<string> {
-  return isCompanyId(id) ? { ok: true, value: id } : fail("Company id must be a lowercase UUID");
+  return isCompanyId(id) ? { ok: true, value: id } : fail("That company id is not valid");
 }
 
 export function parseNewCompany(input: {

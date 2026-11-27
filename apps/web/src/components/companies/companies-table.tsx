@@ -8,36 +8,23 @@ import {
 import { createListSearchParams } from "@crm/ui/patterns/data-table/list-search-params";
 import { DayCell, TextCell, TitleCell } from "@crm/ui/patterns/data-table/table-cells";
 import { useListTable } from "@crm/ui/patterns/data-table/use-list-table";
-import { RailFacts } from "@crm/ui/patterns/record-sheet/record-rail";
-import {
-  RecordHeader,
-  RecordRowMenu,
-  RecordSheet,
-} from "@crm/ui/patterns/record-sheet/record-sheet";
+import { RecordRowMenu } from "@crm/ui/patterns/record-sheet/record-sheet";
 import { useRecordSheetParams } from "@crm/ui/patterns/record-sheet/use-record-sheet-params";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  type Company,
-  companiesCollection,
-  deleteCompaniesMutation,
-  updateCompanyMutation,
-} from "../../lib/companies.ts";
+import { type Company, companiesCollection, deleteCompaniesMutation } from "../../lib/companies.ts";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
+import { RECORD_TABS } from "../../lib/records.ts";
 import { workspaceQuery } from "../../lib/session.ts";
 import { noPosition, type ListPosition, useListKeys } from "../records/use-list-keys.ts";
-import { CompanyForm } from "./company-form.tsx";
-import { CompanyKnowledge } from "./company-knowledge.tsx";
 
 const SEARCH_PARAMS = createListSearchParams<never, "owner">({
   defaultSort: "updatedAt",
   defaultDir: "desc",
   facetIds: ["owner"],
 });
-
-const SHEET_TABS = ["overview", "knowledge"] as const;
 
 type Column = "name" | "domain" | "owner" | "updatedAt" | "createdAt";
 
@@ -121,18 +108,12 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
 
   const { data: workspace } = useQuery(workspaceQuery(userId, workspaceId));
   const [createKind] = useCreateSheet();
-  const record = useRecordSheetParams({ recordKey: "company", tabs: SHEET_TABS });
+  const record = useRecordSheetParams({ recordKey: "company", tabs: RECORD_TABS.company });
   const [position, setPosition] = useState<ListPosition>(noPosition);
   const frame = useRef<HTMLDivElement>(null);
 
   const ownerName = (ownerId: string | null) =>
     workspace?.members.find((member) => member.userId === ownerId)?.user.name ?? null;
-
-  const update = useMutation({
-    ...updateCompanyMutation,
-    onSuccess: () => toast.success("Company saved"),
-    onError: (error) => toast.error(error.message),
-  });
 
   const remove = useMutation({
     ...deleteCompaniesMutation,
@@ -189,7 +170,7 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
     list.reveal(next.activeId);
   };
 
-  const current = rows.find((row) => row.id === record.id);
+  // The sheet itself is in the shell (CompanySheet), so it also opens from ⌘K.
   const sheetOpen = record.id !== null;
 
   useListKeys({
@@ -232,64 +213,6 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
             </BulkActionsMenu>
           ),
         }}
-      />
-      <RecordSheet
-        open={sheetOpen}
-        onClose={() => void record.close()}
-        label="Company"
-        loading={sheetOpen && !current && isLoading}
-        tab={record.tab}
-        onTabChange={(tab) => void record.setTab(tab)}
-        header={current ? <RecordHeader title={current.name} /> : null}
-        tabs={[
-          {
-            id: "overview",
-            label: "Overview",
-            content: current ? (
-              <div className="max-w-md p-4">
-                <CompanyForm
-                  // A different company starts a fresh form.
-                  key={current.id}
-                  initial={{ name: current.name, domain: current.domain }}
-                  submitLabel="Save"
-                  onSubmit={async (input) => {
-                    await update.mutateAsync({ collection, id: current.id, input });
-                  }}
-                />
-              </div>
-            ) : null,
-          },
-          {
-            id: "knowledge",
-            label: "Knowledge",
-            content: current ? (
-              <div className="p-4">
-                <CompanyKnowledge
-                  key={current.id}
-                  userId={userId}
-                  workspaceId={workspaceId}
-                  company={current}
-                />
-              </div>
-            ) : null,
-          },
-        ]}
-        rail={
-          current ? (
-            <RailFacts
-              facts={[
-                { kind: "person", label: "Owner", value: ownerName(current.owner_id) ?? "—" },
-                { kind: "property", label: "Domain", value: current.domain ?? "—" },
-                { kind: "date", label: "Created", value: <DayCell value={current.created_at} /> },
-                {
-                  kind: "date",
-                  label: "Last change",
-                  value: <DayCell value={current.updated_at} />,
-                },
-              ]}
-            />
-          ) : null
-        }
       />
     </div>
   );

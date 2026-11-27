@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createId } from "@crm/core/ids";
 import { Cause, Effect, Exit, Option, References } from "effect";
 import { authorizeWorkspace, parseCompanyPatch, parseNewCompany } from "./companies-rules.ts";
 import { type Actor, makeCompanies } from "./Companies.ts";
@@ -49,13 +50,16 @@ describe("authorizeWorkspace", () => {
 });
 
 describe("company input", () => {
-  const id = crypto.randomUUID();
+  const id = createId("com");
 
   test("normalises name and domain on create", () => {
     expect(parseNewCompany({ id, name: "  Acme  Inc ", domain: "https://www.ACME.com/x" })).toEqual(
       { ok: true, value: { id, name: "Acme Inc", domain: "acme.com" } },
     );
-    expect(parseNewCompany({ id: "not-a-uuid", name: "Acme", domain: null }).ok).toBe(false);
+    expect(parseNewCompany({ id: "not-an-id", name: "Acme", domain: null }).ok).toBe(false);
+    expect(parseNewCompany({ id: createId("ctc"), name: "Acme", domain: null }).ok).toBe(false);
+    // Companies from before prefixes keep their UUIDs.
+    expect(parseNewCompany({ id: crypto.randomUUID(), name: "Acme", domain: null }).ok).toBe(true);
     expect(parseNewCompany({ id, name: " ", domain: null }).ok).toBe(false);
     expect(parseNewCompany({ id, name: "Acme", domain: "acme" }).ok).toBe(false);
   });
@@ -70,7 +74,7 @@ describe("company input", () => {
 describe("companies", () => {
   test("create writes to the active workspace, owned by the creator, and returns the txid", async () => {
     const { companies, rows } = setup();
-    const id = crypto.randomUUID();
+    const id = createId("com");
 
     const result = await Effect.runPromise(
       companies.create(alice, { id, name: " Acme ", domain: "WWW.acme.com" }),
