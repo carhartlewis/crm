@@ -44,6 +44,11 @@ export interface AuthDependencies {
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   /** The MCP authorization server for the connections gateway (see mcp.ts). */
   mcp: McpAuthOptions;
+  /**
+   * Runs after a workspace is created, without delaying the response: the API researches its
+   * website into workspace memory. Must not throw.
+   */
+  onWorkspaceCreated?: (workspaceId: string) => void;
 }
 
 export interface GoogleClient {
@@ -104,7 +109,7 @@ async function faviconFor(images: ImageCache | undefined, website: string | unde
  * website. Name and website are re-validated here so every client gets the same rules.
  * Without an explicit logo, a workspace takes its website's logo (context.dev), else its favicon.
  */
-export function workspaces(images?: ImageCache) {
+export function workspaces(images?: ImageCache, onCreated?: (workspaceId: string) => void) {
   return organization({
     schema: workspaceSchema,
     creatorRole: "owner",
@@ -122,6 +127,9 @@ export function workspaces(images?: ImageCache) {
         }
 
         return { data };
+      },
+      afterCreateOrganization: async ({ organization: workspace }) => {
+        onCreated?.(workspace.id);
       },
       beforeUpdateOrganization: async ({ organization: changes }) => {
         const data = { ...changes, ...validWorkspaceFields(changes, false) };
@@ -296,7 +304,7 @@ export function createAuth(deps: AuthDependencies) {
       },
     },
     plugins: [
-      workspaces(deps.images),
+      workspaces(deps.images, deps.onWorkspaceCreated),
       // Desktop sign-in: system browser + loopback + PKCE (see desktop-handoff.ts).
       desktopHandoff(),
       // The agent's tokens for the connections gateway at /api/mcp.

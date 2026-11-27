@@ -11,6 +11,7 @@ import {
 } from "./companies-rules.ts";
 import { Database } from "./Database.ts";
 import { type DbTx, transactWithTxid } from "./txid.ts";
+import { Memory } from "./Memory.ts";
 
 /** Who is acting: the session user and the session's (unverified) active workspace. */
 export interface Actor {
@@ -70,8 +71,15 @@ const run = <A>(label: string, fn: () => Promise<A>) =>
     Effect.orDie,
   );
 
+/** Work that follows a committed write, off the request path (company memory, ADR 0014). */
+export interface CompanyEvents {
+  /** A company was created, or its domain changed. */
+  readonly researched?: (workspaceId: string, companyId: string) => void;
+  readonly removed?: (workspaceId: string, companyId: string) => void;
+}
+
 /** The companies use cases over an injected store. */
-export function makeCompanies(store: CompanyStore): CompaniesService {
+export function makeCompanies(store: CompanyStore, events: CompanyEvents = {}): CompaniesService {
   /** Membership check, the write and the txid all happen in one transaction. */
   const write = <E>(
     actor: Actor,
@@ -137,7 +145,15 @@ export function makeCompanies(store: CompanyStore): CompaniesService {
         await tx.insert({ ...parsed.value, workspaceId, ownerId: actor.userId });
 
         return { ok: true };
-      });
+      }).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            if (parsed.value.domain && actor.activeWorkspaceId) {
+              events.researched?.(actor.activeWorkspaceId, parsed.value.id);
+            }
+          }),
+        ),
+      );
     },
 
     update: (actor, id, input) => {
@@ -153,6 +169,14 @@ export function makeCompanies(store: CompanyStore): CompaniesService {
         (await tx.update(workspaceId, parsedId.value, patch.value))
           ? { ok: true }
           : { ok: false, error: notFound() },
+      ).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            if (patch.value.domain && actor.activeWorkspaceId) {
+              events.researched?.(actor.activeWorkspaceId, parsedId.value);
+            }
+          }),
+        ),
       );
     },
 
@@ -165,6 +189,12 @@ export function makeCompanies(store: CompanyStore): CompaniesService {
         (await tx.remove(workspaceId, parsedId.value))
           ? { ok: true }
           : { ok: false, error: notFound() },
+      ).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            if (actor.activeWorkspaceId) events.removed?.(actor.activeWorkspaceId, parsedId.value);
+          }),
+        ),
       );
     },
   };
@@ -211,7 +241,12 @@ export class Companies extends Context.Service<Companies, CompaniesService>()(
   static readonly layer = Layer.effect(
     Companies,
     Effect.gen(function* () {
-      return makeCompanies(prismaCompanyStore(yield* Database));
+      const memory = yield* Memory;
+
+      return makeCompanies(prismaCompanyStore(yield* Database), {
+        researched: (workspaceId, id) => void memory.researchCompany(workspaceId, id),
+        removed: (workspaceId, id) => void memory.companyRemoved(workspaceId, id),
+      });
     }),
-  ).pipe(Layer.provide(Database.layer));
+  ).pipe(Layer.provide([Database.layer, Memory.layer]));
 }

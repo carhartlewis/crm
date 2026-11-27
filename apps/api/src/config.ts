@@ -30,6 +30,16 @@ export const AppConfig = Config.all({
   // context.dev brand data: square logos for workspaces and connected apps. Optional; without
   // it, logos fall back to favicons.
   contextDevApiKey: Config.option(Config.Redacted("CONTEXT_DEV_API_KEY")),
+  // Supermemory: workspace and company memory (ADR 0014). Optional; without it, memory is off.
+  supermemoryApiKey: Config.option(Config.Redacted("SUPERMEMORY_API_KEY")),
+  // Separates environments that share one Supermemory account; defaults to a hash of the
+  // auth URL's origin.
+  memoryPrefix: Config.option(
+    Config.schema(
+      Schema.String.check(Schema.isPattern(/^[a-z0-9]{1,16}$/)),
+      "MEMORY_NAMESPACE_PREFIX",
+    ),
+  ),
   s3: Config.all({
     bucket: Config.String("S3_BUCKET").pipe(Config.withDefault("crm")),
     endpoint: Config.String("S3_ENDPOINT").pipe(Config.withDefault("http://127.0.0.1:59000")),

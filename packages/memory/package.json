@@ -1,0 +1,24 @@
+{
+  "name": "@crm/memory",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./supermemory": "./src/supermemory.ts",
+    "./testing": "./src/in-memory-store.ts",
+    "./jev": "./src/jev.ts",
+    "./recall": "./src/recall.ts"
+  },
+  "scripts": {
+    "check-types": "bun check --no-script --project tsconfig.json"
+  },
+  "dependencies": {
+    "supermemory": "5.1.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@crm/typescript-config": "workspace:*",
+    "@types/bun": "1.4.5"
+  }
+}

@@ -18,6 +18,7 @@ import { Auth, type McpPrincipal } from "../services/Auth.ts";
 import { Companies } from "../services/Companies.ts";
 import { type Actor, Connections } from "../services/Connections.ts";
 import { Electric } from "../services/Electric.ts";
+import { type AgentResult, Memory } from "../services/Memory.ts";
 import { Skills } from "../services/Skills.ts";
 import { AuthenticationLive } from "./Authentication.ts";
 import { clientIp, withClientIp } from "./client-ip.ts";
@@ -122,6 +123,27 @@ const SkillsHandlers = HttpApiBuilder.group(CrmApi, "skills", (handlers) =>
   }),
 );
 
+const MemoryHandlers = HttpApiBuilder.group(CrmApi, "memory", (handlers) =>
+  Effect.gen(function* () {
+    const memory = yield* Memory;
+
+    return handlers
+      .handle("workspace", () => Effect.flatMap(actor, memory.workspace))
+      .handle("company", ({ params }) =>
+        Effect.flatMap(actor, (who) => memory.company(who, params.id)),
+      )
+      .handle("addNote", ({ payload }) =>
+        Effect.flatMap(actor, (who) => memory.addNote(who, payload)),
+      )
+      .handle("research", ({ payload }) =>
+        Effect.flatMap(actor, (who) => memory.research(who, payload)),
+      )
+      .handle("forget", ({ payload }) =>
+        Effect.flatMap(actor, (who) => memory.forget(who, payload)),
+      );
+  }),
+);
+
 const ApiRoutes = HttpApiBuilder.layer(CrmApi).pipe(
   Layer.provide([
     SystemHandlers,
@@ -129,6 +151,7 @@ const ApiRoutes = HttpApiBuilder.layer(CrmApi).pipe(
     CompaniesHandlers,
     ConnectionsHandlers,
     SkillsHandlers,
+    MemoryHandlers,
   ]),
   Layer.provide(AuthenticationLive),
 );
@@ -345,8 +368,87 @@ const ConnectionRoutes = Layer.effectDiscard(
   }),
 );
 
+const Target = { companyId: Schema.optional(Schema.String) };
+
+/** Request bodies of the agent's memory endpoints. */
+const AgentBodies = {
+  recall: Schema.Struct({ query: Schema.String }),
+  search: Schema.Struct({ ...Target, query: Schema.String }),
+  remember: Schema.Struct({
+    ...Target,
+    text: Schema.String,
+    kind: Schema.Literals(["agent_fact", "email"]),
+    replaces: Schema.optional(Schema.String),
+  }),
+  forget: Schema.Struct({ ...Target, factId: Schema.String }),
+  chat: Schema.Struct({ sessionId: Schema.String, transcript: Schema.String }),
+};
+
+const agentResponse = <T>(result: AgentResult<T>) =>
+  result.ok
+    ? result.value === null
+      ? new Response(null, { status: 204, headers: { "cache-control": "no-store" } })
+      : Response.json(result.value, { headers: { "cache-control": "no-store" } })
+    : Response.json({ message: result.message }, { status: result.status });
+
+/**
+ * Memory for the eve agent (ADR 0014), with the same better-auth MCP token as the gateway. The
+ * token names the workspace; the agent never sees the memory store's key.
+ */
+const AgentMemoryRoutes = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const router = yield* HttpRouter.HttpRouter;
+    const auth = yield* Auth;
+    const memory = yield* Memory;
+
+    /** A POST endpoint whose JSON body must match `schema`. */
+    const post = <S extends Schema.Top & { readonly DecodingServices: never }>(
+      path: `/api/agent/memory/${string}`,
+      schema: S,
+      handle: (
+        caller: { userId: string; workspaceId: string },
+        body: S["Type"],
+      ) => Promise<AgentResult<unknown>>,
+    ) => {
+      const decode = Schema.decodeUnknownOption(schema);
+
+      const handler = auth.protectMcp(async (request, principal) => {
+        const body = Option.getOrNull(decode(await request.json().catch(() => null)));
+
+        if (body === null) return Response.json({ message: "Invalid request" }, { status: 400 });
+
+        return agentResponse(await handle(principal, body));
+      });
+
+      return router.add("POST", path, () => HttpEffect.fromWebHandler(handler));
+    };
+
+    yield* post("/api/agent/memory/recall", AgentBodies.recall, (caller, body) =>
+      memory.agent.recall(caller, body.query),
+    );
+    yield* post("/api/agent/memory/search", AgentBodies.search, memory.agent.search);
+    yield* post("/api/agent/memory/remember", AgentBodies.remember, memory.agent.remember);
+    yield* post("/api/agent/memory/forget", AgentBodies.forget, memory.agent.forget);
+    yield* post("/api/agent/memory/chats", AgentBodies.chat, memory.agent.saveChat);
+
+    const companies = auth.protectMcp(async (_request, principal) =>
+      agentResponse(await memory.agent.companies(principal)),
+    );
+
+    yield* router.add("GET", "/api/agent/memory/companies", () =>
+      HttpEffect.fromWebHandler(companies),
+    );
+  }),
+);
+
 /**
  * Every HTTP route, still requiring `Auth`, `Companies`, `Electric` and `Connections`. `main.ts`
  * provides the real services; tests provide fakes.
  */
-export const Routes = Layer.mergeAll(ApiRoutes, AuthRoutes, SyncRoutes, ConnectionRoutes);
+export const Routes = Layer.mergeAll(
+  ApiRoutes,
+  AuthRoutes,
+  SyncRoutes,
+  ConnectionRoutes,
+  AgentMemoryRoutes,
+);

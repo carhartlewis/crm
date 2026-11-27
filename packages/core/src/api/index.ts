@@ -309,12 +309,95 @@ export class SkillsApi extends HttpApiGroup.make("skills")
   .middleware(Authentication)
   .prefix("/skills") {}
 
+/** Where a remembered source came from (see `@crm/memory`). */
+export const MemorySourceKind = Schema.Literals([
+  "website_research",
+  "member_note",
+  "agent_fact",
+  "chat",
+  "email",
+]);
+
+/** One remembered fact. Supermemory extracts facts from sources in the background. */
+export const MemoryFact = Schema.Struct({
+  id: Schema.String,
+  text: Schema.String,
+  /** Lasting (from the profile) rather than current. */
+  isStatic: Schema.Boolean,
+  /** Supermemory inferred it from several sources rather than reading it in one. */
+  isInference: Schema.Boolean,
+  createdAt: Schema.String,
+});
+
+export type MemoryFact = typeof MemoryFact.Type;
+
+export const MemorySource = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.NullOr(MemorySourceKind),
+  title: Schema.String,
+  status: Schema.Literals(["processing", "done", "failed"]),
+  updatedAt: Schema.String,
+});
+
+export type MemorySource = typeof MemorySource.Type;
+
+/** A workspace's or a company's memory, as the Workspace knowledge page and record sheet show it. */
+export const Knowledge = Schema.Struct({
+  /** False when the API has no memory store configured. */
+  enabled: Schema.Boolean,
+  /** The lasting summary (Supermemory's profile), then everything else, newest first. */
+  profile: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String })),
+  facts: Schema.Array(MemoryFact),
+  sources: Schema.Array(MemorySource),
+});
+
+export type Knowledge = typeof Knowledge.Type;
+
+const MemoryErrors = [NotFound, NoActiveWorkspace, Invalid, UpstreamUnavailable];
+
+/** The optional company a memory call is about; without it, the workspace's own memory. */
+const MemoryTarget = { companyId: Schema.optional(Schema.String) };
+
+/**
+ * Workspace and company memory. Any member reads and writes it; the memory store's key stays
+ * in the API.
+ */
+export class MemoryApi extends HttpApiGroup.make("memory")
+  .add(
+    HttpApiEndpoint.get("workspace", "/", { success: Knowledge, error: MemoryErrors }),
+    HttpApiEndpoint.get("company", "/companies/:id", {
+      params: { id: Schema.String },
+      success: Knowledge,
+      error: MemoryErrors,
+    }),
+    /** A note in a member's own words. Facts appear once the store has read it. */
+    HttpApiEndpoint.post("addNote", "/notes", {
+      payload: Schema.Struct({ ...MemoryTarget, text: Schema.String }),
+      success: HttpApiSchema.NoContent,
+      error: MemoryErrors,
+    }),
+    /** Reads the website again (context.dev) and replaces the earlier research. */
+    HttpApiEndpoint.post("research", "/research", {
+      payload: Schema.Struct(MemoryTarget),
+      success: HttpApiSchema.NoContent,
+      error: MemoryErrors,
+    }),
+    HttpApiEndpoint.post("forget", "/forget", {
+      payload: Schema.Struct({ ...MemoryTarget, factId: Schema.String }),
+      success: HttpApiSchema.NoContent,
+      error: MemoryErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/memory") {}
+
 export class CrmApi extends HttpApi.make("crm")
   .add(SystemApi)
   .add(AccountApi)
   .add(CompaniesApi)
   .add(ConnectionsApi)
   .add(SkillsApi)
+  .add(MemoryApi)
   .prefix("/api") {}
 
 /**

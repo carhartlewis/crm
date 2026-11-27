@@ -8,6 +8,8 @@ import { Effect, Layer, Option, Schema } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 import { Auth, AuthError } from "../services/Auth.ts";
 import { Companies, makeCompanies } from "../services/Companies.ts";
+import { makeMemory, Memory } from "../services/Memory.ts";
+import { createMemoryDirectory } from "../services/memory-directory-memory.ts";
 import { createMemoryCompanyStore } from "../services/company-store-memory.ts";
 import { Electric, makeElectric } from "../services/Electric.ts";
 import { createMemorySkillStore } from "../services/skill-store-memory.ts";
@@ -233,6 +235,18 @@ const app = HttpRouter.toWebHandler(
           store: createMemorySkillStore([]).store,
           kv: createMemoryKv(),
           now: () => new Date(),
+        }),
+      ),
+      // Memory is covered in Memory.test.ts; here it is off.
+      Layer.succeed(
+        Memory,
+        makeMemory({
+          store: null,
+          researcher: null,
+          directory: createMemoryDirectory({}),
+          prefix: "test",
+          now: () => new Date(),
+          log: () => {},
         }),
       ),
       HttpServer.layerServices,

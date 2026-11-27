@@ -8,6 +8,7 @@ import type { DesktopCallback, DesktopStart } from "../http/desktop.ts";
 import { makeDesktopHandoff } from "./desktop-handoff.ts";
 import { Images } from "./Images.ts";
 import { Kv } from "./Kv.ts";
+import { Memory } from "./Memory.ts";
 import { Postgres } from "./Postgres.ts";
 
 export class AuthError extends Schema.TaggedError<AuthError>()("AuthError", {
@@ -73,6 +74,7 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
       const pool = yield* Postgres;
       const kv = yield* Kv;
       const images = yield* Images;
+      const memory = yield* Memory;
 
       const gateway = new URL("/api/mcp", config.authUrl).href;
 
@@ -98,6 +100,8 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
           consentPage: new URL("/connections", config.webOrigin).href,
           agentCallbackPrefix,
         },
+        // Researches the new workspace's website into its memory (ADR 0014).
+        onWorkspaceCreated: (workspaceId) => void memory.researchWorkspace(workspaceId),
       });
 
       yield* Effect.tryPromise({
@@ -187,5 +191,5 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
 
       return Auth.of({ handler: auth.handler, session, protectMcp, desktopStart, desktopFinish });
     }),
-  ).pipe(Layer.provide([Postgres.layer, Kv.layer, Images.layer]));
+  ).pipe(Layer.provide([Postgres.layer, Kv.layer, Images.layer, Memory.layer]));
 }

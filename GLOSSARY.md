@@ -38,7 +38,7 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Onboarding shell**: The full-window layout for sign-in, setup and route-level states: shader backdrop, app mark, title, content.
 
-**Pinned pages**: The workspace's top-level pages in the sidebar: Companies, Contacts, Workflows, Connections. Each user orders them by dragging; ⌥1–⌥9 open them in that order.
+**Pinned pages**: The workspace's top-level pages in the sidebar: Companies, Contacts, Workflows, Workspace knowledge, Connections. Each user orders them by dragging; ⌥1–⌥9 open them in that order.
 
 **Peek**: The card that opens when you hover or focus a pinned page: what it holds, its shortcut, and the workspace's members. Its code and data load on hover, before it opens.
 
@@ -55,3 +55,13 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 **Skill**: Instructions the agent loads when they apply, shared by everyone in a workspace. Copied from skills.sh or written in the CRM; starts disabled until a member reads and enables it (ADR 0013).
 
 **Custom connector**: A remote MCP server a workspace added by URL. It must support MCP OAuth; it then works like a built-in integration (ADR 0013).
+
+**Memory**: What the CRM remembers about a subject: the workspace's own company, or one company record. Stored in Supermemory, one namespace per subject (ADR 0014).
+
+**Source**: A document memory reads facts from: website research, a member's note, a chat, a sent email, or a fact the assistant saved. Each has a stable id, so saving it again replaces it.
+
+**Fact**: One statement Supermemory extracted from sources. Members can forget a wrong fact; a newer fact can replace an older one.
+
+**Workspace knowledge**: The page that shows the workspace's own memory. A company's memory is on its Knowledge tab.
+
+**Jev**: The decision model (`typesafe-ai/jev` on the Vercel AI Gateway) that judges each chat message and sent email: sensitive, lasting, which company, already known, or a correction. Thresholds in `@crm/memory/jev` decide what is kept.

@@ -96,6 +96,13 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - Logos for apps and workspaces come from context.dev by domain and are copied into our storage (`ImageCache.logo`); the favicon is the fallback. Never hotlink or bundle vendor logos.
 - Upstream tokens stay in the API, encrypted. The agent reaches apps only through `/api/mcp`, with a better-auth MCP token for the `crm-agent` client; keep its eve connection file named `connections`.
 
+### Memory (ADR 0014)
+
+- `@crm/memory` (server-only) holds the memory store interface, the Supermemory adapter, Jev's questions and thresholds, and the recall format. Tests use `createInMemoryStore` from `@crm/memory/testing`.
+- One Supermemory namespace per workspace and per company (`memoryNamespace`). The API's `Memory` service is the only writer; it checks membership and keeps `SUPERMEMORY_API_KEY`. Members use `/api/memory/*`, the agent `/api/agent/memory/*` with its MCP token.
+- New workspaces and companies with a domain are researched through context.dev (`@crm/core/brand` `research`) into one `website-research` source.
+- The agent's `crm` memory slot recalls before each turn, saves every chat, and asks Jev (`experimental_decide`, `typesafe-ai/jev` on the AI Gateway, `AI_GATEWAY_API_KEY`) which messages and sent emails become facts. Judging stays in the agent. Keep the member's words; never summarise them into a fact.
+
 ### Desktop (Electron)
 
 - Preconnect to the app origin before the window exists (`session.preconnect`). Native addons stay external to the main bundle and are required through `createRequire(<app path>/package.json)`: Bun bakes `import.meta.url` and `__dirname` into the build as source paths.

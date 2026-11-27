@@ -22,6 +22,7 @@
       "dependencies": {
         "@crm/core": "workspace:*",
         "@crm/integrations": "workspace:*",
+        "@crm/memory": "workspace:*",
         "@modelcontextprotocol/client": "2.4.0",
         "ai": "7.0.183",
         "effect": "4.1.6",
@@ -42,6 +43,7 @@
         "@better-auth/mcp": "1.7.28",
         "@crm/core": "workspace:*",
         "@crm/integrations": "workspace:*",
+        "@crm/memory": "workspace:*",
         "@effect/platform-bun": "4.1.6",
         "better-auth": "1.7.28",
         "effect": "4.1.6",
@@ -141,6 +143,18 @@
       "dependencies": {
         "@modelcontextprotocol/client": "2.4.0",
         "@modelcontextprotocol/server": "2.4.0",
+        "zod": "4.6.7",
+      },
+      "devDependencies": {
+        "@crm/typescript-config": "workspace:*",
+        "@types/bun": "1.4.5",
+      },
+    },
+    "packages/memory": {
+      "name": "@crm/memory",
+      "version": "0.0.0",
+      "dependencies": {
+        "supermemory": "5.1.2",
         "zod": "4.6.7",
       },
       "devDependencies": {
@@ -334,6 +348,8 @@
     "@crm/desktop": ["@crm/desktop@workspace:apps/desktop"],
 
     "@crm/integrations": ["@crm/integrations@workspace:packages/integrations"],
+
+    "@crm/memory": ["@crm/memory@workspace:packages/memory"],
 
     "@crm/typescript-config": ["@crm/typescript-config@workspace:packages/typescript-config"],
 
@@ -1612,6 +1628,8 @@
     "stubborn-utils": ["stubborn-utils@1.0.2", "", {}, "sha512-zOh9jPYI+xrNOyisSelgym4tolKTJCQd5GBhK0+0xJvcYDcwlOoxF/rnFKQ2KRZknXSG9jWAp66fwP6AxN9STg=="],
 
     "sumchecker": ["sumchecker@3.0.1", "", { "dependencies": { "debug": "^4.1.0" } }, "sha512-MvjXzkz/BOfyVDkG0oFOtBxHX2u3gKbMHIF/dXblZsgD3BWOFLmHovIpZY7BykJdAjcqRCBi1WYBNdEC9yI7vg=="],
+
+    "supermemory": ["supermemory@5.1.2", "", { "bin": { "supermemory": "bin/cli.mjs" } }, "sha512-dUVDfciBjUpjJ17l01IvWRuNRicUvfSMrtmi9+YDLTQ04yoVdiA+fQNdEu2uKYTWqWf3LsbBH1N3MUDTpSHOMA=="],
 
     "systeminformation": ["systeminformation@5.33.26", "", { "os": "!aix", "bin": { "systeminformation": "lib/cli.js" } }, "sha512-/AfmkcUh5/Zgul9vJgTzRqdyeeAkkZM857cXkN1CLzdj3gVvdij9EICcNcl3/nMGsr3A2uRvPmpCy2YX1A9uiQ=="],
 

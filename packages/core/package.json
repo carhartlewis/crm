@@ -15,7 +15,8 @@
     "./desktop": "./src/desktop/index.ts",
     "./workspace": "./src/workspace/index.ts",
     "./company": "./src/company/index.ts",
-    "./auth/desktop-handoff": "./src/auth/desktop-handoff.ts"
+    "./auth/desktop-handoff": "./src/auth/desktop-handoff.ts",
+    "./memory": "./src/memory/index.ts"
   },
   "scripts": {
     "check-types": "bun check --no-script --project tsconfig.json",

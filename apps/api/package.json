@@ -12,6 +12,7 @@
     "@better-auth/mcp": "1.7.28",
     "@crm/core": "workspace:*",
     "@crm/integrations": "workspace:*",
+    "@crm/memory": "workspace:*",
     "@effect/platform-bun": "4.1.6",
     "better-auth": "1.7.28",
     "effect": "4.1.6",
