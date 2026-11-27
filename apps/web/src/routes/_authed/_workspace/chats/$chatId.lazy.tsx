@@ -21,6 +21,7 @@ import { useChats } from "../../../../components/chat/use-chats.ts";
 import { WorkspacePageHeader } from "../../../../components/shell/page-header.tsx";
 import { peekFirstMessage } from "../../../../lib/chat-api.ts";
 import { updateChatMutation } from "../../../../lib/chats.ts";
+import { rememberPermissionMode } from "../../../../lib/permission-mode.ts";
 import { chatTitleError, folderNameError } from "@crm/core/chat";
 import { useMutation } from "@tanstack/react-query";
 
@@ -78,9 +79,11 @@ function ChatPage() {
         chatId={chatId}
         userId={userId}
         permissionMode={chat?.permission_mode ?? "manual"}
-        onPermissionModeChange={(mode) =>
-          rename.mutate({ workspaceId, id: chatId, permissionMode: mode })
-        }
+        onPermissionModeChange={(mode) => {
+          // The mode picked last is also where the next new chat starts.
+          rememberPermissionMode(userId, mode);
+          rename.mutate({ workspaceId, id: chatId, permissionMode: mode });
+        }}
         history={history}
         firstMessage={peekFirstMessage(chatId)}
       />

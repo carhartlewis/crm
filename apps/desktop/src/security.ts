@@ -34,7 +34,7 @@ export function contentSecurityPolicy(dev: boolean) {
       ? "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com http://127.0.0.1:59000"
       : "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
     "font-src 'self'",
-    dev ? "connect-src 'self' ws://localhost:*" : "connect-src 'self'",
+    dev ? "connect-src 'self' ws://localhost:* wss://localhost:*" : "connect-src 'self'",
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'none'",

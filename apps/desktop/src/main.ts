@@ -16,7 +16,7 @@ import { createHaptics, nativeHaptics } from "./haptics.ts";
 import { startLoopback } from "./loopback.ts";
 import { contentSecurityPolicy, isAllowedExternal, isAppUrl } from "./security.ts";
 
-const WEB_URL = new URL(process.env["CRM_WEB_URL"] ?? "http://localhost:3000");
+const WEB_URL = new URL(process.env["CRM_WEB_URL"] ?? "https://localhost:3000");
 const API_URL = new URL(process.env["CRM_API_URL"] ?? "http://localhost:3001");
 const CSP = contentSecurityPolicy(!app.isPackaged);
 

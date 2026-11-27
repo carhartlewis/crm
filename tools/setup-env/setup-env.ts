@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -16,6 +16,8 @@ export interface EnvFile {
   generate?: readonly string[];
   /** Keys a person must provide, with instructions. */
   required?: Readonly<Record<string, string>>;
+  /** Old defaults replaced with new ones. Only the exact old value changes. */
+  upgrade?: Readonly<Record<string, { from: string; to: string }>>;
 }
 
 export const ENV_FILES: readonly EnvFile[] = [
@@ -23,6 +25,8 @@ export const ENV_FILES: readonly EnvFile[] = [
   {
     dir: "apps/api",
     generate: ["BETTER_AUTH_SECRET"],
+    // The dev server moved to HTTPS with HTTP/2 (apps/web/src/dev-tls.ts).
+    upgrade: { WEB_ORIGIN: { from: "http://localhost:3000", to: "https://localhost:3000" } },
     required: {
       GOOGLE_CLIENT_ID:
         "Google OAuth client (Web application) from https://console.cloud.google.com/auth/clients — redirect URI http://localhost:3001/api/auth/callback/google",
@@ -42,6 +46,7 @@ function unquote(value: string) {
 export interface SetupResult {
   created: string[];
   generated: string[];
+  upgraded: string[];
   missing: string[];
 }
 
@@ -50,7 +55,7 @@ export function setupEnv(
   files: readonly EnvFile[] = ENV_FILES,
   secret = () => randomBytes(32).toString("base64"),
 ) {
-  const result: SetupResult = { created: [], generated: [], missing: [] };
+  const result: SetupResult = { created: [], generated: [], upgraded: [], missing: [] };
 
   for (const file of files) {
     const envPath = join(root, file.dir, ".env");
@@ -81,6 +86,15 @@ export function setupEnv(
         return `${key}="${generated}"`;
       }
 
+      const upgrade = file.upgrade?.[key];
+
+      if (upgrade && value === upgrade.from) {
+        values.set(key, upgrade.to);
+        result.upgraded.push(`${file.dir}/.env ${key}`);
+
+        return `${key}="${upgrade.to}"`;
+      }
+
       values.set(key, value);
 
       return line;
@@ -96,12 +110,61 @@ export function setupEnv(
   return result;
 }
 
+/** Runs a command and reports whether it succeeded. */
+export type Run = (command: string[]) => boolean;
+
+const MKCERT_HELP =
+  "  mkcert (local HTTPS for the dev server's HTTP/2)\n      brew install mkcert && mkcert -install";
+
+/**
+ * Makes `.certs/localhost.pem` with mkcert when it is missing. The dev server needs it for
+ * HTTP/2: over HTTP/1.1 the browser's six connections per host are all held by sync streams.
+ * Returns what a person must do, if anything.
+ */
+export function ensureDevCert(root: string, run: Run): string | null {
+  const dir = join(root, ".certs");
+  const cert = join(dir, "localhost.pem");
+  const key = join(dir, "localhost-key.pem");
+
+  if (existsSync(cert) && existsSync(key)) return null;
+
+  mkdirSync(dir, { recursive: true });
+
+  const made = run([
+    "mkcert",
+    "-cert-file",
+    cert,
+    "-key-file",
+    key,
+    "localhost",
+    "127.0.0.1",
+    "::1",
+  ]);
+
+  return made ? null : MKCERT_HELP;
+}
+
+const runCommand: Run = (command) => {
+  try {
+    return Bun.spawnSync(command, { stdout: "ignore", stderr: "inherit" }).success;
+  } catch {
+    // Not installed.
+    return false;
+  }
+};
+
 if (import.meta.main) {
-  const result = setupEnv(join(import.meta.dir, "..", ".."));
+  const root = join(import.meta.dir, "..", "..");
+  const result = setupEnv(root);
+  const cert = ensureDevCert(root, runCommand);
+
+  if (cert) result.missing.push(cert);
 
   for (const path of result.created) console.log(`setup:env: created ${path} from .env.example`);
 
   for (const entry of result.generated) console.log(`setup:env: generated ${entry}`);
+
+  for (const entry of result.upgraded) console.log(`setup:env: upgraded ${entry}`);
 
   if (result.missing.length > 0) {
     console.error(

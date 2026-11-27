@@ -9,7 +9,8 @@
     },
     "dev": {
       "with": ["@crm/api#dev", "@crm/web#routes:watch", "@crm/agent#dev"],
-      "env": ["RENDERER", "PORT", "CRM_API_URL"]
+      "env": ["RENDERER", "PORT", "CRM_API_URL"],
+      "dependsOn": ["//#setup:env"]
     },
     "routes": {
       "inputs": ["src/routes/**", "tsr.config.json"],

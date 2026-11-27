@@ -1,4 +1,5 @@
 import index from "../index.html";
+import { devCert, serveHttp2Front } from "./dev-tls.ts";
 
 const API_ORIGIN = new URL(Bun.env["CRM_API_URL"] ?? "http://localhost:3001");
 
@@ -41,14 +42,24 @@ async function proxyApi(request: Request, server: Bun.Server<undefined>) {
   }
 }
 
+const PORT = Number(Bun.env["PORT"] ?? 3000);
+const cert = devCert();
+
 // Bun full-stack dev server: bundles index.html on demand using the plugins in bunfig.toml.
-// Every other path serves the SPA; TanStack Router takes over.
+// Every other path serves the SPA; TanStack Router takes over. With a local certificate it
+// listens on a private port behind the HTTP/2 front (dev-tls.ts).
 const server = Bun.serve({
-  port: Number(Bun.env["PORT"] ?? 3000),
+  ...(cert ? { hostname: "127.0.0.1", port: 0 } : { port: PORT }),
   routes: { "/api/*": proxyApi, "/*": index },
   // HMR needs patches/@tanstack%2Frouter-core (a circular import Bun's HMR registry
   // evaluates before its bindings exist). Drop the patch once fixed upstream.
   development: { hmr: true, console: true },
 });
 
-console.log(`web: ${server.url} (api → ${API_ORIGIN.origin})`);
+const front = cert ? serveHttp2Front({ port: PORT, cert, inner: server.url }) : null;
+
+if (!front) {
+  console.warn("web: no .certs/localhost.pem; HTTP/1.1 holds 6 connections (run setup:env)");
+}
+
+console.log(`web: ${front?.url ?? server.url} (api → ${API_ORIGIN.origin})`);
