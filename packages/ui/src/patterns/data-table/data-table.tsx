@@ -809,20 +809,18 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
         <div
           aria-hidden={selecting}
           className={cn(
-            "col-start-1 row-start-1 flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between",
+            "col-start-1 row-start-1 flex flex-col gap-2 @4xl:flex-row @4xl:flex-wrap @4xl:items-center @4xl:justify-between",
             selecting && "invisible",
           )}
           inert={selecting}
         >
           {lead}
-          {search != null && (
-            <div className="hidden @2xl:block lg:order-last lg:ml-auto">{search}</div>
-          )}
+          {search != null && <div className="wide-slot @4xl:order-last @4xl:ml-auto">{search}</div>}
           {hasFilterControls && (
             <Button
               type="button"
               variant="outline"
-              className="w-full justify-between sm:hidden"
+              className="narrow-only w-full justify-between"
               aria-expanded={filtersOpen}
               aria-controls={filtersId}
               onClick={() => setFiltersOpen((open) => !open)}
@@ -844,14 +842,14 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
           )}
           <div
             id={filtersId}
-            className={cn("flex-col gap-2 lg:contents", filtersOpen ? "flex" : "hidden sm:flex")}
+            className={cn("flex flex-col gap-2 @4xl:contents", !filtersOpen && "wide-only")}
           >
             {leadingActions}
 
             {quiet ? (
               actions
             ) : (
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <div className="grid grid-cols-1 gap-2 @2xl:flex @2xl:flex-wrap @2xl:items-center">
                 {tabs && (
                   <DropdownMenu>
                     <DropdownMenuTrigger
@@ -859,7 +857,7 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
                         <Button
                           type="button"
                           variant="outline"
-                          className="justify-start sm:justify-center"
+                          className="justify-start @2xl:justify-center"
                         />
                       }
                     >
@@ -893,7 +891,7 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
-                        <Button variant="outline" className="justify-start sm:justify-center" />
+                        <Button variant="outline" className="justify-start @2xl:justify-center" />
                       }
                     >
                       <Catalog data-icon="inline-start" />
@@ -921,7 +919,7 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
-                        <Button variant="outline" className="justify-start sm:justify-center" />
+                        <Button variant="outline" className="justify-start @2xl:justify-center" />
                       }
                     >
                       <Filter data-icon="inline-start" />
@@ -947,7 +945,7 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
-                        <Button variant="outline" className="justify-start sm:justify-center" />
+                        <Button variant="outline" className="justify-start @2xl:justify-center" />
                       }
                     >
                       <ArrowsVertical data-icon="inline-start" />

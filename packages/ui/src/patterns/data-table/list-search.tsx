@@ -29,7 +29,8 @@ const SEARCH_DELAY_MS = 250;
 
 /**
  * The search field. Hidden where its container (the table, or the toolbar holding it) is narrower
- * than 42rem: the viewport can't tell, since the sidebar takes part of it. Wrappers hide too.
+ * than 42rem: the viewport can't tell, since the sidebar takes part of it. It fades as it comes
+ * and goes (`wide-only`); wrappers use `wide-slot` so they leave the layout after the fade.
  */
 export function ListSearch({ placeholder, scope }: { placeholder: string; scope?: string }) {
   const [{ q }, setState] = useQueryStates(searchParsers, {
@@ -38,7 +39,7 @@ export function ListSearch({ placeholder, scope }: { placeholder: string; scope?
   });
 
   return (
-    <div className="hidden @2xl:block @2xl:w-64">
+    <div className="wide-only @2xl:w-64">
       <InputGroup>
         <InputGroupAddon>
           <SearchIcon />

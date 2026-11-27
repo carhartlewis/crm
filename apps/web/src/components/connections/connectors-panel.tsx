@@ -7,6 +7,7 @@ import { desktopBridge } from "@crm/core/desktop";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Card } from "@crm/ui/components/card";
+import { CardGrid } from "@crm/ui/patterns/card-grid";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -97,7 +98,7 @@ export function ConnectorsPanel({
             : "Nothing connected yet. Connect an app from Discover."}
         </p>
       ) : (
-        <div className="grid grid-cols-cards gap-3">
+        <CardGrid>
           {shown.map((integration) => (
             <IntegrationCard
               key={integration.id}
@@ -108,7 +109,7 @@ export function ConnectorsPanel({
               connection={byIntegration.get(integration.id)}
             />
           ))}
-        </div>
+        </CardGrid>
       )}
     </section>
   );

@@ -10,6 +10,7 @@
     "./hooks/*": "./src/hooks/*.ts",
     "./lib/*": "./src/lib/*.ts",
     "./patterns/adaptive-sheet": "./src/patterns/adaptive-sheet.tsx",
+    "./patterns/card-grid": "./src/patterns/card-grid.tsx",
     "./patterns/close-glyph": "./src/patterns/close-glyph.tsx",
     "./patterns/data-table/bulk-actions": "./src/patterns/data-table/bulk-actions.tsx",
     "./patterns/data-table/bulk-result": "./src/patterns/data-table/bulk-result.ts",

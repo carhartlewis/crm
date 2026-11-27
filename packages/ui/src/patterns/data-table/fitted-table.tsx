@@ -54,7 +54,7 @@ export function FittedTable<TRow>({
     <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-3">
       {action ? (
         <div className="flex min-w-0 items-center gap-2">
-          <div className="hidden min-w-0 flex-1 @2xl:block">
+          <div className="wide-slot min-w-0 flex-1">
             <ListSearch placeholder={searchPlaceholder} scope={scope} />
           </div>
           {action}

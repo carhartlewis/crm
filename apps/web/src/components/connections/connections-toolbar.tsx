@@ -8,7 +8,7 @@ export function ConnectionsToolbar({ tabs, search }: ConnectionsToolbarParts) {
   return (
     <div className="@container flex flex-wrap items-center gap-3">
       {tabs}
-      <div className="hidden @2xl:ml-auto @2xl:block">{search}</div>
+      <div className="wide-slot @2xl:ml-auto">{search}</div>
     </div>
   );
 }

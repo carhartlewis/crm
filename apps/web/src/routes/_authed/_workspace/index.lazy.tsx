@@ -1,5 +1,6 @@
 import { Card, CardDescription, CardHeader, CardTitle } from "@crm/ui/components/card";
 import { Kbd, KbdGroup } from "@crm/ui/components/kbd";
+import { CardGrid } from "@crm/ui/patterns/card-grid";
 import {
   PageShell,
   PageShellActions,
@@ -43,39 +44,41 @@ function Home() {
         </PageShellActions>
       </WorkspacePageHeader>
       <PageShellContent>
-        <div className="animate-enter enter-delay-1 grid grid-cols-cards gap-3">
-          {order.map((id, index) => {
-            const page = pageById(id);
-            const PageIcon = page.icon;
-            const shortcut = pinnedShortcut(index);
+        <div className="animate-enter enter-delay-1">
+          <CardGrid>
+            {order.map((id, index) => {
+              const page = pageById(id);
+              const PageIcon = page.icon;
+              const shortcut = pinnedShortcut(index);
 
-            return (
-              <Link
-                key={id}
-                to={page.to}
-                className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Card className="h-full">
-                  <CardHeader>
-                    <CardTitle>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <PageIcon className="shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 truncate">{page.label}</span>
-                        {shortcut && (
-                          <KbdGroup className="ml-auto shrink-0">
-                            {shortcutKeys(shortcut).map((key) => (
-                              <Kbd key={key}>{key}</Kbd>
-                            ))}
-                          </KbdGroup>
-                        )}
-                      </span>
-                    </CardTitle>
-                    <CardDescription>{page.description}</CardDescription>
-                  </CardHeader>
-                </Card>
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={id}
+                  to={page.to}
+                  className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Card className="h-full">
+                    <CardHeader>
+                      <CardTitle>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <PageIcon className="shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 truncate">{page.label}</span>
+                          {shortcut && (
+                            <KbdGroup className="ml-auto shrink-0">
+                              {shortcutKeys(shortcut).map((key) => (
+                                <Kbd key={key}>{key}</Kbd>
+                              ))}
+                            </KbdGroup>
+                          )}
+                        </span>
+                      </CardTitle>
+                      <CardDescription>{page.description}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              );
+            })}
+          </CardGrid>
         </div>
       </PageShellContent>
     </PageShell>
