@@ -171,6 +171,7 @@ const FakeConnections = Layer.succeed(
     page: new URL("http://web.test/connections"),
     now: () => new Date("2026-11-26T12:00:00Z"),
     state: () => `state_${++states}`,
+    logo: async (website) => `https://storage.test/logos/${new URL(website).hostname}`,
   }),
 );
 
@@ -338,6 +339,16 @@ describe("connections", () => {
     expect(decodeAccess(await updated.json()).access).toBe("write");
     expect((await send("DELETE", "/api/connections/granola", member)).status).toBe(204);
     expect((await send("DELETE", "/api/connections/granola", member)).status).toBe(404);
+  });
+
+  test("serves each app's stored logo, and needs a workspace", async () => {
+    const response = await get("/api/connections/logos", member);
+
+    expect(await response.json()).toEqual({
+      granola: "https://storage.test/logos/granola.ai",
+      superhuman: "https://storage.test/logos/superhuman.com",
+    });
+    expect((await get("/api/connections/logos", "session=valid")).status).toBe(403);
   });
 
   test("serves the Client ID Metadata Document", async () => {

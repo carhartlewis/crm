@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { connectionsQuery } from "../../../lib/connections.ts";
+import { connectionLogosQuery, connectionsQuery } from "../../../lib/connections.ts";
 import { skillsQuery } from "../../../lib/skills.ts";
 
 /** What an app's sign-in returned with. Set only by the API's OAuth callback redirect. */
@@ -44,6 +44,9 @@ export const Route = createFileRoute("/_authed/_workspace/connections")({
   },
   loader: ({ context: { queryClient, session } }) => {
     const workspaceId = session.session.activeOrganizationId ?? "";
+
+    // Logos may need a first fetch from context.dev: start it, but don't wait for it.
+    void queryClient.prefetchQuery(connectionLogosQuery(session.user.id, workspaceId));
 
     return Promise.all([
       queryClient.fetchQuery(connectionsQuery(session.user.id, workspaceId)),

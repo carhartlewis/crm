@@ -38,7 +38,7 @@ export interface AuthDependencies {
   trustedOrigins: string[];
   /** Google OAuth client. Sign-in is Google-only; accounts are created on first sign-in. */
   google: GoogleClient;
-  /** Copies profile pictures and workspace favicons into storage. Omit to keep remote URLs. */
+  /** Copies profile pictures and workspace logos into storage. Omit to keep remote URLs. */
   images?: ImageCache;
   /** The MCP authorization server for the connections gateway (see mcp.ts). */
   mcp: McpAuthOptions;
@@ -90,17 +90,17 @@ function validWorkspaceFields(
   return fields;
 }
 
-/** The website's favicon URL in storage, or `undefined` when it can't be fetched. */
+/** The website's logo (or favicon) URL in storage, or `undefined` when it can't be fetched. */
 async function faviconFor(images: ImageCache | undefined, website: string | undefined) {
   if (!images || !website) return undefined;
 
-  return images.favicon(website).catch(() => undefined);
+  return images.logo(website).catch(() => undefined);
 }
 
 /**
  * Workspaces are better-auth organizations, stored in the `workspace` table with a required
  * website. Name and website are re-validated here so every client gets the same rules.
- * Without an explicit logo, a workspace takes its website's favicon.
+ * Without an explicit logo, a workspace takes its website's logo (context.dev), else its favicon.
  */
 export function workspaces(images?: ImageCache) {
   return organization({
@@ -124,7 +124,7 @@ export function workspaces(images?: ImageCache) {
       beforeUpdateOrganization: async ({ organization: changes }) => {
         const data = { ...changes, ...validWorkspaceFields(changes, false) };
 
-        // A new website brings its own favicon, unless this update also sets a logo.
+        // A new website brings its own logo, unless this update also sets one.
         if (data.logo === undefined) {
           const logo = await faviconFor(images, data.website);
 
@@ -165,7 +165,7 @@ export async function cacheSignInImages(
 
   if (!workspace || workspace.logo || !workspace.website) return;
 
-  const logo = await images.favicon(workspace.website);
+  const logo = await images.logo(workspace.website);
 
   if (logo) {
     await context.adapter.update({

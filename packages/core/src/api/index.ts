@@ -160,6 +160,11 @@ export class ConnectionsApi extends HttpApiGroup.make("connections")
       success: Schema.Array(Connection),
       error: ConnectionErrors,
     }),
+    /** Each catalog app's logo in our storage (context.dev, else its favicon), by app id. */
+    HttpApiEndpoint.get("logos", "/logos", {
+      success: Schema.Record(Schema.String, Schema.NullOr(Schema.String)),
+      error: ConnectionErrors,
+    }),
     /** Starts OAuth with the app; send the browser to `url`. The callback saves the connection. */
     HttpApiEndpoint.post("authorize", "/:integration/authorize", {
       params: { integration: Schema.String },

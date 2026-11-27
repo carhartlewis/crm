@@ -126,6 +126,7 @@ const FakeConnections = Layer.succeed(
     page: new URL("http://web.test/connections"),
     now: () => new Date(),
     state: () => "state",
+    logo: async () => null,
   }),
 );
 

@@ -17,6 +17,14 @@ export const connectionKeys = {
     [...connectionKeys.all, userId, workspaceId] as const,
 };
 
+/** Each app's logo URL in our storage, by app id. Logos change rarely: fresh for an hour. */
+export const connectionLogosQuery = (userId: string, workspaceId: string) =>
+  queryOptions({
+    queryKey: [...connectionKeys.list(userId, workspaceId), "logos"] as const,
+    queryFn: () => request<Readonly<Record<string, string | null>>>("/api/connections/logos"),
+    staleTime: 60 * 60 * 1000,
+  });
+
 export const connectionsQuery = (userId: string, workspaceId: string) =>
   queryOptions({
     queryKey: connectionKeys.list(userId, workspaceId),

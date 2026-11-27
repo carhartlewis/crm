@@ -3,6 +3,11 @@ import type { Storage } from "./types.ts";
 export interface ImageCacheDependencies {
   storage: Storage;
   fetch?: (url: string, init: { signal: AbortSignal }) => Promise<Response>;
+  /**
+   * Square logo URLs for a domain, best first (`createContextDev` from `@crm/core/brand`).
+   * Without it, `logo` falls back to the favicon.
+   */
+  logoSources?: (domain: string) => Promise<readonly string[]>;
   /** Per-download limit, so a slow host can't hold up sign-in. */
   timeoutMs?: number;
   maxBytes?: number;
@@ -15,6 +20,11 @@ export interface ImageCache {
   avatar(userId: string, source: string): Promise<string | null>;
   /** Copies a website's favicon, shared by every workspace on that host. */
   favicon(website: string): Promise<string | null>;
+  /**
+   * Copies a company's square logo (context.dev), or its favicon when there is none. Stored per
+   * host, so workspaces and connected apps on the same domain share it.
+   */
+  logo(website: string): Promise<string | null>;
 }
 
 /**
@@ -25,6 +35,7 @@ export interface ImageCache {
 export function createImageCache({
   storage,
   fetch: fetchImpl = fetch,
+  logoSources,
   timeoutMs = 5000,
   maxBytes = 1024 * 1024,
 }: ImageCacheDependencies): ImageCache {
@@ -53,6 +64,21 @@ export function createImageCache({
       const host = websiteHost(website);
 
       return copy(`favicons/${host}`, host && faviconSource(host));
+    },
+    logo: async (website) => {
+      const host = websiteHost(website);
+
+      if (!host) return null;
+
+      // An SVG or a dead link fails the copy; try the next candidate (at most three).
+      for (const source of ((await logoSources?.(host)) ?? []).slice(0, 3)) {
+        // oxlint-disable-next-line no-await-in-loop -- stop at the first logo that stores.
+        const stored = await copy(`logos/${host}`, source).catch(() => null);
+
+        if (stored) return stored;
+      }
+
+      return copy(`favicons/${host}`, faviconSource(host));
     },
   };
 }

@@ -140,3 +140,53 @@ describe("image cache", () => {
     expect(avatarSource("not a url")).toBeNull();
   });
 });
+
+describe("image cache logos", () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+  const svg = new TextEncoder().encode("<svg onload=alert(1)></svg>");
+
+  function setup(sources: readonly string[]) {
+    const storage = createMemoryStorage();
+    const fetched: string[] = [];
+
+    const images = createImageCache({
+      storage,
+      logoSources: async () => sources,
+      fetch: async (url) => {
+        fetched.push(url);
+
+        if (url.endsWith(".svg")) return new Response(svg);
+
+        if (url.includes("favicons")) return new Response(png);
+
+        return url.endsWith("good.png") ? new Response(png) : new Response(null, { status: 404 });
+      },
+    });
+
+    return { images, fetched };
+  }
+
+  test("stores the first raster logo, skipping SVGs and dead links", async () => {
+    const { images, fetched } = setup([
+      "https://media.test/icon.svg",
+      "https://media.test/gone.png",
+      "https://media.test/good.png",
+    ]);
+
+    const url = await images.logo("https://www.acme.com/about");
+
+    expect(url).toContain("logos/www.acme.com");
+    expect(fetched).toEqual([
+      "https://media.test/icon.svg",
+      "https://media.test/gone.png",
+      "https://media.test/good.png",
+    ]);
+  });
+
+  test("falls back to the favicon when no logo stores", async () => {
+    const { images } = setup(["https://media.test/icon.svg"]);
+
+    expect(await images.logo("https://acme.com")).toContain("favicons/acme.com");
+    expect(await images.logo("not a url")).toBeNull();
+  });
+});

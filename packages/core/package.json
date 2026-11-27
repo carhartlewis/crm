@@ -8,6 +8,7 @@
     "./auth": "./src/auth/server.ts",
     "./auth/client": "./src/auth/client.ts",
     "./auth/mcp": "./src/auth/mcp.ts",
+    "./brand": "./src/brand/index.ts",
     "./db": "./src/prisma/db.ts",
     "./kv": "./src/kv/index.ts",
     "./storage": "./src/storage/index.ts",

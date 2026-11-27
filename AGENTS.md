@@ -43,7 +43,7 @@ A desktop-first CRM. Optimise for keyboard and mouse first; touch must work but 
 - `apps/desktop`: Electron shell. It loads the web app and adds a small preload bridge (`@crm/core/desktop`). Run with `turbo dev --filter=@crm/desktop` (web and API start alongside via `with`).
 - `apps/agent`: Eve agent that powers AI chat. Read `node_modules/eve/docs/README.md` before writing Eve code.
 - `packages/ui`: shared shadcn/ui components (Tailwind v4 tokens and variants). Consumers import `@crm/ui/<component>`.
-- `packages/core`: shared domain code with explicit subpath exports. Client-safe: `@crm/core/api` (Effect HttpApi contract, schemas, `Authentication` middleware definition) and `@crm/core/auth/client`. Server-only: `@crm/core/auth` (better-auth factory), `@crm/core/db` (Prisma 8 client), `@crm/core/kv` (Redis KV and preloader). Never import server-only subpaths from `apps/web`.
+- `packages/core`: shared domain code with explicit subpath exports. Client-safe: `@crm/core/api` (Effect HttpApi contract, schemas, `Authentication` middleware definition) and `@crm/core/auth/client`. Server-only: `@crm/core/auth` (better-auth factory), `@crm/core/db` (Prisma 8 client), `@crm/core/kv` (Redis KV and preloader), `@crm/core/brand` (context.dev logos; key injected as `CONTEXT_DEV_API_KEY` in the API). Never import server-only subpaths from `apps/web`.
 - Local infrastructure is part of the Turbo graph. `turbo dev` (or any `--filter` that includes `@crm/api`) runs `//#infra:up` (`docker compose up -d --wait`: Postgres 17 with logical replication on 55432, Redis on 56379), then `@crm/core#db:migrate` (refuses non-local database hosts unless `ALLOW_REMOTE_MIGRATE=1`), then the servers. Use Turbo commands, not ad-hoc scripts. Copy each `.env.example` to `.env`; `bun run infra:down` stops the containers.
 - Internal packages are Turborepo Just-in-Time packages: `exports` point at `.ts`/`.tsx` source, there is no package build step, and the app bundler compiles them. Do not author `.js`/`.mjs`/`.cjs` files; config files are TypeScript or JSON.
 - Apps depend on packages only through declared `workspace:*` dependencies and public exports. Never import another workspace's `src/` by path.
@@ -92,6 +92,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - `@crm/integrations` holds the catalog of connectable apps (remote MCP servers), generic MCP OAuth (`./oauth`) and the gateway (`./gateway`). Add an app with one catalog entry; never add per-app scopes or tool lists.
 - Access is `read` (tools with `readOnlyHint: true`) or `write` (all tools). OAuth always asks for every scope the server offers.
 - Workspace skills: a pinned copy from skills.sh (`@crm/integrations/skills-sh`), shared by the workspace, disabled until a member enables it. The agent loads enabled ones per turn from `/api/agent/skills`.
+- Logos for apps and workspaces come from context.dev by domain and are copied into our storage (`ImageCache.logo`); the favicon is the fallback. Never hotlink or bundle vendor logos.
 - Upstream tokens stay in the API, encrypted. The agent reaches apps only through `/api/mcp`, with a better-auth MCP token for the `crm-agent` client; keep its eve connection file named `connections`.
 
 ### Desktop (Electron)

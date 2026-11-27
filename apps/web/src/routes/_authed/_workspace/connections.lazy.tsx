@@ -48,7 +48,11 @@ function Connections() {
           </TabsList>
           <TabsContent value="connectors">
             <div className="pt-4">
-              <ConnectorsPanel connections={connections} />
+              <ConnectorsPanel
+                connections={connections}
+                userId={session.user.id}
+                workspaceId={workspaceId}
+              />
             </div>
           </TabsContent>
           <TabsContent value="skills">

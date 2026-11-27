@@ -27,6 +27,9 @@ export const AppConfig = Config.all({
   // Image storage: Vercel Blob when its token is set, otherwise the S3-compatible store. The
   // S3 defaults match the local RustFS container in compose.yaml.
   blobToken: Config.option(Config.Redacted("BLOB_READ_WRITE_TOKEN")),
+  // context.dev brand data: square logos for workspaces and connected apps. Optional; without
+  // it, logos fall back to favicons.
+  contextDevApiKey: Config.option(Config.Redacted("CONTEXT_DEV_API_KEY")),
   s3: Config.all({
     bucket: Config.String("S3_BUCKET").pipe(Config.withDefault("crm")),
     endpoint: Config.String("S3_ENDPOINT").pipe(Config.withDefault("http://127.0.0.1:59000")),

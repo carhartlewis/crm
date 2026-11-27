@@ -2,7 +2,6 @@ import add from "@carbon/icons/es/add/16.js";
 import checkmarkOutline from "@carbon/icons/es/checkmark--outline/16.js";
 import checkmark from "@carbon/icons/es/checkmark/16.js";
 import { type Access, integrations, type Integration } from "@crm/integrations";
-import { logos } from "@crm/integrations/logos";
 import { desktopBridge } from "@crm/core/desktop";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
@@ -19,10 +18,11 @@ import {
   DropdownMenuTrigger,
 } from "@crm/ui/components/dropdown-menu";
 import { carbonIcon } from "@crm/ui/components/icon";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   type Connection,
+  connectionLogosQuery,
   connectMutation,
   disconnectMutation,
   setAccessMutation,
@@ -42,8 +42,17 @@ const accessHints: Record<Access, string> = {
 const onError = (error: Error) => toast.error(error.message);
 
 /** The apps people can connect, as a grid of cards. */
-export function ConnectorsPanel({ connections }: { connections: readonly Connection[] }) {
+export function ConnectorsPanel({
+  connections,
+  userId,
+  workspaceId,
+}: {
+  connections: readonly Connection[];
+  userId: string;
+  workspaceId: string;
+}) {
   const byIntegration = new Map(connections.map((entry) => [entry.integration, entry]));
+  const { data: logos } = useQuery(connectionLogosQuery(userId, workspaceId));
 
   return (
     <div className="flex flex-col gap-4">
@@ -56,7 +65,7 @@ export function ConnectorsPanel({ connections }: { connections: readonly Connect
           <IntegrationCard
             key={integration.id}
             integration={integration}
-            logo={logos[integration.id]}
+            logo={logos?.[integration.id] ?? null}
             connection={byIntegration.get(integration.id)}
           />
         ))}
@@ -71,7 +80,7 @@ function IntegrationCard({
   connection,
 }: {
   integration: Integration;
-  logo: string;
+  logo: string | null;
   connection: Connection | undefined;
 }) {
   const connect = useMutation({ ...connectMutation, onError });
@@ -90,7 +99,13 @@ function IntegrationCard({
     <Card>
       <div className="flex items-start gap-4 px-5 py-1">
         <div className="size-10 shrink-0 overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10">
-          <img src={logo} alt="" width={40} height={40} className="size-full object-cover" />
+          {logo ? (
+            <img src={logo} alt="" width={40} height={40} className="size-full object-cover" />
+          ) : (
+            <span className="flex size-full items-center justify-center font-medium text-muted-foreground">
+              {integration.name.slice(0, 1)}
+            </span>
+          )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 className="flex items-center gap-1.5 text-base font-medium">

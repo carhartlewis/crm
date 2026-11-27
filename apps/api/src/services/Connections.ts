@@ -1,7 +1,13 @@
 import { type Connection, NoActiveWorkspace, NotFound, UpstreamUnavailable } from "@crm/core/api";
 import type { Db } from "@crm/core/db";
 import type { Kv as KvStore } from "@crm/core/kv";
-import { type Access, integrationById, isAccess, type Integration } from "@crm/integrations";
+import {
+  type Access,
+  integrationById,
+  integrations,
+  isAccess,
+  type Integration,
+} from "@crm/integrations";
 import type { GatewayConnection } from "@crm/integrations/gateway";
 import {
   type AuthorizationCallback,
@@ -15,6 +21,7 @@ import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { AppConfig } from "../config.ts";
 import { Database } from "./Database.ts";
+import { Images } from "./Images.ts";
 import { Kv } from "./Kv.ts";
 
 /** Who is acting: the session user and the session's (unverified) active workspace. */
@@ -77,6 +84,10 @@ export interface CallbackParams {
 
 export interface ConnectionsService {
   readonly list: (actor: Actor) => Effect.Effect<readonly Connection[], NoActiveWorkspace>;
+  /** Each catalog app's stored logo, by app id; null when there is none. */
+  readonly logos: (
+    actor: Actor,
+  ) => Effect.Effect<Readonly<Record<string, string | null>>, NoActiveWorkspace>;
   readonly authorize: (
     actor: Actor,
     integration: string,
@@ -113,6 +124,8 @@ export interface ConnectionsDependencies {
   readonly page: URL;
   readonly now: () => Date;
   readonly state: () => string;
+  /** Copies a domain's logo into our storage (`ImageCache.logo`). */
+  readonly logo: (website: string) => Promise<string | null>;
 }
 
 /** A sign-in in progress, from `authorize` to `callback`. */
@@ -138,6 +151,11 @@ const decodeCredentials = Schema.decodeUnknownOption(
 );
 
 const PENDING_TTL_SECONDS = 10 * 60;
+
+// A stored logo is kept for a month; a miss is retried after a day.
+const LOGO_TTL_SECONDS = 30 * 24 * 60 * 60;
+const LOGO_MISS_TTL_SECONDS = 24 * 60 * 60;
+const logoKey = (domain: string) => `connections:logo:${domain}`;
 const pendingKey = (state: string) => `connections:pending:${state}`;
 
 const noWorkspace = () =>
@@ -234,6 +252,32 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
       const rows = yield* run("list", () => store.list(scope));
 
       return rows.filter((row) => integrationById(row.integration)).map(toConnection);
+    }),
+
+    logos: Effect.fn("Connections.logos")(function* (actor) {
+      yield* owner(actor);
+
+      const entries = yield* run("logos", () =>
+        Promise.all(
+          integrations.map(async (app): Promise<[string, string | null]> => {
+            const cached = await kv.get(logoKey(app.domain));
+
+            if (cached !== null) return [app.id, cached === "" ? null : cached];
+
+            const url = await deps.logo(`https://${app.domain}`).catch(() => null);
+
+            await kv.set(
+              logoKey(app.domain),
+              url ?? "",
+              url ? LOGO_TTL_SECONDS : LOGO_MISS_TTL_SECONDS,
+            );
+
+            return [app.id, url];
+          }),
+        ),
+      );
+
+      return Object.fromEntries(entries);
     }),
 
     authorize: Effect.fn("Connections.authorize")(function* (actor, id, access) {
@@ -408,6 +452,7 @@ export class Connections extends Context.Service<Connections, ConnectionsService
       const config = yield* AppConfig;
       const db = yield* Database;
       const kv = yield* Kv;
+      const images = yield* Images;
       const api = config.authUrl;
 
       const oauth: OAuthClientConfig = {
@@ -429,7 +474,8 @@ export class Connections extends Context.Service<Connections, ConnectionsService
         page: new URL("/connections", config.webOrigin),
         now: () => new Date(),
         state: () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"),
+        logo: (website) => images.logo(website),
       });
     }),
-  ).pipe(Layer.provide([Database.layer, Kv.layer]));
+  ).pipe(Layer.provide([Database.layer, Kv.layer, Images.layer]));
 }
