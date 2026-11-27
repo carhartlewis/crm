@@ -31,7 +31,11 @@ const memory: CrmToolDeps["memory"] = {
 
     return { ok: true, value: [] };
   },
-  remember: async () => ({ ok: true, value: null }),
+  remember: async (who, input) => {
+    memoryCalls.push(`remember ${who.workspaceId} ${input.companyId ?? "workspace"}`);
+
+    return { ok: true, value: null };
+  },
   forget: async () => ({ ok: false, status: 404, message: "No such fact" }),
 };
 
@@ -41,7 +45,7 @@ function setup() {
   return {
     store,
     tools: crmTools(
-      { directory, companies: makeCompanies(store.store), memory, web: null },
+      { directory, companies: makeCompanies(store.store), memory, web: null, jev: null },
       caller,
     ),
   };
@@ -110,6 +114,16 @@ describe("CRM tools", () => {
     expect(text(await byName(tools, "forget").call({ factId: "f1" }))).toBe("No such fact");
   });
 
+  test("a fact the agent saves without a company goes to the company it names", async () => {
+    const remember = byName(setup().tools, "remember");
+
+    memoryCalls.length = 0;
+    await remember.call({ text: "Acme renewed SOC 2 in September" });
+    await remember.call({ text: "We moved our office" });
+
+    expect(memoryCalls).toEqual(["remember ws_a com_1", "remember ws_a workspace"]);
+  });
+
   test("context.dev tools appear only with a key, and read what the agent asks", async () => {
     expect(setup().tools.some((entry) => entry.tool.name === "crm__lookup_company")).toBe(false);
 
@@ -118,6 +132,7 @@ describe("CRM tools", () => {
         directory,
         companies: makeCompanies(createMemoryCompanyStore([]).store),
         memory,
+        jev: null,
         web: {
           lookup: async (query) =>
             "domain" in query ? { ...EMPTY_PROFILE, domain: query.domain, name: "Acme" } : null,

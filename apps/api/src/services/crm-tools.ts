@@ -1,10 +1,13 @@
 import { createId, ID_PREFIXES } from "@crm/core/ids";
 import type { LocalTool } from "@crm/integrations/gateway";
 import { createContextDev, type WebReader } from "@crm/core/brand";
+import type { JevClient } from "@crm/memory/jev";
+import { gatewayJev } from "@crm/memory/jev-gateway";
 import { Context, Effect, Exit, Layer, Option, Redacted, Schema } from "effect";
 import { AppConfig } from "../config.ts";
 import { Companies, type CompaniesService } from "./Companies.ts";
 import { postgresDirectory } from "./crm-directory.ts";
+import { factSubject } from "./fact-subject.ts";
 import { type AgentCaller, type AgentResult, Memory, type MemoryService } from "./Memory.ts";
 import { Postgres } from "./Postgres.ts";
 
@@ -45,7 +48,13 @@ export interface CrmToolDeps {
   readonly memory: Pick<MemoryService["agent"], "search" | "remember" | "forget">;
   /** context.dev, when the API has a key; without it the web tools aren't listed. */
   readonly web: WebReader | null;
+  /** Jev, to file a fact under the company it is about; without it facts the agent gives no
+   * company for stay with the workspace unless they name one. */
+  readonly jev: JevClient | null;
 }
+
+/** How long saving a fact waits for Jev to say which company it is about. */
+const SUBJECT_WAIT_MS = 3000;
 
 /** The tool's answer: JSON the model reads. A type alias: MCP results need an index signature. */
 type ToolResult = {
@@ -284,11 +293,32 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
           }),
         }),
       },
-      async (input) =>
-        fromAgent(await deps.memory.remember(caller, { ...input, kind: "agent_fact" }), {
-          saved: true,
-          note: "Facts appear in memory a few seconds after saving.",
-        }),
+      async (input) => {
+        // A fact about a company belongs on that company: when the agent gives none, the fact
+        // goes to the one it names, or the one Jev judges it is about.
+        const companyId =
+          input.companyId ??
+          (await factSubject(
+            input.text,
+            await deps.directory.companies(caller.workspaceId, "", 500),
+            deps.jev,
+            AbortSignal.timeout(SUBJECT_WAIT_MS),
+          )) ??
+          undefined;
+
+        const company = companyId
+          ? await deps.directory.company(caller.workspaceId, companyId)
+          : null;
+
+        return fromAgent(
+          await deps.memory.remember(caller, { ...input, companyId, kind: "agent_fact" }),
+          {
+            saved: true,
+            savedTo: company ? company.name : "the workspace",
+            note: "Facts appear in memory a few seconds after saving.",
+          },
+        );
+      },
     ),
     tool(
       {
@@ -321,6 +351,7 @@ export class CrmTools extends Context.Service<
           onNone: () => null,
           onSome: (apiKey) => createContextDev({ apiKey: Redacted.value(apiKey) }),
         }),
+        jev: Option.isSome(config.aiGatewayApiKey) ? gatewayJev() : null,
       };
 
       return { forCaller: (caller) => crmTools(deps, caller) };
