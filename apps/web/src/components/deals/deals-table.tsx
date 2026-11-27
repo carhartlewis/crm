@@ -26,14 +26,7 @@ import {
   LosingReasonDialog,
   SetStageMenu,
 } from "../records/bulk-edit.tsx";
-import {
-  CompanyCell,
-  CompanyLogo,
-  MoneyCell,
-  NameWithMark,
-  OwnerCell,
-  MARK_SIZE,
-} from "../records/record-visuals.tsx";
+import { CompanyCell, MoneyCell, OwnerCell } from "../records/record-visuals.tsx";
 import {
   activityAt,
   ownerFacet,
@@ -82,19 +75,8 @@ function dealColumns({
       header: "Deal",
       sortable: true,
       hideable: false,
-      // The deal's company logo leads its name, as a contact's photo and a company's logo do.
-      cell: (row) => (
-        <NameWithMark
-          mark={
-            <CompanyLogo
-              company={companiesById.get(row.company_id) ?? noCompany(row.name)}
-              size={MARK_SIZE}
-            />
-          }
-          name={row.name}
-          strong
-        />
-      ),
+      // The company column shows the logo, so the name stands alone.
+      cell: (row) => <span className="truncate font-medium">{row.name}</span>,
     },
     {
       id: "company",
@@ -341,9 +323,4 @@ export function DealsTable({ userId, workspaceId }: { userId: string; workspaceI
       />
     </>
   );
-}
-
-/** Initials from the deal's own name while its company has not synced yet. */
-function noCompany(name: string) {
-  return { name, icon_url: null, logo_url: null, icon_dark_url: null, icon_tone: null };
 }
