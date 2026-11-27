@@ -1,7 +1,7 @@
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 /** The records that can be created from anywhere in the app (`?create=<kind>`). */
-export const CREATE_KINDS = ["company"] as const;
+export const CREATE_KINDS = ["company", "workspace"] as const;
 
 export type CreateKind = (typeof CREATE_KINDS)[number];
 

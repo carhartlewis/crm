@@ -46,3 +46,21 @@ export const switchWorkspaceMutation = mutationOptions({
     await Promise.all([resetAuth(client), releaseSynced(workspaceId)]);
   },
 });
+
+/**
+ * Creates a workspace from inside the app and moves into it: the new workspace becomes active,
+ * auth state reloads for it, and the previous workspace's synced data stops.
+ */
+export const createAndOpenWorkspaceMutation = mutationOptions({
+  mutationKey: ["workspaces", "create-and-open"],
+  mutationFn: async (value: WorkspaceInput, { client }) => {
+    const workspace = await createWorkspace(value);
+    const { error } = await authClient.organization.setActive({ organizationId: workspace.id });
+
+    if (error) throw new Error(error.message ?? "Couldn't open the new workspace");
+
+    await Promise.all([resetAuth(client), releaseSynced(workspace.id)]);
+
+    return workspace;
+  },
+});

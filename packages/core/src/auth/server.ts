@@ -1,6 +1,8 @@
-import { APIError, betterAuth, type BetterAuthOptions } from "better-auth";
+import { APIError, betterAuth, type AuthContext, type BetterAuthOptions } from "better-auth";
 import { organization } from "better-auth/plugins/organization";
+import { Schema } from "effect";
 import type { Kv } from "../kv/index.ts";
+import type { ImageCache } from "../storage/index.ts";
 import { desktopHandoff } from "./desktop-handoff.ts";
 import { mcpPlugins, type McpAuthOptions } from "./mcp.ts";
 import {
@@ -36,6 +38,8 @@ export interface AuthDependencies {
   trustedOrigins: string[];
   /** Google OAuth client. Sign-in is Google-only; accounts are created on first sign-in. */
   google: GoogleClient;
+  /** Copies profile pictures and workspace favicons into storage. Omit to keep remote URLs. */
+  images?: ImageCache;
   /** The MCP authorization server for the connections gateway (see mcp.ts). */
   mcp: McpAuthOptions;
 }
@@ -86,25 +90,109 @@ function validWorkspaceFields(
   return fields;
 }
 
+/** The website's favicon URL in storage, or `undefined` when it can't be fetched. */
+async function faviconFor(images: ImageCache | undefined, website: string | undefined) {
+  if (!images || !website) return undefined;
+
+  return images.favicon(website).catch(() => undefined);
+}
+
 /**
  * Workspaces are better-auth organizations, stored in the `workspace` table with a required
  * website. Name and website are re-validated here so every client gets the same rules.
+ * Without an explicit logo, a workspace takes its website's favicon.
  */
-export const workspaces = organization({
-  schema: workspaceSchema,
-  creatorRole: "owner",
-  organizationLimit: 10,
-  membershipLimit: 200,
-  disableOrganizationDeletion: true,
-  organizationHooks: {
-    beforeCreateOrganization: async ({ organization: workspace }) => ({
-      data: { ...workspace, ...validWorkspaceFields(workspace, true) },
-    }),
-    beforeUpdateOrganization: async ({ organization: changes }) => ({
-      data: { ...changes, ...validWorkspaceFields(changes, false) },
-    }),
-  },
-});
+export function workspaces(images?: ImageCache) {
+  return organization({
+    schema: workspaceSchema,
+    creatorRole: "owner",
+    organizationLimit: 10,
+    membershipLimit: 200,
+    disableOrganizationDeletion: true,
+    organizationHooks: {
+      beforeCreateOrganization: async ({ organization: workspace }) => {
+        const data = { ...workspace, ...validWorkspaceFields(workspace, true) };
+
+        if (!data.logo) {
+          const logo = await faviconFor(images, data.website);
+
+          if (logo) data.logo = logo;
+        }
+
+        return { data };
+      },
+      beforeUpdateOrganization: async ({ organization: changes }) => {
+        const data = { ...changes, ...validWorkspaceFields(changes, false) };
+
+        // A new website brings its own favicon, unless this update also sets a logo.
+        if (data.logo === undefined) {
+          const logo = await faviconFor(images, data.website);
+
+          if (logo !== undefined) data.logo = logo;
+        }
+
+        return { data };
+      },
+    },
+  });
+}
+
+/**
+ * On sign-in, copies the user's (Google) profile picture into storage, and gives the active
+ * workspace its website's favicon if it has no logo yet. Both happen once: later sign-ins
+ * find the stored URLs.
+ */
+export async function cacheSignInImages(
+  images: ImageCache,
+  context: AuthContext,
+  userId: string,
+  workspaceId: string | null,
+) {
+  const user = await context.internalAdapter.findUserById(userId);
+
+  if (user?.image && !images.isStored(user.image)) {
+    const image = await images.avatar(user.id, user.image);
+
+    if (image) await context.internalAdapter.updateUser(user.id, { image });
+  }
+
+  if (!workspaceId) return;
+
+  const workspace = await context.adapter.findOne<{ logo?: string | null; website?: string }>({
+    model: "organization",
+    where: [{ field: "id", value: workspaceId }],
+  });
+
+  if (!workspace || workspace.logo || !workspace.website) return;
+
+  const logo = await images.favicon(workspace.website);
+
+  if (logo) {
+    await context.adapter.update({
+      model: "organization",
+      where: [{ field: "id", value: workspaceId }],
+      update: { logo },
+    });
+  }
+}
+
+/** Failures only log: images are a nicety and never block sign-in. */
+async function cacheSignInImagesSafely(
+  images: ImageCache,
+  context: AuthContext,
+  userId: string,
+  workspaceId: string | null,
+) {
+  try {
+    await cacheSignInImages(images, context, userId, workspaceId);
+  } catch (error) {
+    context.logger.warn("Couldn't cache sign-in images", error);
+  }
+}
+
+const decodeActiveWorkspace = Schema.decodeUnknownSync(
+  Schema.Struct({ activeOrganizationId: Schema.optional(Schema.NullOr(Schema.String)) }),
+);
 
 /**
  * Server-only better-auth instance. Sessions are read from KV on every request (no cookie
@@ -153,11 +241,27 @@ export function createAuth(deps: AuthDependencies) {
               data: { ...session, activeOrganizationId: membership?.organizationId ?? null },
             };
           },
+          after: async (session, context) => {
+            const { images } = deps;
+
+            if (!context || !images) return;
+
+            const { activeOrganizationId } = decodeActiveWorkspace(session);
+
+            await context.context.runInBackgroundOrAwait(
+              cacheSignInImagesSafely(
+                images,
+                context.context,
+                session.userId,
+                activeOrganizationId ?? null,
+              ),
+            );
+          },
         },
       },
     },
     plugins: [
-      workspaces,
+      workspaces(deps.images),
       // Desktop sign-in: system browser + loopback + PKCE (see desktop-handoff.ts).
       desktopHandoff(),
       // The agent's tokens for the connections gateway at /api/mcp.

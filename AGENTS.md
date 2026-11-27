@@ -75,6 +75,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - `BETTER_AUTH_SECRET` must be at least 32 characters; the API refuses to start otherwise (better-auth would silently use its public default secret).
 - Keep better-auth's `session.cookieCache` disabled. It lets revoked sessions and deleted users stay valid until the cached cookie expires; Redis already makes the real lookup fast. The web app re-checks the session on window focus (`SessionWatcher`) and returns to sign-in when it's gone.
 - Tests use `createMemoryKv` with an injected clock. Do not mock modules.
+- Images go through `@crm/core/storage` (server-only): Vercel Blob when `BLOB_READ_WRITE_TOKEN` is set, otherwise S3 through Bun's `S3Client` (local RustFS in compose on 59000, bucket `crm`, only `public/` is anonymously readable). On sign-in, the auth hook copies the Google avatar to `users/<id>/avatar` and gives a workspace without a logo its website favicon (`favicons/<host>`, from Google's favicon service so the server never fetches user-supplied URLs). Only PNG, JPEG, GIF, WebP and ICO are kept. Tests use `createMemoryStorage`. Storage origins must be in the desktop CSP `img-src`.
 
 ### Routing, URL state, and prefetching
 

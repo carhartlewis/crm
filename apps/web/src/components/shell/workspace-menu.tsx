@@ -1,3 +1,4 @@
+import add from "@carbon/icons/es/add/16.js";
 import arrowsHorizontal from "@carbon/icons/es/arrows--horizontal/16.js";
 import chevronDown from "@carbon/icons/es/chevron--down/16.js";
 import logout from "@carbon/icons/es/logout/16.js";
@@ -22,11 +23,13 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@crm/ui/compone
 import { useTheme } from "@crm/ui/components/theme-provider";
 import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { initials } from "../../lib/initials.ts";
 import { sessionQuery, signOutMutation, workspacesQuery } from "../../lib/session.ts";
 import { switchWorkspaceMutation } from "../../lib/workspaces.ts";
 
 const SwitchIcon = carbonIcon(arrowsHorizontal);
+const AddIcon = carbonIcon(add);
 const ChevronDownIcon = carbonIcon(chevronDown);
 const LogoutIcon = carbonIcon(logout);
 const ThemeIcon = carbonIcon(screen);
@@ -42,6 +45,7 @@ export function WorkspaceMenu({ userId }: { userId: string }) {
   const { data: session } = useSuspenseQuery(sessionQuery);
   const { data: workspaces } = useSuspenseQuery(workspacesQuery(userId));
   const { theme, setTheme } = useTheme();
+  const [, setCreate] = useCreateSheet();
   const activeId = session?.session.activeOrganizationId;
   const active = workspaces.find((workspace) => workspace.id === activeId) ?? workspaces[0];
   const user = session?.user;
@@ -62,6 +66,7 @@ export function WorkspaceMenu({ userId }: { userId: string }) {
         <DropdownMenu>
           <DropdownMenuTrigger render={<SidebarMenuButton />}>
             <Avatar size="sm">
+              {active?.logo && <AvatarImage src={active.logo} alt="" />}
               <AvatarFallback>{initials(active?.name ?? "")}</AvatarFallback>
             </Avatar>
             <span>{active?.name}</span>
@@ -103,6 +108,11 @@ export function WorkspaceMenu({ userId }: { userId: string }) {
                       </DropdownMenuRadioItem>
                     ))}
                   </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => void setCreate("workspace")}>
+                    <AddIcon />
+                    Create new workspace
+                  </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuSub>

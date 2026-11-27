@@ -22,7 +22,8 @@ function PopoverContent({
 }: PopoverPrimitive.Popup.Props &
   Pick<PopoverPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
   return (
-    <PopoverPrimitive.Portal>
+    // Above the fixed sidebar, so a modal popover's backdrop covers it (see DropdownMenuContent).
+    <PopoverPrimitive.Portal className="relative z-50">
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}

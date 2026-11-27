@@ -32,7 +32,9 @@ function DropdownMenuContent({
 }: MenuPrimitive.Popup.Props &
   Pick<MenuPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
   return (
-    <MenuPrimitive.Portal>
+    // The portal stacks above the fixed sidebar so the modal backdrop Base UI renders beside the
+    // positioner (it has no z-index) blocks the sidebar too, not only the page.
+    <MenuPrimitive.Portal className="relative z-50">
       <MenuPrimitive.Positioner
         className="isolate z-50 outline-none"
         align={align}

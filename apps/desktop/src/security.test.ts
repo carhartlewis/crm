@@ -30,4 +30,11 @@ describe("desktop security policy", () => {
     expect(csp).toContain("object-src 'none'");
     expect(contentSecurityPolicy(true)).toContain("script-src 'self' 'unsafe-inline'");
   });
+
+  test("images load only from the app and image storage", () => {
+    expect(contentSecurityPolicy(false)).toContain(
+      "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com;",
+    );
+    expect(contentSecurityPolicy(true)).toContain("http://127.0.0.1:59000");
+  });
 });
