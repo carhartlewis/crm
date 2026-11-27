@@ -79,7 +79,7 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
           </Link>
         </HotkeyTooltip>
       </SidebarHeader>
-      <SidebarContent className="overscroll-none">
+      <SidebarContent className="overscroll-contain">
         {isSettingsPath(pathname) ? (
           <SettingsNav />
         ) : (
