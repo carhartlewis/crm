@@ -23,7 +23,7 @@ import {
 import { ApprovalCard, type ApprovalItem } from "@crm/ui/patterns/approval-card";
 import { QuestionCard, type QuestionOption } from "@crm/ui/patterns/question-card";
 import { ThinkingIndicator } from "@crm/ui/patterns/dot-matrix";
-import { ToolStep, ToolStepGroup } from "@crm/ui/patterns/tool-step";
+import { ToolStep, ToolStepGroup, ToolStepResult } from "@crm/ui/patterns/tool-step";
 import { Button } from "@crm/ui/components/button";
 import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { chatAgentBase, type ChatHistory } from "@crm/core/api";
@@ -47,7 +47,10 @@ import { PERMISSION_MODE_OPTIONS, RUN_PLAN_MODE } from "../../lib/permission-mod
 import { type SlashCommand, skillCommandName, skillMessage } from "../../lib/slash-commands.ts";
 import { useNavigate } from "@tanstack/react-router";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
-import { ReplyResponse } from "./reply-islands.tsx";
+import { MentionChip, ReplyResponse } from "./reply-islands.tsx";
+import { ToolResultTable } from "./tool-results.tsx";
+import { listResult, withoutRepeatedTable } from "../../lib/tool-results.ts";
+import { callRecord, type TurnRecord, turnRecords } from "../../lib/turn-records.ts";
 import { Composer } from "./composer.tsx";
 
 import {
@@ -511,6 +514,24 @@ function ChatMessage({
 }) {
   const branchedFrom = message.role === "user" ? branchOf(messageText(message)) : null;
   const any = actions.copy ?? actions.retry ?? actions.edit ?? actions.branch;
+  const blocks = messageBlocks(message.parts);
+
+  // The records this message's calls touched: the reply's names for them open them.
+  const touched = turnRecords(
+    message.parts.flatMap((part) => (part.type === "tool" ? [part] : [])),
+  );
+
+  // Only the turn's latest call keeps its result open: a table an earlier call showed is out
+  // of date once another call runs, so it folds into its step, which opens it again.
+  const lastCalls = blocks.findLast((block) => block.kind === "calls");
+  const latestCallId = lastCalls?.kind === "calls" ? lastCalls.calls.at(-1)?.callId : undefined;
+
+  // A list shown open as a result table: the reply's own copy of it, after that call, is dropped.
+  const tableAt = blocks.findIndex(
+    (block) =>
+      block.kind === "calls" &&
+      block.calls.some((call) => call.callId === latestCallId && listResult(call) !== null),
+  );
 
   // A branch's first message holds the earlier conversation: it shows as one line.
   if (branchedFrom !== null) {
@@ -526,13 +547,25 @@ function ChatMessage({
   return (
     <Message from={message.role}>
       <MessageContent>
-        {messageBlocks(message.parts).map((block) =>
-          block.kind === "part" ? (
-            <ChatPart key={block.key} part={block.part} onAnswer={onAnswer} />
-          ) : (
-            <ToolCalls key={block.key} calls={block.calls} onAnswer={onAnswer} />
-          ),
-        )}
+        {blocks.map((block, index) => {
+          if (block.kind === "calls") {
+            return (
+              <ToolCalls
+                key={block.key}
+                calls={block.calls}
+                latestCallId={latestCallId}
+                onAnswer={onAnswer}
+              />
+            );
+          }
+
+          const part =
+            tableAt !== -1 && index > tableAt && block.part.type === "text"
+              ? { ...block.part, text: withoutRepeatedTable(block.part.text) }
+              : block.part;
+
+          return <ChatPart key={block.key} part={part} touched={touched} onAnswer={onAnswer} />;
+        })}
       </MessageContent>
       {summary && <p className="text-xs text-muted-foreground select-none">{summary}</p>}
       {any && (
@@ -565,14 +598,18 @@ function ChatMessage({
 
 function ChatPart({
   part,
+  touched,
   onAnswer,
 }: {
   part: EveMessagePart;
+  touched: readonly TurnRecord[];
   onAnswer: (interactionId: string, optionId: string) => void;
 }) {
   switch (part.type) {
     case "text":
-      return <ReplyResponse text={part.text} streaming={part.state === "streaming"} />;
+      return (
+        <ReplyResponse text={part.text} streaming={part.state === "streaming"} touched={touched} />
+      );
     case "reasoning":
       return (
         <Reasoning isStreaming={part.state === "streaming"}>
@@ -641,16 +678,21 @@ const fileKind = (name: string) => /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toUpperCas
 /** One call as a step; a run of two or more calls to one tool as a group that opens. */
 function ToolCalls({
   calls,
+  latestCallId,
   onAnswer,
 }: {
   calls: readonly ToolPart[];
+  /** The message's last call: only its result shows open. */
+  latestCallId: string | undefined;
   onAnswer: (interactionId: string, optionId: string) => void;
 }) {
   const [first] = calls;
 
   if (!first) return null;
 
-  if (calls.length === 1) return <ToolCall part={first} onAnswer={onAnswer} />;
+  if (calls.length === 1) {
+    return <ToolCall part={first} latest={first.callId === latestCallId} onAnswer={onAnswer} />;
+  }
 
   // A sign-in or open question asked inside a call must be seen, so its group opens.
   const asking = calls.some(
@@ -668,7 +710,12 @@ function ToolCalls({
       defaultOpen={asking}
     >
       {calls.map((call) => (
-        <ToolCall key={call.callId} part={call} onAnswer={onAnswer} />
+        <ToolCall
+          key={call.callId}
+          part={call}
+          latest={call.callId === latestCallId}
+          onAnswer={onAnswer}
+        />
       ))}
     </ToolStepGroup>
   );
@@ -676,14 +723,49 @@ function ToolCalls({
 
 function ToolCall({
   part,
+  latest = true,
   onAnswer,
 }: {
   part: ToolPart;
+  /** The turn's latest call: its result starts open. */
+  latest?: boolean;
   onAnswer: (interactionId: string, optionId: string) => void;
 }) {
+  // CRM list calls show their rows as a table (ADR 0024).
+  const result = listResult(part);
+  // A record the call wrote or read shows as its name, from the call's answer, not the reply.
+  // The name opens the record, but its logo shows only in the reply, the turn's latest view, so
+  // one record doesn't show the same chip on every step and again in the answer.
+  const record = callRecord(part);
+
+  const detail = record ? (
+    <MentionChip
+      fallback={stepDetail(part)}
+      id={record.id}
+      kind={record.kind}
+      label={record.name}
+      mark={false}
+    />
+  ) : (
+    stepDetail(part)
+  );
+
   return (
     <div className="flex flex-col gap-2">
-      <ToolStep label={stepLabel(part)} detail={stepDetail(part)} state={stepState(part)} />
+      {result ? (
+        // Keyed on `latest`, so the table folds away when a later call runs.
+        <ToolStepResult
+          key={String(latest)}
+          label={stepLabel(part)}
+          detail={detail}
+          state={stepState(part)}
+          defaultOpen={latest}
+        >
+          <ToolResultTable result={result} />
+        </ToolStepResult>
+      ) : (
+        <ToolStep label={stepLabel(part)} detail={detail} state={stepState(part)} />
+      )}
       {/* Approvals and questions with choices wait above the composer; sign-ins and open
           questions stay with their call. */}
       {part.interaction?.status === "open" &&

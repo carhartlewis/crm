@@ -1,3 +1,5 @@
+import { rankSearch } from "@crm/ui/lib/search-rank";
+
 export type ClientTableInput = {
   q: string;
   sort: string;
@@ -74,9 +76,23 @@ export function clientTable<TRow, TFacet extends string, TColumn extends string 
 
   const byGroup = (left: TRow, right: TRow) => (groupOf ? groupOf(left) - groupOf(right) : 0);
 
-  const visible = (() => {
-    const needle = input.q.trim().toLowerCase();
+  // Search ranks like ⌘K (`rankSearch`): typos and words in any order still match, and each
+  // matching row keeps its tier, so better matches come first and the sort applies within a tier.
+  const tierOf = (() => {
+    if (input.q.trim() === "") return null;
 
+    const ranked = rankSearch(
+      rows.map((row) => ({ row, label: haystack(row), section: "" })),
+      input.q,
+    );
+
+    return new Map(ranked.map(({ item, tier }) => [item.row, tier]));
+  })();
+
+  const byTier = (left: TRow, right: TRow) =>
+    tierOf ? (tierOf.get(left) ?? 0) - (tierOf.get(right) ?? 0) : 0;
+
+  const visible = (() => {
     const readSort = isSortKey(sortValues, input.sort) ? sortValues[input.sort] : undefined;
 
     const direction = input.dir === "desc" ? -1 : 1;
@@ -86,7 +102,7 @@ export function clientTable<TRow, TFacet extends string, TColumn extends string 
         return false;
       }
 
-      if (needle.length > 0 && !haystack(row).toLowerCase().includes(needle)) {
+      if (tierOf && !tierOf.has(row)) {
         return false;
       }
 
@@ -105,14 +121,16 @@ export function clientTable<TRow, TFacet extends string, TColumn extends string 
     });
 
     if (!readSort) {
-      return groupOf ? filtered.toSorted(byGroup) : filtered;
+      return groupOf || tierOf
+        ? filtered.toSorted((left, right) => byGroup(left, right) || byTier(left, right))
+        : filtered;
     }
 
     return filtered.toSorted((left, right) => {
-      const group = byGroup(left, right);
+      const first = byGroup(left, right) || byTier(left, right);
 
-      if (group !== 0) {
-        return group;
+      if (first !== 0) {
+        return first;
       }
 
       const a = readSort(left);

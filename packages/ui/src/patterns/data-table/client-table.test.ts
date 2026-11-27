@@ -79,6 +79,17 @@ describe("clientTable", () => {
     expect(ids(table({ q: "  ACCESS " }).visible)).toEqual(["1", "4"]);
   });
 
+  it("searches like ⌘K: words in any order and one typo", () => {
+    expect(ids(table({ q: "review access" }).visible)).toEqual(["1"]);
+    expect(ids(table({ q: "acess" }).visible)).toEqual(["1", "4"]);
+  });
+
+  it("puts better matches first and sorts within each match tier", () => {
+    // "Access …" starts with "ac"; "Backup test" only contains it.
+    expect(ids(table({ q: "ac", sort: "name", dir: "desc" }).visible)).toEqual(["1", "4", "2"]);
+    expect(ids(table({ q: "ac" }).visible)).toEqual(["1", "4", "2"]);
+  });
+
   it("keeps rows that match any chosen value of a facet", () => {
     expect(ids(table({ status: ["done"] }).visible)).toEqual(["2", "4"]);
     expect(ids(table({ tag: ["iam"] }).visible)).toEqual(["1", "2"]);

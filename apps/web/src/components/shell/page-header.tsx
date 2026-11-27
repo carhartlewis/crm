@@ -12,8 +12,9 @@ export const TitleBarContext = createContext<TitleBarControlsProps>({
 
 /**
  * A workspace page's header: the vms.dev page title row, which is also the window's title bar
- * (a drag area). The sidebar toggle leads it, on the title's line; when the sidebar is hidden,
- * search, back and forward join it, and on macOS it clears the traffic lights.
+ * (a drag area). When the sidebar is hidden, the sidebar toggle, search, back and forward lead it
+ * on the title's line, and on macOS they clear the traffic lights. The toggle then sits at the
+ * same x as in the sidebar's top row (inset 8px + padding 32px + 40px = sidebar 16px + 64px).
  */
 export function WorkspacePageHeader({ children }: { children: ReactNode }) {
   const { state, isMobile } = useSidebar();
@@ -24,13 +25,15 @@ export function WorkspacePageHeader({ children }: { children: ReactNode }) {
     <PageShellHeader
       className="app-region-drag"
       leading={
-        <div
-          data-clear-traffic-lights={(hidden && trafficLights) || undefined}
-          className="app-region-no-drag flex shrink-0 items-center gap-0.5 data-clear-traffic-lights:pl-14"
-        >
-          <SidebarToggle />
-          {hidden && <TitleBarControls {...controls} />}
-        </div>
+        hidden && (
+          <div
+            data-clear-traffic-lights={trafficLights || undefined}
+            className="app-region-no-drag flex shrink-0 items-center gap-0.5 data-clear-traffic-lights:pl-16 md:data-clear-traffic-lights:pl-10"
+          >
+            <SidebarToggle />
+            <TitleBarControls {...controls} />
+          </div>
+        )
       }
     >
       {children}

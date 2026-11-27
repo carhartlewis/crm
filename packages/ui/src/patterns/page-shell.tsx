@@ -10,7 +10,8 @@ import { VisuallyHidden } from "@crm/ui/patterns/visually-hidden";
 import type * as React from "react";
 import { observeReflow } from "@crm/ui/lib/reflow";
 
-export type PageWidth = "standard" | "full" | "narrow";
+// Every page shares one column width (standard) unless it fills the window (full).
+export type PageWidth = "standard" | "full";
 
 function PageShell({
   className,
@@ -43,7 +44,8 @@ function PageShell({
 }
 
 /**
- * The page's title row. `leading` sits at the row's start, outside the centered content column
+ * The page's title row, 44px tall so its center (30px from the window top, under the 8px inset)
+ * lines up with the sidebar's top row and the macOS traffic lights. `leading` sits at the row's start, outside the centered content column
  * (e.g. the app's sidebar toggle), on the same line as the title.
  */
 function PageShellHeader({
@@ -62,7 +64,7 @@ function PageShellHeader({
       {...props}
     >
       {leading}
-      <div className="mx-auto grid min-h-12 w-full min-w-0 flex-1 grid-cols-page-header items-center gap-x-3 py-2 group-data-[width=narrow]/page-shell:max-w-3xl group-data-[width=standard]/page-shell:max-w-360 sm:min-h-16 sm:gap-x-4">
+      <div className="mx-auto grid min-h-11 w-full min-w-0 flex-1 grid-cols-page-header items-center gap-x-3 py-2 group-data-[width=standard]/page-shell:max-w-360 sm:gap-x-4">
         {children}
       </div>
     </header>
@@ -105,7 +107,7 @@ function PageShellContent({ className, children, ...props }: React.ComponentProp
   return (
     <div
       className={cn(
-        "@container/page-content mx-auto flex w-full flex-1 flex-col gap-6 pt-5 group-data-[width=narrow]/page-shell:max-w-3xl group-data-[width=standard]/page-shell:max-w-360",
+        "@container/page-content mx-auto flex w-full flex-1 flex-col gap-6 pt-5 group-data-[width=standard]/page-shell:max-w-360",
         className,
       )}
       data-slot="page-shell-content"

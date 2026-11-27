@@ -26,6 +26,7 @@ import { HotkeyTooltip } from "../hotkey-tooltip.tsx";
 import { SettingsNav } from "../settings/settings-nav.tsx";
 import { NavSection } from "./nav-section.tsx";
 import { PinnedNav } from "./pinned-nav.tsx";
+import { SidebarToggle, trafficLights } from "./sidebar-toggle.tsx";
 import { TitleBarControls } from "./title-bar.tsx";
 import { WorkspaceMenu } from "./workspace-menu.tsx";
 
@@ -57,9 +58,17 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
 
   return (
     <Sidebar variant="inset">
-      {/* Its row is centered 40px from the window top: the traffic lights' and page title's line. */}
+      {/* Its row is centered 30px from the window top: the traffic lights' and page title's line. */}
       <SidebarHeader className="app-region-drag">
-        <div className="mt-2.5 flex h-7 items-center justify-end">
+        <div className="flex h-7 items-center justify-between">
+          {/* As in T3 Code: the toggle follows the traffic lights, at the same x as in the page
+              header when the sidebar is hidden (page-header.tsx). */}
+          <div
+            data-clear-traffic-lights={trafficLights || undefined}
+            className="data-clear-traffic-lights:pl-16"
+          >
+            <SidebarToggle />
+          </div>
           <TitleBarControls onSearch={onSearch} onSearchIntent={onSearchIntent} />
         </div>
         <HotkeyTooltip shortcut={shortcuts.newChat} side="right">

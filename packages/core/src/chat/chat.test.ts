@@ -3,6 +3,7 @@ import { createId, ID_PREFIXES } from "../ids/index.ts";
 import {
   CHAT_FILE_BYTES,
   chatFileTypeOf,
+  chatTitlePrompt,
   cleanGeneratedTitle,
   callDecision,
   callKind,
@@ -135,6 +136,13 @@ describe("generated chat titles", () => {
     expect(cleanGeneratedTitle("Title: Q4 pipeline")).toBe("Q4 pipeline");
     expect(cleanGeneratedTitle("   ")).toBeUndefined();
     expect(cleanGeneratedTitle("x".repeat(80))?.length).toBe(60);
+  });
+
+  test("the prompt names attached files, and only when there are some", () => {
+    expect(chatTitlePrompt("Whats this", ["TaxInvoice-1614320.pdf"])).toContain(
+      "Attached files: TaxInvoice-1614320.pdf",
+    );
+    expect(chatTitlePrompt("Hi")).not.toContain("Attached files");
   });
 });
 

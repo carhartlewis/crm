@@ -1,3 +1,4 @@
+import { rankSearch } from "@crm/ui/lib/search-rank";
 import { ListSearch } from "./list-search";
 import { useFitRows } from "./use-fit-rows";
 import { UI_COPY } from "@crm/ui/patterns/ui-copy";
@@ -8,14 +9,16 @@ import { useTabQuery } from "./tab-query";
 
 const UNMEASURED_PAGE_SIZE = 25;
 
-export function matchesSearch(search: string, text: string) {
-  const haystack = text.toLowerCase();
-
-  return search
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((word) => haystack.includes(word));
+/** The rows that match `search` as ⌘K would match them, best first; every row when it is empty. */
+export function searchRows<TRow>(
+  rows: readonly TRow[],
+  search: string,
+  text: (row: TRow) => string,
+) {
+  return rankSearch(
+    rows.map((row) => ({ row, label: text(row), section: "" })),
+    search,
+  ).map(({ item }) => item.row);
 }
 
 export function FittedTable<TRow>({
@@ -48,7 +51,7 @@ export function FittedTable<TRow>({
   const query = useTabQuery(scope);
   const fit = useFitRows(UNMEASURED_PAGE_SIZE);
 
-  const shown = rows.filter((row) => matchesSearch(query.search, haystack(row)));
+  const shown = searchRows(rows, query.search, haystack);
 
   return (
     <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-3">

@@ -82,9 +82,9 @@ function createWindow() {
     // Matches the theme `--background` token so the first paint does not flash the wrong mode.
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#000000" : "#fcfcfc",
     titleBarStyle: "hiddenInset",
-    // Centered (y ≈ 40px) on the web app's title rows: the sidebar's top row and the page
-    // header (components/shell). Move them together.
-    trafficLightPosition: { x: 16, y: 33 },
+    // Near the corner, as in native macOS apps, and centered (y ≈ 30px) on the web app's title
+    // rows: the sidebar's top row and the page header (@crm/ui PageShellHeader). Move them together.
+    trafficLightPosition: { x: 16, y: 23 },
     webPreferences: {
       // Not __dirname: Bun inlines it as the source directory at build time.
       preload: join(app.getAppPath(), "dist", "preload.cjs"),

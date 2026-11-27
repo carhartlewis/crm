@@ -44,6 +44,12 @@ export type Chat = {
   readonly last_message_at: string;
   /** `manual`, `auto` or `bypass` (ADR 0019). */
   readonly permission_mode: string;
+  /**
+   * The record the chat is about, from a record sheet's Agent tab (ADR 0024). Absent in device
+   * snapshots saved before records had chats.
+   */
+  readonly record_kind?: string | null;
+  readonly record_id?: string | null;
 };
 
 export type ChatSpace = {
@@ -115,6 +121,8 @@ function createChatsCollection(workspaceId: string) {
                   title: modified.title,
                   spaceId: modified.space_id,
                   permissionMode: modified.permission_mode,
+                  recordKind: modified.record_kind ?? null,
+                  recordId: modified.record_id ?? null,
                 }),
               });
 
@@ -313,6 +321,8 @@ interface StartChat {
   readonly title?: string;
   /** Files sent with the first message; the chat page uploads and sends them. */
   readonly files?: readonly Attachment[];
+  /** The record the chat is about, from a record sheet's Agent tab (ADR 0024). */
+  readonly record?: { readonly kind: string; readonly id: string };
 }
 
 /**
@@ -322,7 +332,15 @@ interface StartChat {
  */
 export const startChatMutation = mutationOptions({
   mutationKey: ["chats", "start"],
-  mutationFn: async ({ workspaceId, userId, text, spaceId, permissionMode, title }: StartChat) => {
+  mutationFn: async ({
+    workspaceId,
+    userId,
+    text,
+    spaceId,
+    permissionMode,
+    title,
+    record,
+  }: StartChat) => {
     const id = createId(ID_PREFIXES.chat);
     const now = new Date().toISOString();
     const session = Promise.withResolvers<string>();
@@ -339,6 +357,8 @@ export const startChatMutation = mutationOptions({
       updated_at: now,
       last_message_at: now,
       permission_mode: permissionMode,
+      record_kind: record?.kind ?? null,
+      record_id: record?.id ?? null,
     });
 
     // The row settles later, through sync; its failure already rejected `session`.

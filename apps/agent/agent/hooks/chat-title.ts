@@ -5,8 +5,19 @@ import { crmCaller } from "../lib/crm-caller.ts";
 import { crmToken } from "../lib/crm-token.ts";
 import { apiUrl } from "../lib/gateway.ts";
 
-/** Small, fast and cheap: a title is a few words. */
-const TITLE_MODEL = process.env["CHAT_TITLE_MODEL"] ?? "zai/glm-5.3-flash";
+/**
+ * Small and fast: a title is a few words. It has a zero-retention provider on the gateway, as
+ * the vision model does (lib/pick-model.ts).
+ */
+const TITLE_MODEL = process.env["CHAT_TITLE_MODEL"] ?? "anthropic/claude-haiku-5.5";
+
+/**
+ * Haiku 5.5 thinks by default, and thinking counts against the output limit: with it on, most
+ * titles ran out of tokens and came back empty. Off, a title is about 5 to 20 tokens;
+ * `cleanGeneratedTitle` keeps it to 60 characters.
+ */
+const TITLE_OUTPUT_TOKENS = 40;
+const TITLE_PROVIDER_OPTIONS = { anthropic: { thinking: { type: "disabled" } } };
 
 /** A title that takes longer than this isn't worth waiting for; the first title stays. */
 const TITLE_TIMEOUT_MS = 15_000;
@@ -32,17 +43,28 @@ export default defineHook({
         .flatMap((part) => (part.kind === "text" ? [part.text] : []))
         .join("\n");
 
+      const filenames = event.data.parts.flatMap((part) =>
+        part.kind === "file" && part.filename ? [part.filename] : [],
+      );
+
       // Not awaited: eve waits for a hook before the turn goes on, and the reply must not wait
       // for the title. If the hook runs twice, the API keeps the first title (`auto_title`).
       void (async () => {
         const { generateText } = await import("ai");
 
         await nameChat(
-          { sessionId: ctx.session.id, message },
+          { sessionId: ctx.session.id, message, filenames },
           {
             generate: async (prompt, abortSignal) =>
-              (await generateText({ model: TITLE_MODEL, prompt, maxOutputTokens: 30, abortSignal }))
-                .text,
+              (
+                await generateText({
+                  model: TITLE_MODEL,
+                  prompt,
+                  maxOutputTokens: TITLE_OUTPUT_TOKENS,
+                  providerOptions: TITLE_PROVIDER_OPTIONS,
+                  abortSignal,
+                })
+              ).text,
             save: async (sessionId, title, signal) => {
               const token = await crmToken(caller);
 

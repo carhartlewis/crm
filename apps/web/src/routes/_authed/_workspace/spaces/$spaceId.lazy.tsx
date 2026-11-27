@@ -66,7 +66,7 @@ function SpaceView({
   const members = api.membersOf(spaceId).length;
 
   return (
-    <PageShell width="narrow">
+    <PageShell>
       <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>

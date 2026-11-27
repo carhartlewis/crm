@@ -33,6 +33,51 @@ describe("tidyReply", () => {
     expect(tidyReply(`${onlyCapgo}\n${mixed}`, companies)).toContain("| Acme | acme.com |");
   });
 
+  test("a mention in backticks, or after the same name in bold, becomes a bare mention", () => {
+    const deal = ':deal[Mercury — New opportunity]{record="del_a"}';
+
+    expect(tidyReply(`Created **Mercury — New opportunity** (\`${deal}\`).`, companies)).toBe(
+      `Created ${deal}.`,
+    );
+    expect(tidyReply(`See \`${deal}\` and **Acme** (${deal}).`, companies)).toBe(
+      `See ${deal} and **Acme** (${deal}).`,
+    );
+    expect(tidyReply(`\`\`\`md\n\`${deal}\`\n\`\`\``, companies)).toBe(
+      `\`\`\`md\n\`${deal}\`\n\`\`\``,
+    );
+  });
+
+  test("the first name of a record the turn touched becomes its mention", () => {
+    const touched = [
+      { kind: "deal" as const, id: "del_a", name: "Mercury — New opportunity" },
+      { kind: "company" as const, id: "com_m", name: "Mercury" },
+    ];
+
+    expect(
+      tidyReply(
+        "Created **Mercury — New opportunity** against Mercury. Mercury had no other deals.",
+        companies,
+        touched,
+      ),
+    ).toBe(
+      'Created :deal[Mercury — New opportunity]{record="del_a"} against :company[Mercury]{record="com_m"}. Mercury had no other deals.',
+    );
+  });
+
+  test("a touched name inside code, a link, a word or a fence, or one already mentioned, stays", () => {
+    const touched = [{ kind: "company" as const, id: "com_m", name: "Mercury" }];
+
+    for (const text of [
+      "Run `Mercury` now.",
+      "See [Mercury](https://mercury.com).",
+      "Mercurylike banks.",
+      "```\nMercury\n```",
+      ':company[Mercury Bank]{record="com_m"} and Mercury.',
+    ]) {
+      expect(tidyReply(text, companies, touched)).toBe(text);
+    }
+  });
+
   test("text without tables is untouched", () => {
     expect(tidyReply("Just a sentence.", companies)).toBe("Just a sentence.");
   });

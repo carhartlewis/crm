@@ -16,8 +16,8 @@ const OpenIcon = carbonIcon(openPanelLeft);
 export const trafficLights = desktopBridge()?.platform === "darwin";
 
 /**
- * Shows or hides the sidebar (⌘B). It sits at the top-left of the page panel, never in the
- * sidebar, and the icon shows what a click will do.
+ * Shows or hides the sidebar (⌘B). It follows the traffic lights: in the sidebar's top row, or
+ * leading the page header while the sidebar is hidden. The icon shows what a click will do.
  */
 export function SidebarToggle() {
   const { open, openMobile, isMobile, toggleSidebar } = useSidebar();

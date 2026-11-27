@@ -78,7 +78,7 @@ export function WorkspaceMenu({ userId }: { userId: string }) {
             <span>{active?.name}</span>
             <ChevronDownIcon className="ml-auto text-muted-foreground" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-64">
+          <DropdownMenuContent side="top" align="start">
             <DropdownMenuGroup>
               <DropdownMenuLabel>
                 <span className="flex items-center gap-2 py-1">

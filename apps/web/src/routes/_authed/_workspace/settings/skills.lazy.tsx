@@ -127,7 +127,7 @@ function WorkspaceSkills() {
 
   return (
     // The skills table fills the page and pages what fits.
-    <SettingsPage title="Workspace Skills" fill actions={actions}>
+    <SettingsPage title="Workspace Skills" table actions={actions}>
       <SkillsPanel
         userId={session.user.id}
         workspaceId={workspaceId}

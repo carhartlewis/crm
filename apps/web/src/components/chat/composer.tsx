@@ -62,6 +62,8 @@ export interface ComposerProps {
   readonly fieldRef?: RefObject<HTMLTextAreaElement | null>;
   /** What `/` offers. A sent message that names one runs it instead of sending. */
   readonly commands?: readonly SlashCommand[];
+  /** The empty field's hint while the agent is idle. */
+  readonly placeholder?: string;
 }
 
 /**
@@ -89,6 +91,7 @@ export function Composer({
   onTypingStart,
   fieldRef,
   commands = NO_COMMANDS,
+  placeholder = "Work on anything",
 }: ComposerProps) {
   const field = useRef<HTMLTextAreaElement | null>(null);
 
@@ -248,7 +251,7 @@ export function Composer({
       <PromptInputBody>
         <PromptInputTextarea
           name="message"
-          placeholder={working ? "Add to this, or ask something else" : "Work on anything"}
+          placeholder={working ? "Add to this, or ask something else" : placeholder}
           aria-label="Message"
           aria-expanded={menuOpen}
           aria-autocomplete="list"

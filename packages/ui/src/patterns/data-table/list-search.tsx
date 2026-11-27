@@ -39,7 +39,7 @@ export function ListSearch({ placeholder, scope }: { placeholder: string; scope?
   });
 
   return (
-    <div className="wide-only @2xl:w-64">
+    <div className="wide-only @2xl:w-80">
       <InputGroup>
         <InputGroupAddon>
           <SearchIcon />

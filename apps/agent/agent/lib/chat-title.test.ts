@@ -27,6 +27,25 @@ describe("nameChat", () => {
     expect(saved).toEqual(["ses_1: Company list"]);
   });
 
+  test("names attached files, so a vague message still gets a title", async () => {
+    const prompts: string[] = [];
+
+    await nameChat(
+      { sessionId: "ses_1", message: "", filenames: ["TaxInvoice.pdf"] },
+      {
+        generate: async (prompt) => {
+          prompts.push(prompt);
+
+          return "HSS tax invoice";
+        },
+        save: async () => undefined,
+      },
+      new AbortController().signal,
+    );
+
+    expect(prompts[0]).toContain("TaxInvoice.pdf");
+  });
+
   test("a model failure keeps the first title and never throws", async () => {
     const logged: string[] = [];
 

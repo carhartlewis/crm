@@ -29,6 +29,7 @@ function fakeAgent() {
   const logs = new Map<string, FakeEvent[]>();
   const calls: string[] = [];
   const modes: string[] = [];
+  const records: string[] = [];
 
   const agent: ChatAgent = {
     createSession: async (caller: AgentCaller) => {
@@ -53,6 +54,7 @@ function fakeAgent() {
     forward: async (caller, path, request) => {
       calls.push(`${request.method} ${path} as ${caller.id} in ${caller.workspaceId}`);
       modes.push(caller.permissionMode ?? "none");
+      records.push(caller.record ? `${caller.record.kind} ${caller.record.id}` : "none");
 
       return new Response("{}", { status: 202 });
     },
@@ -62,6 +64,7 @@ function fakeAgent() {
     agent,
     calls,
     modes,
+    records,
     append: (sessionId: string, event: FakeEvent) => logs.get(sessionId)?.push(event),
     /** Eve restarted: every session it had is gone. */
     restart: () => logs.clear(),
@@ -534,5 +537,46 @@ describe("titles from the agent", () => {
     expect(
       await outcome(chats.titleFromAgent({ userId: "bob", workspaceId: "ws_a" }, "ses_1", "X")),
     ).toBe("NotFound");
+  });
+});
+
+describe("record chats", () => {
+  test("a chat about a record tells the agent which record, on every message", async () => {
+    const { chats, rows, records } = setup();
+    const id = chatId();
+    const companyId = createId(ID_PREFIXES.company);
+
+    await run(
+      chats.create(alice, {
+        id,
+        title: "Research",
+        spaceId: null,
+        recordKind: "company",
+        recordId: companyId,
+      }),
+    );
+
+    expect(rows().chats.get(id)).toMatchObject({ recordKind: "company", recordId: companyId });
+
+    await run(chats.forward(alice, id, "/eve/v1/session/ses_1", get()));
+
+    expect(records.at(-1)).toBe(`company ${companyId}`);
+  });
+
+  test("refuses an unknown kind, a mismatched id, or half a record", async () => {
+    const { chats } = setup();
+    const base = { title: "Research", spaceId: null };
+    const contactId = createId(ID_PREFIXES.contact);
+
+    for (const record of [
+      { recordKind: "invoice", recordId: contactId },
+      { recordKind: "company", recordId: contactId },
+      { recordKind: "contact", recordId: null },
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- each case runs alone.
+      expect(await outcome(chats.create(alice, { ...base, ...record, id: chatId() }))).toBe(
+        "Invalid",
+      );
+    }
   });
 });

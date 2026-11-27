@@ -12,6 +12,8 @@ export interface AgentCaller {
   readonly workspaceId?: string | null;
   /** The chat's permission mode (ADR 0019); the agent decides each tool call with it. */
   readonly permissionMode?: string;
+  /** The record the chat is about (ADR 0024); the agent reads it before each turn. */
+  readonly record?: { readonly kind: string; readonly id: string };
 }
 
 /** What the chats service needs from the agent (ADR 0018). Tests inject a fake. */
@@ -37,6 +39,8 @@ export interface CallerHeaders {
   "x-crm-user-email"?: string;
   "x-crm-workspace-id"?: string;
   "x-crm-permission-mode"?: string;
+  "x-crm-record-kind"?: string;
+  "x-crm-record-id"?: string;
 }
 
 export function callerHeaders(secret: string, caller: AgentCaller | null) {
@@ -51,6 +55,11 @@ export function callerHeaders(secret: string, caller: AgentCaller | null) {
     if (caller.workspaceId) headers["x-crm-workspace-id"] = caller.workspaceId;
 
     if (caller.permissionMode) headers["x-crm-permission-mode"] = caller.permissionMode;
+
+    if (caller.record) {
+      headers["x-crm-record-kind"] = caller.record.kind;
+      headers["x-crm-record-id"] = caller.record.id;
+    }
   }
 
   return { ...headers };

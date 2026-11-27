@@ -4,6 +4,8 @@ import { chatTitlePrompt, cleanGeneratedTitle } from "@crm/core/chat";
 export interface FirstMessage {
   readonly sessionId: string;
   readonly message: string;
+  /** The names of files sent with it. */
+  readonly filenames?: readonly string[];
 }
 
 export interface ChatTitleOptions {
@@ -21,11 +23,13 @@ export interface ChatTitleOptions {
  * leaves the first title in place.
  */
 export async function nameChat(turn: FirstMessage, options: ChatTitleOptions, signal: AbortSignal) {
-  if (!turn.message.trim()) return;
+  const filenames = turn.filenames ?? [];
+
+  if (!turn.message.trim() && filenames.length === 0) return;
 
   try {
     const title = cleanGeneratedTitle(
-      await options.generate(chatTitlePrompt(turn.message), signal),
+      await options.generate(chatTitlePrompt(turn.message, filenames), signal),
     );
 
     if (title) await options.save(turn.sessionId, title, signal);

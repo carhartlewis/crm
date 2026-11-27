@@ -17,7 +17,6 @@
     "@crm/ui": "workspace:*",
     "@electric-sql/client": "1.5.28",
     "@foresightjs/react": "1.0.0",
-    "@leeoniya/ufuzzy": "1.0.19",
     "@tanstack/electric-db-collection": "1.0.0-rc.1.5",
     "@tanstack/react-db": "1.0.0-rc.1.5",
     "@tanstack/react-form": "1.33.6",

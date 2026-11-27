@@ -1138,7 +1138,15 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
                         data-state={isSelected ? "selected" : undefined}
                         tabIndex={clickable ? 0 : undefined}
                         aria-expanded={canExpand ? isOpen : undefined}
-                        onClick={clickable ? handleClick : undefined}
+                        onClick={
+                          clickable
+                            ? (event) => {
+                                // Controls in a cell (a stage menu, a link) and their portalled
+                                // menus and dialogs act on their own; they never open the row.
+                                if (isPlainRowClick(event)) handleClick();
+                              }
+                            : undefined
+                        }
                         onKeyDown={
                           clickable
                             ? (event) => {

@@ -32,7 +32,7 @@ function SpacesList({ userId, workspaceId }: { userId: string; workspaceId: stri
   const [, setCreate] = useCreateSheet();
 
   return (
-    <PageShell width="narrow">
+    <PageShell>
       <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>Spaces</PageShellTitle>

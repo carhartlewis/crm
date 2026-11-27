@@ -22,6 +22,7 @@ import {
   type SidebarLayout,
 } from "@crm/core/chat";
 import type { Db } from "@crm/core/db";
+import { isChatRecordKind, isRecordOfKind } from "@crm/core/records";
 import type { Kv as KvStore } from "@crm/core/kv";
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { AppConfig } from "../config.ts";
@@ -53,6 +54,9 @@ export interface ChatRow {
   readonly permissionMode: string;
   /** The CRM made the title; a person's rename turns it off. Absent means on. */
   readonly autoTitle?: boolean;
+  /** The record the chat is about (ADR 0024); absent or null for other chats. */
+  readonly recordKind?: string | null;
+  readonly recordId?: string | null;
 }
 
 export interface SpaceRow {
@@ -191,6 +195,8 @@ export interface ChatsService {
       title: string;
       spaceId: string | null;
       permissionMode?: string | undefined;
+      recordKind?: string | null | undefined;
+      recordId?: string | null | undefined;
     },
   ) => Effect.Effect<{ txid: number; sessionId: string }, Failure>;
   readonly update: (
@@ -293,13 +299,21 @@ const callerIn = (
   actor: ChatActor,
   workspaceId: string | null,
   permissionMode?: string,
-): AgentCaller => ({
-  id: actor.id,
-  name: actor.name,
-  email: actor.email,
-  workspaceId,
-  permissionMode: permissionMode ?? DEFAULT_PERMISSION_MODE,
-});
+  chat?: ChatRow,
+): AgentCaller => {
+  const caller = {
+    id: actor.id,
+    name: actor.name,
+    email: actor.email,
+    workspaceId,
+    permissionMode: permissionMode ?? DEFAULT_PERMISSION_MODE,
+  } satisfies AgentCaller;
+
+  // A chat from a record sheet tells the agent which record it is about (ADR 0024).
+  if (!chat?.recordKind || !chat.recordId) return caller;
+
+  return { ...caller, record: { kind: chat.recordKind, id: chat.recordId } };
+};
 
 const notMember = () => new Forbidden({ message: "Join the space first" });
 
@@ -411,6 +425,18 @@ export function makeChats(
 
         if (!title.ok) return yield* new Invalid({ message: title.message });
 
+        const recordKind = input.recordKind ?? null;
+        const recordId = input.recordId ?? null;
+
+        if (
+          (recordKind === null) !== (recordId === null) ||
+          (recordKind !== null &&
+            recordId !== null &&
+            (!isChatRecordKind(recordKind) || !isRecordOfKind(recordKind, recordId)))
+        ) {
+          return yield* new Invalid({ message: "That record is not valid" });
+        }
+
         const workspaceId = actor.activeWorkspaceId;
 
         if (!workspaceId) return yield* noWorkspace();
@@ -442,6 +468,8 @@ export function makeChats(
             title: title.value,
             sessionId,
             permissionMode: input.permissionMode ?? DEFAULT_PERMISSION_MODE,
+            recordKind,
+            recordId,
           });
 
           return ok(undefined);
@@ -793,7 +821,7 @@ export function makeChats(
 
         const response = await agent
           .forward(
-            callerIn(actor, chat.value.workspaceId, chat.value.permissionMode),
+            callerIn(actor, chat.value.workspaceId, chat.value.permissionMode, chat.value),
             path,
             request,
           )

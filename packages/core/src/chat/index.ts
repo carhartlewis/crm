@@ -63,13 +63,15 @@ export function spaceDescriptionError(value: string) {
 
 /**
  * What the agent asks a small model when a chat's first message arrives, to name it in the
- * sidebar while the reply is still being written.
+ * sidebar while the reply is still being written. Attached files are named too: "What's this?"
+ * with an invoice says little alone.
  */
-export function chatTitlePrompt(message: string) {
+export function chatTitlePrompt(message: string, filenames: readonly string[] = []) {
   return [
-    "Name this chat for a sidebar list from its first message. Reply with the title only: 2 to 6 words, plain text, no quotes, no full stop, in the language of the message.",
+    "Name this chat for a sidebar list from its first message. Reply with the title only: 2 to 6 words, plain text, no quotes, no full stop, in the language of the message. When the message is vague, name it from the attached files.",
     "",
     `Message: ${message.slice(0, 2_000)}`,
+    ...(filenames.length > 0 ? [`Attached files: ${filenames.slice(0, 10).join(", ")}`] : []),
   ].join("\n");
 }
 

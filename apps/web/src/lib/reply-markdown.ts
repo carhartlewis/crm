@@ -2,12 +2,21 @@
  * Tidies an agent reply before it renders, so a slip in the agent's formatting doesn't show:
  * a bulleted "Company — text" list becomes a table, a table that repeats companies already
  * shown as records goes, and a table's first-column company names become record links, so
- * every such row opens its company.
+ * every such row opens its company. The first time the reply names a record this turn's tool
+ * calls touched, the name becomes its mention. A record mention the agent wrapped in backticks, or wrote
+ * after the same name in bold, becomes a bare mention so it renders as its chip.
  */
 
 export interface NamedRecord {
   readonly id: string;
   readonly name: string;
+}
+
+/** A record this turn's tool calls touched (`turnRecords`), so the reply's name for it can open it. */
+export interface MentionableRecord {
+  readonly kind: "company" | "contact" | "deal";
+  readonly id: string;
+  readonly name: string | undefined;
 }
 
 const RECORDS_FENCE = /```island-records\s*\n([\s\S]*?)\n```/g;
@@ -92,7 +101,119 @@ function listsToTables(lines: readonly string[], byName: ReadonlyMap<string, Nam
   return out;
 }
 
-export function tidyReply(text: string, companies: readonly NamedRecord[]) {
+const QUOTED_MENTION = /`(:(?:company|contact|deal)\[[^\]`\n]*\]\{record="[^"`\n]*"\})`/g;
+
+const NAMED_MENTION =
+  /(\*\*|__)([^*_\n]+)\1\s*\(\s*(:(?:company|contact|deal)\[([^\]\n]*)\]\{record="[^"\n]*"\})\s*\)/g;
+
+/**
+ * Mentions as the agent should have written them: never inside inline code (where they show as
+ * source), and never after the same name in bold ("**Mercury** (:company[Mercury]{…})").
+ */
+function bareMentions(line: string) {
+  return line
+    .replaceAll(QUOTED_MENTION, "$1")
+    .replaceAll(NAMED_MENTION, (whole, _mark, name: string, mention: string, label: string) =>
+      key(name) === key(label) ? mention : whole,
+    );
+}
+
+/** Applies `change` to every line outside code fences. */
+function proseLines(lines: readonly string[], change: (line: string) => string) {
+  let fenced = false;
+
+  return lines.map((line) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+
+      return line;
+    }
+
+    return fenced ? line : change(line);
+  });
+}
+
+/** Text a name must never be linked inside: inline code, a mention, a link, a heading. */
+const PROTECTED =
+  /`[^`\n]*`|:(?:company|contact|deal)\[[^\]\n]*\]\{[^}\n]*\}|!?\[[^\]\n]*\]\([^)\n]*\)|^\s*#.*$/g;
+
+const NO_RECORDS: readonly MentionableRecord[] = [];
+
+const escapeRegExp = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** A record's name alone, bold or not, never inside a longer word. */
+const namePattern = (name: string) =>
+  new RegExp(`(?<![\\p{L}\\p{N}_])(\\*\\*|__)?${escapeRegExp(name)}\\1(?![\\p{L}\\p{N}_])`, "iu");
+
+/**
+ * Replaces the first match of `pattern` in `line` outside protected spans, or returns null when
+ * there is none.
+ */
+function replaceOutside(line: string, pattern: RegExp, replacement: string) {
+  let start = 0;
+
+  for (const span of [...line.matchAll(PROTECTED), null]) {
+    const end = span ? (span.index ?? 0) : line.length;
+    const match = pattern.exec(line.slice(start, end));
+
+    if (match) {
+      const at = start + match.index;
+
+      return `${line.slice(0, at)}${replacement}${line.slice(at + match[0].length)}`;
+    }
+
+    if (span) start = end + span[0].length;
+  }
+
+  return null;
+}
+
+/**
+ * The first time the reply names a record the turn touched, the name becomes its mention, so it
+ * shows as a chip that opens it. Longer names go first ("Mercury — New opportunity" before
+ * "Mercury"); a record already mentioned, and a name of under three letters, stay as they are.
+ */
+function linkNames(lines: readonly string[], records: readonly MentionableRecord[]) {
+  const text = lines.join("\n");
+
+  const named = records
+    .flatMap((record) => {
+      const name = record.name?.trim();
+
+      return name && name.length >= 3 && !/[[\]\n|]/.test(name) && !text.includes(record.id)
+        ? [{ ...record, name }]
+        : [];
+    })
+    .toSorted((a, b) => b.name.length - a.name.length);
+
+  let out = [...lines];
+
+  for (const record of named) {
+    const pattern = namePattern(record.name);
+    const mention = `:${record.kind}[${record.name}]{record="${record.id}"}`;
+    let done = false;
+
+    out = proseLines(out, (line) => {
+      if (done) return line;
+
+      const changed = replaceOutside(line, pattern, mention);
+
+      if (changed === null) return line;
+
+      done = true;
+
+      return changed;
+    });
+  }
+
+  return out;
+}
+
+export function tidyReply(
+  text: string,
+  companies: readonly NamedRecord[],
+  touched: readonly MentionableRecord[] = NO_RECORDS,
+) {
   const byName = new Map(companies.map((company) => [key(company.name), company]));
   const shown = shownIds(text);
 
@@ -100,7 +221,11 @@ export function tidyReply(text: string, companies: readonly NamedRecord[]) {
     companies.flatMap((company) => (shown.has(company.id) ? [key(company.name)] : [])),
   );
 
-  const lines = listsToTables(text.split("\n"), byName);
+  const lines = linkNames(
+    listsToTables(proseLines(text.split("\n"), bareMentions), byName),
+    touched,
+  );
+
   const out: string[] = [];
   let index = 0;
 
