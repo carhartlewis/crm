@@ -20,7 +20,7 @@ import { useListTable } from "@crm/ui/patterns/data-table/use-list-table";
 import { RecordRowMenu } from "@crm/ui/patterns/record-sheet/record-sheet";
 import { preloadable } from "@crm/ui/lib/preloadable";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Suspense } from "react";
+import { type ReactNode, Suspense } from "react";
 import { parseAsString, useQueryState } from "nuqs";
 import { toast } from "sonner";
 import {
@@ -174,10 +174,13 @@ export function SkillsPanel({
   skills,
   view,
   settledQuery,
+  toolbar,
 }: Scope & {
   skills: readonly SkillSummary[];
   view: "yours" | "discover";
   settledQuery: string;
+  /** The page's tabs and search; the table shows them on one line with its Sort. */
+  toolbar: ReactNode;
 }) {
   const [open, setOpen] = useQueryState("skill", parseAsString);
   const scope = { userId, workspaceId };
@@ -185,9 +188,12 @@ export function SkillsPanel({
   return (
     <>
       {view === "yours" ? (
-        <YourSkills skills={skills} onOpen={(id) => void setOpen(id)} />
+        <YourSkills skills={skills} toolbar={toolbar} onOpen={(id) => void setOpen(id)} />
       ) : (
-        <DiscoverSkills scope={scope} query={settledQuery} onOpen={(id) => void setOpen(id)} />
+        <div className="flex flex-col gap-6">
+          {toolbar}
+          <DiscoverSkills scope={scope} query={settledQuery} onOpen={(id) => void setOpen(id)} />
+        </div>
       )}
       {open ? (
         <Suspense fallback={null}>
@@ -205,9 +211,11 @@ export function SkillsPanel({
 
 function YourSkills({
   skills,
+  toolbar,
   onOpen,
 }: {
   skills: readonly SkillSummary[];
+  toolbar: ReactNode;
   onOpen: (id: string) => void;
 }) {
   const setEnabled = useMutation({ ...setSkillEnabledMutation, onError });
@@ -244,8 +252,7 @@ function YourSkills({
   return (
     <DataTable
       {...list.tableProps}
-      // The page toolbar holds the search and the count would repeat the tab.
-      search={null}
+      search={toolbar}
       meta={null}
       columns={COLUMNS}
       onRowClick={(row) => onOpen(row.id)}

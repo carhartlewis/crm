@@ -135,6 +135,28 @@ function Connections() {
     </DropdownMenu>
   );
 
+  // What to show, whose, and the search. A table puts it on its own toolbar's line, by Sort.
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-3">
+      <Tabs value={tab} onValueChange={(next: (typeof TABS)[number]) => void setTab(next)}>
+        <TabsList aria-label="Show">
+          <TabsTrigger value="connectors">Connectors</TabsTrigger>
+          <TabsTrigger value="skills">Skills</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <Separator orientation="vertical" className="h-5" />
+      <Tabs value={view} onValueChange={(next: (typeof VIEWS)[number]) => void setView(next)}>
+        <TabsList aria-label="Whose">
+          <TabsTrigger value="yours">Yours</TabsTrigger>
+          <TabsTrigger value="discover">Discover</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <div className="min-w-48 flex-1 sm:max-w-80">
+        <ListSearch placeholder={tab === "connectors" ? "Search connectors…" : "Search skills…"} />
+      </div>
+    </div>
+  );
+
   const outcome = outcomeMessage(search, appName);
 
   return (
@@ -150,42 +172,7 @@ function Connections() {
             </Link>
           </output>
         ) : null}
-        <div className="flex flex-wrap items-center gap-3">
-          <Tabs value={tab} onValueChange={(next: (typeof TABS)[number]) => void setTab(next)}>
-            <TabsList aria-label="Show">
-              <TabsTrigger value="connectors">Connectors</TabsTrigger>
-              <TabsTrigger value="skills">Skills</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Separator orientation="vertical" className="h-5" />
-          <Tabs value={view} onValueChange={(next: (typeof VIEWS)[number]) => void setView(next)}>
-            <TabsList aria-label="Whose">
-              <TabsTrigger value="yours">Yours</TabsTrigger>
-              <TabsTrigger value="discover">Discover</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <div className="min-w-48 flex-1 sm:max-w-80">
-            <ListSearch
-              placeholder={tab === "connectors" ? "Search connectors…" : "Search skills…"}
-            />
-          </div>
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".md,text/markdown"
-            className="hidden"
-            aria-label="Upload a SKILL.md"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-
-              event.target.value = "";
-
-              if (!file) return;
-
-              void openDraft(file);
-            }}
-          />
-        </div>
+        {tab === "connectors" ? toolbar : null}
         {tab === "connectors" ? (
           <ConnectorsPanel
             catalog={catalog}
@@ -202,9 +189,26 @@ function Connections() {
             skills={skills}
             view={view}
             settledQuery={settledQuery}
+            toolbar={toolbar}
           />
         )}
       </div>
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".md,text/markdown"
+        className="hidden"
+        aria-label="Upload a SKILL.md"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+
+          event.target.value = "";
+
+          if (!file) return;
+
+          void openDraft(file);
+        }}
+      />
       {adding === "connector" ? <AddConnectorSheet onClose={() => void setAdding(null)} /> : null}
       {adding === "skill" ? (
         <CreateSkillSheet
