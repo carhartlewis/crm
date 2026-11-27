@@ -4,7 +4,7 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from "@crm/ui/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@crm/ui/components/ai-elements/message";
+import { Message, MessageContent } from "@crm/ui/components/ai-elements/message";
 import {
   Reasoning,
   ReasoningContent,
@@ -23,7 +23,7 @@ import { useEveAgent } from "eve/react";
 import { toast } from "sonner";
 import { chatKeys, takeFirstMessage } from "../../lib/chat-api.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
-import { replyIslands } from "./reply-islands.tsx";
+import { ReplyResponse } from "./reply-islands.tsx";
 import { Composer } from "./composer.tsx";
 
 import {
@@ -228,11 +228,7 @@ function ChatPart({
 }) {
   switch (part.type) {
     case "text":
-      return (
-        <MessageResponse isAnimating={part.state === "streaming"} islands={replyIslands}>
-          {part.text}
-        </MessageResponse>
-      );
+      return <ReplyResponse text={part.text} streaming={part.state === "streaming"} />;
     case "reasoning":
       return (
         <Reasoning isStreaming={part.state === "streaming"}>

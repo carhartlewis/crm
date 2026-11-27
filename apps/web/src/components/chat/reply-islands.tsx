@@ -1,3 +1,4 @@
+import { MessageResponse } from "@crm/ui/components/ai-elements/message";
 import type { ReactiveIslands } from "@crm/ui/components/markdown";
 import { RecordChip, RecordList } from "@crm/ui/patterns/record-list";
 import { useLiveQuery } from "@tanstack/react-db";
@@ -5,6 +6,7 @@ import { useRouteContext } from "@tanstack/react-router";
 import { Option, Schema } from "effect";
 import { companiesCollection } from "../../lib/companies.ts";
 import { useOpenRecord } from "../../lib/records.ts";
+import { tidyReply } from "../../lib/reply-markdown.ts";
 
 /** ```` ```island-records ```` : CRM records the reply lists, by id, in the reply's order. */
 const RecordsIsland = Schema.Struct({
@@ -75,3 +77,14 @@ export const replyIslands: ReactiveIslands = {
       }),
   },
 };
+
+/** An agent reply with its components, tidied first (`tidyReply`). */
+export function ReplyResponse({ text, streaming }: { text: string; streaming: boolean }) {
+  const companies = useCompanies();
+
+  return (
+    <MessageResponse isAnimating={streaming} islands={replyIslands}>
+      {tidyReply(text, companies)}
+    </MessageResponse>
+  );
+}
