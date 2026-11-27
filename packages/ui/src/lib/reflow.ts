@@ -63,7 +63,8 @@ export function observeReflow(element: HTMLElement | null) {
     width = next;
   });
 
-  observer.observe(element);
+  // The border box: a scrollbar coming or going is not a width change.
+  observer.observe(element, { box: "border-box" });
 
   return () => observer.disconnect();
 }

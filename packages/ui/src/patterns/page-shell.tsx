@@ -24,7 +24,7 @@ function PageShell({
       ref={observeReflow}
       className={cn(
         "relative flex min-w-0 flex-1 flex-col outline-none",
-        contained ? "min-h-0 overflow-hidden" : "overflow-y-auto",
+        contained ? "min-h-0 overflow-hidden" : "overflow-y-auto scrollbar-gutter-stable",
       )}
       data-slot="page-shell-scroll"
     >

@@ -300,6 +300,16 @@
   width: min(var(--container-record), calc(100vw - var(--workspace-sidebar-width, 3rem) - 0.5rem));
 }
 
+/*
+ * A scrolling page keeps its scrollbar's space whether or not it scrolls (the app's scrollbars
+ * take room). Otherwise content that grows or moves past the bottom, such as cards gliding to a
+ * new grid layout, toggles the scrollbar, the page narrows mid-frame, and everything reflows by
+ * its width: a visible jitter, and a ResizeObserver loop error.
+ */
+@utility scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+}
+
 @utility no-scrollbar {
   scrollbar-width: none;
 
