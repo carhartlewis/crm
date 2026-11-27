@@ -62,6 +62,12 @@ export const AppConfig = Config.all({
   // The eve agent's origin. Its sign-in callback is the only redirect the MCP authorization
   // server accepts for the agent client (see @crm/core/auth/mcp).
   agentUrl: Config.URL("AGENT_URL").pipe(Config.withDefault(new URL("http://localhost:2000"))),
+  // Background research sessions that run at once (ADR 0030): per workspace, and in all. More
+  // wait in the queue and start as sessions end. Generous on purpose: they stop a flood.
+  researchWorkspaceConcurrency: Config.Int("RESEARCH_WORKSPACE_CONCURRENCY").pipe(
+    Config.withDefault(10),
+  ),
+  researchConcurrency: Config.Int("RESEARCH_CONCURRENCY").pipe(Config.withDefault(50)),
   // Shared with the agent: it accepts chat requests only with this secret (ADR 0018). Optional;
   // without it, chats are off.
   agentProxySecret: Config.option(

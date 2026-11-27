@@ -95,6 +95,64 @@ describe("enrichment status", () => {
   });
 });
 
+describe("research settles when its session ends", () => {
+  test("a finished turn completes research the agent left open", async () => {
+    const env = setup();
+    const input = { kind: "contact", id: env.contactId };
+
+    await run(env.intel.setEnrichment(alice, { ...input, status: "running" }));
+
+    const result = await run(env.intel.settleResearch(alice, { ...input, outcome: "completed" }));
+    const row = env.record("contact", env.contactId);
+
+    expect(result.settled).toBe(true);
+    expect(row?.enrichmentStatus).toBe("complete");
+    expect(row?.enrichedAt).toEqual(now);
+  });
+
+  test.each(["failed", "cancelled", "paused"])(
+    "a %s turn marks open research failed, never forever running",
+    async (ended) => {
+      const env = setup();
+
+      await run(
+        env.intel.settleResearch(alice, { kind: "company", id: env.companyId, outcome: ended }),
+      );
+
+      const row = env.record("company", env.companyId);
+
+      expect(row?.enrichmentStatus).toBe("failed");
+      expect(row?.enrichmentError).toBe("Research stopped before it finished");
+    },
+  );
+
+  test("a status the agent already set stays", async () => {
+    const env = setup();
+    const input = { kind: "contact", id: env.contactId };
+
+    await run(env.intel.setEnrichment(alice, { ...input, status: "skipped" }));
+
+    const result = await run(env.intel.settleResearch(alice, { ...input, outcome: "failed" }));
+
+    expect(result.settled).toBe(false);
+    expect(env.record("contact", env.contactId)?.enrichmentStatus).toBe("skipped");
+  });
+
+  test("another workspace's record is refused", async () => {
+    const env = setup();
+
+    expect(
+      await outcome(
+        env.intel.settleResearch(bob, {
+          kind: "company",
+          id: env.companyId,
+          outcome: "completed",
+        }),
+      ),
+    ).toBe("NotFound");
+  });
+});
+
 describe("contact facts", () => {
   const sourced = { field: "title", sourceUrl: "https://example.com" };
 

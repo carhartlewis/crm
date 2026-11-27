@@ -16,6 +16,8 @@ export interface AgentCaller {
   readonly record?: { readonly kind: string; readonly id: string };
   /** `research` for a background session the API started (ADR 0025); usage is filed under it. */
   readonly origin?: "research";
+  /** The research queue's job (ADR 0030); the agent reports it back when the session ends. */
+  readonly researchJob?: string;
 }
 
 /** What the chats service needs from the agent (ADR 0018). Tests inject a fake. */
@@ -44,6 +46,7 @@ export interface CallerHeaders {
   "x-crm-record-kind"?: string;
   "x-crm-record-id"?: string;
   "x-crm-origin"?: string;
+  "x-crm-research-job"?: string;
 }
 
 export function callerHeaders(secret: string, caller: AgentCaller | null) {
@@ -65,6 +68,8 @@ export function callerHeaders(secret: string, caller: AgentCaller | null) {
     }
 
     if (caller.origin) headers["x-crm-origin"] = caller.origin;
+
+    if (caller.researchJob) headers["x-crm-research-job"] = caller.researchJob;
   }
 
   return { ...headers };

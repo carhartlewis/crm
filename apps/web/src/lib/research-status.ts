@@ -15,7 +15,9 @@ export interface ResearchStatus {
   readonly detail: string;
 }
 
-/** A company keeps its indicator while its people's independent research finishes. */
+const contactCount = (count: number) => `${count} ${count === 1 ? "contact" : "contacts"}`;
+
+/** A company keeps its indicator while its contacts' independent research finishes. */
 export function researchStatus(record: ResearchRecord, people = 0): ResearchStatus | null {
   if (record.archived_at) return null;
 
@@ -23,7 +25,7 @@ export function researchStatus(record: ResearchRecord, people = 0): ResearchStat
     return {
       state: "failed",
       label: "Research interrupted",
-      detail: "Saved details are kept. Open the record and run Research or Re-enrich to try again.",
+      detail: "Saved details are kept. Use Re-enrich to try again.",
     };
   }
 
@@ -32,8 +34,8 @@ export function researchStatus(record: ResearchRecord, people = 0): ResearchStat
       state: "running",
       label: "Researching",
       detail: people
-        ? `Filling in this company and researching ${people} ${people === 1 ? "person" : "people"}. Details appear as they are found.`
-        : "Details appear as they are found. You can keep working and editing this record.",
+        ? `Researching this company and ${contactCount(people)}. Details appear as they are found.`
+        : "Details appear as they are found.",
     };
   }
 
@@ -41,18 +43,59 @@ export function researchStatus(record: ResearchRecord, people = 0): ResearchStat
     return {
       state: "queued",
       label: "Research queued",
-      detail: "Waiting for research to start. You can use and edit this record now.",
+      detail: "Waiting for a research slot. It starts on its own.",
     };
   }
 
   return people > 0
     ? {
         state: "running",
-        label: `Researching ${people} ${people === 1 ? "person" : "people"}`,
-        detail:
-          "Company research has finished. Its contacts are still filling in their profiles and photos.",
+        label: `Researching ${contactCount(people)}`,
+        detail: "Details appear as they are found.",
       }
     : null;
+}
+
+/** The workspace's research right now: sessions running, and records waiting in the queue. */
+export function researchActivity(records: readonly ResearchRecord[]) {
+  let running = 0;
+  let queued = 0;
+
+  for (const record of records) {
+    if (record.archived_at) continue;
+
+    if (record.enrichment_status === "running") running += 1;
+    else if (record.enrichment_status === "pending") queued += 1;
+  }
+
+  return { running, queued };
+}
+
+/** The page header's summary; null when nothing is being researched. */
+export function activityStatus({
+  running,
+  queued,
+}: {
+  running: number;
+  queued: number;
+}): ResearchStatus | null {
+  if (running === 0 && queued === 0) return null;
+
+  const waiting = `${queued} queued`;
+
+  return {
+    state: running > 0 ? "running" : "queued",
+    label:
+      running > 0
+        ? queued > 0
+          ? `Researching ${running} · ${waiting}`
+          : `Researching ${running}`
+        : waiting,
+    detail:
+      queued > 0
+        ? "A few records are researched at a time. Queued records start on their own as others finish."
+        : "Details appear as they are found.",
+  };
 }
 
 /** One pass over the workspace's contacts; never count archived people. */

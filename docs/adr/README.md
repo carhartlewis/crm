@@ -33,3 +33,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0027](0027-enrichment-through-treg.md)             | People search, emails, phones and enrichment through treg; a usage ledger per workspace; costs shown in chats                        |
 | [0028](0028-shared-enrichment-cache.md)             | treg and context.dev answers are cached once for every workspace; a hit is free                                                      |
 | [0029](0029-contact-and-deal-research-is-memory.md) | A contact's brief and a deal's research brief are the record's memory core; deals research themselves; no research cap               |
+| [0030](0030-research-queue.md)                      | Research runs as BullMQ jobs: concurrency limits per workspace and in all, slots freed when a session ends; status synced live       |

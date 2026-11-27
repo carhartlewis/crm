@@ -16,6 +16,8 @@ export interface CrmCaller {
    * started, `sheet` for a chat about one record, otherwise `chat`.
    */
   readonly origin: "chat" | "research" | "sheet";
+  /** A background research session's queue job (ADR 0030); null for chats. */
+  readonly researchJob: string | null;
 }
 
 const RecordAttributes = Schema.Struct({
@@ -41,6 +43,8 @@ export function crmCaller(auth: SessionAuthContext | null | undefined): CrmCalle
   const workspace = auth.attributes["workspaceId"];
   const mode = auth.attributes["permissionMode"];
   const record = recordOf(auth.attributes);
+  const research = auth.attributes["origin"] === "research";
+  const job = auth.attributes["researchJob"];
 
   return {
     userId: auth.principalId,
@@ -48,6 +52,7 @@ export function crmCaller(auth: SessionAuthContext | null | undefined): CrmCalle
     permissionMode:
       String(mode) === mode && isPermissionMode(mode) ? mode : DEFAULT_PERMISSION_MODE,
     record,
-    origin: auth.attributes["origin"] === "research" ? "research" : record ? "sheet" : "chat",
+    origin: research ? "research" : record ? "sheet" : "chat",
+    researchJob: research && String(job) === job && job !== "" ? job : null,
   };
 }

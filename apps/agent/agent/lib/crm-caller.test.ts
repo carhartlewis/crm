@@ -11,6 +11,14 @@ const recordFrom = (recordKind: string, recordId: string) =>
   })?.record;
 
 /** What runs a turn, as the agent reads it from a chat's attributes. */
+const jobOf = (attributes: Readonly<Record<string, string>>) =>
+  crmCaller({
+    authenticator: "crm-proxy",
+    principalType: "user",
+    principalId: "user_1",
+    attributes: { workspaceId: "ws_1", ...attributes },
+  })?.researchJob;
+
 const originOf = (attributes: Readonly<Record<string, string>>) =>
   crmCaller({
     authenticator: "crm-proxy",
@@ -39,6 +47,7 @@ describe("crmCaller", () => {
       permissionMode: "bypass",
       record: null,
       origin: "chat",
+      researchJob: null,
     });
   });
 
@@ -56,6 +65,7 @@ describe("crmCaller", () => {
       permissionMode: "manual",
       record: null,
       origin: "chat",
+      researchJob: null,
     });
     expect(
       crmCaller({
@@ -83,5 +93,11 @@ describe("crmCaller", () => {
     expect(originOf({ ...record, origin: "research" })).toBe("research");
     expect(originOf(record)).toBe("sheet");
     expect(originOf({})).toBe("chat");
+  });
+
+  test("only background research carries its queue job", () => {
+    expect(jobOf({ origin: "research", researchJob: "research-ctc_1" })).toBe("research-ctc_1");
+    expect(jobOf({ researchJob: "research-ctc_1" })).toBeNull();
+    expect(jobOf({ origin: "research" })).toBeNull();
   });
 });

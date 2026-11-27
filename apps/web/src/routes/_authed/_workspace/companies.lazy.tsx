@@ -10,7 +10,7 @@ function Companies() {
   const { session } = Route.useRouteContext();
 
   return (
-    <RecordsPage create="company" createLabel="New company" title="Companies">
+    <RecordsPage research create="company" createLabel="New company" title="Companies">
       {(workspaceId) => (
         // Another workspace is another list: fresh selection, position and filters.
         <CompaniesTable key={workspaceId} userId={session.user.id} workspaceId={workspaceId} />

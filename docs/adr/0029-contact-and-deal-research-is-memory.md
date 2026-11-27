@@ -2,7 +2,8 @@
 
 **Status:** accepted (2026-11). Extends [0025](0025-records-fill-themselves.md) to deals and
 [0014](0014-workspace-and-company-memory.md) and [0026](0026-research-is-the-graph-core.md) to
-contacts and deals. Supersedes the per-workspace research cap of 0025.
+contacts and deals. Supersedes the per-workspace research cap of 0025. Amended by
+[0030](0030-research-queue.md): research now waits in a queue with concurrency limits.
 
 ## Context
 

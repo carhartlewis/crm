@@ -19,6 +19,8 @@ type CallerAttributes = {
   recordId?: string;
   /** `research` for a background session the API started (ADR 0025). */
   origin?: string;
+  /** The research queue's job (ADR 0030), reported back when the session ends. */
+  researchJob?: string;
 };
 
 export function crmProxy(secret: string | undefined): AuthFn<Request> {
@@ -67,7 +69,13 @@ export function crmProxy(secret: string | undefined): AuthFn<Request> {
       attributes.recordId = recordId;
     }
 
-    if (request.headers.get("x-crm-origin") === "research") attributes.origin = "research";
+    if (request.headers.get("x-crm-origin") === "research") {
+      attributes.origin = "research";
+
+      const job = request.headers.get("x-crm-research-job") ?? "";
+
+      if (job) attributes.researchJob = job;
+    }
 
     return {
       authenticator: "crm-proxy",

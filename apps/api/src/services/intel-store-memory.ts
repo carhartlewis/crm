@@ -95,6 +95,7 @@ export function createMemoryIntelStore(members: Iterable<string>) {
           return {
             companyId: table === "company" ? row.id : (row.companyId ?? null),
             lastActivityAt: row.lastActivityAt ?? null,
+            enrichmentStatus: table === "deal" ? null : (row.enrichmentStatus ?? "pending"),
           };
         },
         setEnrichment: async (table, workspaceId, id, patch) => {

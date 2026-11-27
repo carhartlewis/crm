@@ -56,6 +56,8 @@ export type EnrichedTable = "company" | "contact";
 export interface RecordRef {
   readonly companyId: string | null;
   readonly lastActivityAt: Date | null;
+  /** Research state of a company or contact; null for a deal. */
+  readonly enrichmentStatus: string | null;
 }
 
 export interface FactRow {
@@ -194,6 +196,13 @@ export interface EnrichmentInput {
   readonly error?: string | null | undefined;
 }
 
+export interface SettleInput {
+  readonly kind: string;
+  readonly id: string;
+  /** How the research turn ended: `completed`, `failed` or `cancelled`. */
+  readonly outcome: string;
+}
+
 export interface FactInput {
   readonly contactId: string;
   readonly field: string;
@@ -280,6 +289,12 @@ export interface RecordedFact {
 export interface IntelService {
   readonly setEnrichment: (actor: IntelActor, input: EnrichmentInput) => Write<object>;
   /**
+   * The research session ended. A record it left `pending` or `running` becomes `complete` when
+   * the turn finished, or `failed` when it failed or stopped, so the indicator never waits for
+   * the sweep. A status the agent already set stays.
+   */
+  readonly settleResearch: (actor: IntelActor, input: SettleInput) => Write<{ settled: boolean }>;
+  /**
    * Records a fact the agent found. It fills the contact at once unless it would replace a
    * member's own value; older proposals for the same field are superseded.
    */
@@ -303,6 +318,9 @@ export interface IntelService {
 }
 
 const ENRICHMENT_WRITES = new Set(["running", "complete", "failed", "skipped"]);
+
+/** Research the session left open; anything else the agent already settled. */
+const OPEN_RESEARCH = new Set(["pending", "running"]);
 
 /** A timestamp from the agent; null when it doesn't parse. */
 function instant(value: string | null | undefined) {
@@ -428,8 +446,20 @@ const short = (value: string | null | undefined) =>
   value?.trim() ? value.trim().slice(0, 200) : null;
 
 /** The parts of a record row a touch needs. */
-const ref = (row: { companyId?: string | null; lastActivityAt: Date | null } | null) =>
-  row ? { companyId: row.companyId ?? null, lastActivityAt: row.lastActivityAt } : null;
+const ref = (
+  row: {
+    companyId?: string | null;
+    lastActivityAt: Date | null;
+    enrichmentStatus?: string;
+  } | null,
+): RecordRef | null =>
+  row
+    ? {
+        companyId: row.companyId ?? null,
+        lastActivityAt: row.lastActivityAt,
+        enrichmentStatus: row.enrichmentStatus ?? null,
+      }
+    : null;
 
 export function makeIntel(store: IntelStore, deps: IntelDependencies = {}): IntelService {
   const now = deps.now ?? (() => new Date());
@@ -534,6 +564,40 @@ export function makeIntel(store: IntelStore, deps: IntelDependencies = {}): Inte
         await tx.setEnrichment(table, workspaceId, input.id, patch);
 
         return ok({});
+      });
+    },
+
+    settleResearch: (actor, input) => {
+      if (input.kind !== "company" && input.kind !== "contact") {
+        return reject("Choose a company or a contact");
+      }
+
+      const table: EnrichedTable = input.kind;
+
+      if (!(table === "company" ? isCompanyId(input.id) : isContactId(input.id))) {
+        return Effect.fail(new NotFound({ message: `${input.kind} not found` }));
+      }
+
+      return write<{ settled: boolean }>(actor, "settle research", async (workspaceId, tx) => {
+        const row = await tx.record(table, workspaceId, input.id);
+
+        if (!row) return fail(new NotFound({ message: `${input.kind} not found` }));
+
+        if (!OPEN_RESEARCH.has(row.enrichmentStatus ?? "")) return ok({ settled: false });
+
+        await tx.setEnrichment(
+          table,
+          workspaceId,
+          input.id,
+          input.outcome === "completed"
+            ? { enrichmentStatus: "complete", enrichedAt: now(), enrichmentError: null }
+            : {
+                enrichmentStatus: "failed",
+                enrichmentError: "Research stopped before it finished",
+              },
+        );
+
+        return ok({ settled: true });
       });
     },
 
@@ -925,7 +989,13 @@ function intelTx(tx: DbTx): IntelTx {
     if (table === "company") {
       const row = await orm.Company.where({ id, workspaceId }).first();
 
-      return row ? { companyId: row.id, lastActivityAt: row.lastActivityAt } : null;
+      return row
+        ? {
+            companyId: row.id,
+            lastActivityAt: row.lastActivityAt,
+            enrichmentStatus: row.enrichmentStatus,
+          }
+        : null;
     }
 
     if (table === "contact") return ref(await orm.Contact.where({ id, workspaceId }).first());

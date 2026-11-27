@@ -4,14 +4,31 @@ import { AppConfig } from "../config.ts";
 import { type AgentCaller, startAgentSession } from "./chat-agent.ts";
 import { Database } from "./Database.ts";
 import { Postgres } from "./Postgres.ts";
+import {
+  DEFAULT_LIMITS,
+  type QueueLimits,
+  type ResearchJob,
+  runResearchJob,
+  type SessionEnds,
+  type WorkspaceSlots,
+} from "./research-queue.ts";
+import {
+  createRedisEnds,
+  createRedisSlots,
+  createResearchQueue,
+  type ResearchQueue,
+  startResearchWorker,
+} from "./research-bullmq.ts";
+import { RedisClient } from "bun";
 
 /**
  * Research that starts by itself (ADR 0025): when a company, contact or deal is added, the API
- * starts a background agent session about it, in Auto permissions, and the agent fills the record
- * from the web through `crm__` tools. A deal's research is a brief in its memory (ADR 0029). Nobody waits on it: the sheet shows "Researching" and the values
+ * queues a background agent session about it, in Auto permissions, and the agent fills the record
+ * from the web through `crm__` tools. A deal's research is a brief in its memory (ADR 0029).
+ * Sessions wait in the research queue (ADR 0030) until their workspace and the API have room.
+ * Nobody waits on it: the record shows "Research queued", then "Researching", and the values
  * arrive through sync. The API only starts the session; the agent judges what is true.
  */
-
 export type ResearchKind = "company" | "contact" | "deal";
 
 export interface ResearchActor {
@@ -38,18 +55,20 @@ export interface PendingRecord {
 }
 
 export interface ResearchService {
-  /** Starts research on a new record, off the request path. Never fails the caller. */
+  /** Queues research on a new record, off the request path. Never fails the caller. */
   readonly start: (actor: ResearchActor, kind: ResearchKind, id: string) => void;
   /**
-   * Starts research on records that never got it (the agent was down when they were added).
-   * Returns how many started.
+   * Queues research on records that never got it (the agent was down, or a session died).
+   * Returns how many were queued; a record already queued or running is left alone.
    */
   readonly sweep: () => Promise<number>;
   /**
-   * Starts a background session that fills one custom field across records; false without a
+   * Queues a background session that fills one custom field across records; false without a
    * workspace or a known member.
    */
   readonly fill: (actor: ResearchActor, field: FillRequest) => Promise<boolean>;
+  /** A research session ended (the agent's hook): its slot goes to the next job. */
+  readonly finished: (workspaceId: string, jobId: string) => Promise<void>;
 }
 
 export interface ResearchDependencies {
@@ -61,10 +80,24 @@ export interface ResearchDependencies {
   ) => Promise<void>;
   /** The member's name and email, as the agent's caller headers carry them. */
   readonly user: (userId: string) => Promise<{ name: string; email: string } | null>;
-  readonly log: (message: string, cause: unknown) => void;
+  readonly log: (message: string, cause?: unknown) => void;
   readonly now?: () => number;
   /** Records still `pending` a while after they were added, or stuck `running`, oldest first. */
   readonly pending?: () => Promise<readonly PendingRecord[]>;
+  /** Where jobs wait their turn (ADR 0030): BullMQ in the API. */
+  readonly queue: ResearchQueue;
+  /** Each workspace's running sessions. */
+  readonly slots: WorkspaceSlots;
+  /** Word that a session ended, from the agent's hook. */
+  readonly ends: SessionEnds;
+  readonly limits?: QueueLimits;
+  /**
+   * Its session is starting: marks a company or contact `running`, which Electric syncs to every
+   * open table at once. False when the record is gone, archived or already researched.
+   */
+  readonly claim?: (job: ResearchJob & { kind: "company" | "contact" }) => Promise<boolean>;
+  /** Its session could not start: back to `pending`, so the sweep tries again. */
+  readonly unclaim?: (job: ResearchJob & { kind: "company" | "contact" }) => Promise<void>;
 }
 
 /** The first message of a research session; the skills hold the steps. */
@@ -83,95 +116,163 @@ export const SWEEP_EVERY = "10 minutes";
 export const fillPrompt = (field: FillRequest) =>
   `Fill the custom field "${field.label}" (field id ${field.id}) on every ${field.entity} that has no value for it yet. Read the field and its brief with crm__list_fields, list the records, research each one, and set a value with crm__set_field_value only where a source answers the brief. Leave values members set alone. This runs in the background: nobody is watching, so don't ask questions. Work through them one by one; skip a record you can't answer.`;
 
-export function makeResearch(deps: ResearchDependencies): ResearchService {
+/** The job id of a record's research: one at a time per record. */
+export const researchJobId = (recordId: string) => `research-${recordId}`;
+
+const statusKind = (
+  job: ResearchJob,
+): job is ResearchJob & { kind: "company" | "contact"; recordId: string } =>
+  (job.kind === "company" || job.kind === "contact") && job.recordId !== null;
+
+/** The first message of a job's session; null for a fill that lost its field. */
+function messageOf(job: ResearchJob) {
+  if (job.kind !== "fill") return RESEARCH_PROMPTS[job.kind];
+
+  return job.field ? fillPrompt(job.field) : null;
+}
+
+/** A record's research job; `operationId` differs for a retry, the job id never does. */
+function recordJob(
+  workspaceId: string,
+  userId: string,
+  kind: ResearchKind,
+  id: string,
+  operationId: string,
+): ResearchJob {
+  return {
+    id: researchJobId(id),
+    workspaceId,
+    userId,
+    kind,
+    recordId: id,
+    field: null,
+    operationId,
+  };
+}
+
+export function makeResearch(deps: ResearchDependencies): ResearchService & {
+  /** Runs one job, as BullMQ's worker calls it: `busy` when its workspace is full. */
+  readonly run: (job: ResearchJob) => Promise<"busy" | "done">;
+} {
   const now = deps.now ?? Date.now;
 
-  /** Starts one Auto session as the member; false without a workspace or a known member. */
-  const session = async (
-    actor: ResearchActor,
-    message: string,
-    operationId: string,
-    record?: { kind: string; id: string },
-  ) => {
-    const workspaceId = actor.activeWorkspaceId;
-
-    if (!workspaceId) return false;
-
-    const user = await deps.user(actor.userId);
+  /** Starts one job's Auto session as its member; false when there is nothing to start. */
+  const begin = async (job: ResearchJob) => {
+    const user = await deps.user(job.userId);
 
     if (!user) return false;
 
-    const caller: AgentCaller = record
-      ? {
-          id: actor.userId,
-          name: user.name,
-          email: user.email,
-          workspaceId,
-          permissionMode: "auto",
-          record,
-          origin: "research",
-        }
-      : {
-          id: actor.userId,
-          name: user.name,
-          email: user.email,
-          workspaceId,
-          permissionMode: "auto",
-          origin: "research",
-        };
+    if (statusKind(job) && deps.claim && !(await deps.claim(job))) return false;
 
-    await deps.startSession(caller, message, operationId);
+    const message = messageOf(job);
+
+    if (!message) return false;
+
+    let caller: AgentCaller = {
+      id: job.userId,
+      name: user.name,
+      email: user.email,
+      workspaceId: job.workspaceId,
+      permissionMode: "auto",
+      origin: "research",
+      researchJob: job.id,
+    };
+
+    if (job.kind !== "fill" && job.recordId) {
+      caller = { ...caller, record: { kind: job.kind, id: job.recordId } };
+    }
+
+    try {
+      await deps.startSession(caller, message, job.operationId);
+    } catch (cause) {
+      if (statusKind(job)) await deps.unclaim?.(job);
+
+      throw cause;
+    }
 
     return true;
   };
 
+  const limits = deps.limits ?? DEFAULT_LIMITS;
+  const { queue } = deps;
+
   return {
     start: (actor, kind, id) => {
-      session(actor, RESEARCH_PROMPTS[kind], `research:${id}`, { kind, id }).catch(
-        (cause: unknown) => deps.log(`research: ${kind} ${id}`, cause),
-      );
+      if (!actor.activeWorkspaceId) return;
+
+      queue
+        .enqueue(recordJob(actor.activeWorkspaceId, actor.userId, kind, id, `research:${id}`))
+        .catch((cause: unknown) => deps.log(`research: ${kind} ${id}`, cause));
     },
     sweep: async () => {
       const records = (await deps.pending?.()) ?? [];
+      // One retry per record per day: eve starts each operation id once.
+      const day = new Date(now()).toISOString().slice(0, 10);
       let count = 0;
 
       for (const record of records) {
-        const actor = { userId: record.userId, activeWorkspaceId: record.workspaceId };
+        // oxlint-disable-next-line no-await-in-loop -- in order, so the oldest queue first.
+        const queued = await queue.enqueue(
+          recordJob(
+            record.workspaceId,
+            record.userId,
+            record.kind,
+            record.id,
+            `research:${record.id}:${day}`,
+          ),
+        );
 
-        // One retry per record per day: eve starts each operation id once.
-        const day = new Date(now()).toISOString().slice(0, 10);
-
-        // oxlint-disable-next-line no-await-in-loop -- one at a time, so a sweep can't flood the agent.
-        const begun = await session(
-          actor,
-          RESEARCH_PROMPTS[record.kind],
-          `research:${record.id}:${day}`,
-          {
-            kind: record.kind,
-            id: record.id,
-          },
-        ).catch((cause: unknown) => {
-          deps.log(`research sweep: ${record.kind} ${record.id}`, cause);
-
-          return false;
-        });
-
-        if (begun) count += 1;
+        if (queued) count += 1;
       }
 
       return count;
     },
-    // One fill per field per minute: a second click joins the running one.
-    fill: (actor, field) =>
-      session(actor, fillPrompt(field), `fill:${field.id}:${Math.floor(now() / 60_000)}`),
+    fill: async (actor, field) => {
+      const workspaceId = actor.activeWorkspaceId;
+
+      if (!workspaceId || !(await deps.user(actor.userId))) return false;
+
+      // One fill per field per minute: a second click joins the queued or running one.
+      const id = `fill-${field.id}-${Math.floor(now() / 60_000)}`;
+
+      await queue.enqueue({
+        id,
+        workspaceId,
+        userId: actor.userId,
+        kind: "fill",
+        recordId: null,
+        field: { id: field.id, entity: field.entity, label: field.label },
+        operationId: id,
+      });
+
+      return true;
+    },
+    finished: async (workspaceId, jobId) => {
+      // Only a job running in the caller's workspace can be ended.
+      if (await deps.slots.holds(workspaceId, jobId)) await deps.ends.end(jobId);
+    },
+    run: (job) =>
+      runResearchJob(job, {
+        slots: deps.slots,
+        ends: deps.ends,
+        limits,
+        now,
+        begin,
+        log: deps.log,
+      }),
   };
 }
+
+/** Research problems go to the API's log as warnings; research never fails a request. */
+const log = (message: string, cause?: unknown) =>
+  void Effect.runFork(Effect.logWarning(message, cause));
 
 /** Without the agent's secret there is no agent to ask, and research stays manual. */
 const noResearch: ResearchService = {
   start: () => {},
   fill: async () => false,
   sweep: async () => 0,
+  finished: async () => {},
 };
 
 export class Research extends Context.Service<Research, ResearchService>()(
@@ -184,27 +285,50 @@ export class Research extends Context.Service<Research, ResearchService>()(
       const db = yield* Database;
       const pool = yield* Postgres;
 
-      const research = Option.match(config.agentProxySecret, {
-        onNone: () => noResearch,
-        onSome: (secret) =>
-          makeResearch({
-            startSession: (caller, message, operationId) =>
-              startAgentSession(
-                config.agentUrl,
-                Redacted.value(secret),
-                caller,
-                message,
-                operationId,
-              ),
-            user: async (userId) => {
-              const row = await db.orm.public.User.where({ id: userId }).first();
+      if (Option.isNone(config.agentProxySecret)) return noResearch;
 
-              return row ? { name: row.name, email: row.email } : null;
-            },
-            log: (message, cause) => void Effect.runFork(Effect.logWarning(message, cause)),
-            pending: () => pendingRecords(pool),
-          }),
+      const secret = Redacted.value(config.agentProxySecret.value);
+      const redisUrl = Redacted.value(config.redisUrl);
+
+      const limits: QueueLimits = {
+        workspace: config.researchWorkspaceConcurrency,
+        global: config.researchConcurrency,
+        leaseMs: DEFAULT_LIMITS.leaseMs,
+      };
+
+      const redis = yield* Effect.acquireRelease(
+        Effect.sync(() => new RedisClient(redisUrl)),
+        (client) => Effect.sync(() => client.close()),
+      );
+
+      const { research: queue, queue: bull } = yield* Effect.acquireRelease(
+        Effect.sync(() => createResearchQueue(redisUrl)),
+        ({ queue: open }) => Effect.promise(() => open.close()),
+      );
+
+      const research = makeResearch({
+        startSession: (caller, message, operationId) =>
+          startAgentSession(config.agentUrl, secret, caller, message, operationId),
+        user: async (userId) => {
+          const row = await db.orm.public.User.where({ id: userId }).first();
+
+          return row ? { name: row.name, email: row.email } : null;
+        },
+        log,
+        pending: () => pendingRecords(pool),
+        queue,
+        slots: createRedisSlots(redis),
+        ends: createRedisEnds(redis),
+        limits,
+        claim: (job) => claimRecord(pool, job),
+        unclaim: (job) => unclaimRecord(pool, job),
       });
+
+      // The worker runs jobs as slots free up; closing it lets running jobs finish first.
+      yield* Effect.acquireRelease(
+        Effect.promise(() => startResearchWorker(redisUrl, bull, limits, research.run, log)),
+        (worker) => Effect.promise(() => worker.close()),
+      );
 
       // Every record gets researched: the sweep picks up any whose start was missed.
       yield* Effect.promise(() => research.sweep()).pipe(
@@ -221,7 +345,8 @@ export class Research extends Context.Service<Research, ResearchService>()(
 /**
  * Companies and contacts still `pending` 15 minutes after they were added, or `running` with no
  * change for 30 minutes (the session died, such as when the agent restarted), oldest first, each
- * with the member to research it as: its owner, else the workspace's first owner.
+ * with the member to research it as: its owner, else the workspace's first owner. Records still
+ * waiting in the queue come back too; the queue already holds them and leaves them alone.
  */
 async function pendingRecords(pool: Pool): Promise<readonly PendingRecord[]> {
   const result = await pool.query<{
@@ -246,12 +371,40 @@ async function pendingRecords(pool: Pool): Promise<readonly PendingRecord[]> {
               OR (enrichment_status = 'running' AND updated_at < now() - interval '30 minutes'))
        ) r
       ORDER BY created_at
-      LIMIT 25`,
+      LIMIT 500`,
   );
 
   return result.rows.flatMap((row) =>
     row.user_id
       ? [{ kind: row.kind, id: row.id, workspaceId: row.workspace_id, userId: row.user_id }]
       : [],
+  );
+}
+
+/** Table of a company or contact job; the job's kind is checked, so this is never user text. */
+const TABLES = { company: "company", contact: "contact" } as const;
+
+/**
+ * Its session is starting: `running`, unless the record is gone, archived, or no longer waiting
+ * (a member re-ran research, or it finished). Electric syncs the change to every open table.
+ */
+async function claimRecord(pool: Pool, job: ResearchJob & { kind: "company" | "contact" }) {
+  const result = await pool.query(
+    `UPDATE ${TABLES[job.kind]} SET enrichment_status = 'running', enrichment_error = NULL,
+            updated_at = now()
+      WHERE id = $1 AND workspace_id = $2 AND archived_at IS NULL
+        AND enrichment_status IN ('pending', 'running')`,
+    [job.recordId, job.workspaceId],
+  );
+
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** Its session could not start: back to `pending`, which the sweep retries. */
+async function unclaimRecord(pool: Pool, job: ResearchJob & { kind: "company" | "contact" }) {
+  await pool.query(
+    `UPDATE ${TABLES[job.kind]} SET enrichment_status = 'pending', updated_at = now()
+      WHERE id = $1 AND workspace_id = $2 AND enrichment_status = 'running'`,
+    [job.recordId, job.workspaceId],
   );
 }

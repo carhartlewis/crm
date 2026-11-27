@@ -256,7 +256,12 @@ const app = HttpRouter.toWebHandler(
       FakeCompanies,
       FakeRecords,
       Layer.succeed(Fields, makeFields(createMemoryFieldStore({ members: [] }).store)),
-      Layer.succeed(Research, { start: () => {}, fill: async () => true, sweep: async () => 0 }),
+      Layer.succeed(Research, {
+        start: () => {},
+        fill: async () => true,
+        sweep: async () => 0,
+        finished: async () => {},
+      }),
       Layer.succeed(Usage, makeUsage(emptyUsage)),
       FakeChats,
       Layer.succeed(Intel, makeIntel(createMemoryIntelStore([]).store)),

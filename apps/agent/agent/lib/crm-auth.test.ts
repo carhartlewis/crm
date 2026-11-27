@@ -27,6 +27,24 @@ describe("crmProxy", () => {
     });
   });
 
+  test("a research session the API queued carries its job", async () => {
+    const headers = {
+      authorization: `Bearer ${secret}`,
+      "x-crm-user-id": "user_1",
+      "x-crm-workspace-id": "ws_1",
+      "x-crm-research-job": "research-ctc_1",
+    };
+
+    const research = await crmProxy(secret)(request({ ...headers, "x-crm-origin": "research" }));
+    const chat = await crmProxy(secret)(request(headers));
+
+    expect(research?.attributes).toMatchObject({
+      origin: "research",
+      researchJob: "research-ctc_1",
+    });
+    expect(chat?.attributes).not.toHaveProperty("researchJob");
+  });
+
   test("the API without a user is a service caller", async () => {
     expect(await crmProxy(secret)(request({ authorization: `Bearer ${secret}` }))).toEqual({
       authenticator: "crm-proxy",

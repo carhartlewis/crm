@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  activityStatus,
+  researchActivity,
   researchActive,
   researchingPeople,
   researchStatus,
@@ -25,7 +27,7 @@ describe("record research feedback", () => {
     });
   });
 
-  test("completion, no match and failure all stop the photo placeholder", () => {
+  test("completion, no match and failure all stop the avatar placeholder", () => {
     for (const status of ["complete", "skipped", "failed"]) {
       expect(researchActive(record(status))).toBe(false);
     }
@@ -55,9 +57,9 @@ describe("record research feedback", () => {
     ]);
     expect(researchStatus(record("complete"), counts.get("com_a"))).toMatchObject({
       state: "running",
-      label: "Researching 2 people",
+      label: "Researching 2 contacts",
     });
-    expect(researchStatus(record("complete"), 1)?.label).toBe("Researching 1 person");
+    expect(researchStatus(record("complete"), 1)?.label).toBe("Researching 1 contact");
     expect(researchStatus(record("complete"), 0)).toBeNull();
   });
 
@@ -70,5 +72,29 @@ describe("record research feedback", () => {
   test("unknown states do not invent progress", () => {
     expect(researchActive(record("unknown"))).toBe(false);
     expect(researchStatus(record("unknown"))).toBeNull();
+  });
+
+  test("the workspace summary counts running and queued research, never archived rows", () => {
+    const activity = researchActivity([
+      record("running"),
+      record("running"),
+      record("pending"),
+      record("pending"),
+      record("pending"),
+      record("complete"),
+      record("running", "2026-11-27"),
+    ]);
+
+    expect(activity).toEqual({ running: 2, queued: 3 });
+    expect(activityStatus(activity)).toMatchObject({
+      state: "running",
+      label: "Researching 2 · 3 queued",
+    });
+    expect(activityStatus({ running: 0, queued: 4 })).toMatchObject({
+      state: "queued",
+      label: "4 queued",
+    });
+    expect(activityStatus({ running: 1, queued: 0 })?.label).toBe("Researching 1");
+    expect(activityStatus({ running: 0, queued: 0 })).toBeNull();
   });
 });

@@ -66,6 +66,8 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Memory**: What the CRM remembers about a subject: the workspace's own company, or one company record. Stored in Supermemory, one namespace per subject (ADR 0014).
 
+**Research queue**: The BullMQ queue where background research sessions wait for a slot (ADR 0030): a few run at a time per workspace and in all, and a session's end frees its slot. A queued company or contact is `pending` ("Research queued"), then `running` ("Researching") when its session starts.
+
 **Source**: A document memory reads facts from: website research, the agent's research on a contact or deal, a member's note, a chat, a sent email, or a fact the assistant saved. Each has a stable id, so saving it again replaces it.
 
 **Fact**: One statement Supermemory extracted from sources. Members can forget a wrong fact; a newer fact can replace an older one.

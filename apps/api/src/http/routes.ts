@@ -893,6 +893,8 @@ function proxyFailure(error: typeof ProxyFailure.Type) {
 const AgentProxyRoutes = Layer.effectDiscard(
   Effect.gen(function* () {
     const router = yield* HttpRouter.HttpRouter;
+    const intel = yield* Intel;
+    const research = yield* Research;
     const auth = yield* Auth;
     const chats = yield* Chats;
 
@@ -948,6 +950,47 @@ const AgentProxyRoutes = Layer.effectDiscard(
     });
 
     yield* router.add("POST", "/api/agent/chats/title", () => HttpEffect.fromWebHandler(title));
+
+    // A research session ended (ADR 0025, 0030): the agent's hook reports how its turn ended. Its
+    // queue slot goes to the next job, and a record it left `running` stops showing
+    // "Researching" at once instead of waiting for the sweep.
+    const decodeSettle = Schema.decodeUnknownOption(
+      Schema.Struct({
+        job: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
+        record: Schema.NullOr(
+          Schema.Struct({ kind: Schema.Literals(["company", "contact"]), id: Schema.String }),
+        ),
+        outcome: Schema.String,
+      }),
+    );
+
+    const settle = auth.protectMcp(async (request, principal) => {
+      const body = Option.getOrNull(decodeSettle(await request.json().catch(() => null)));
+
+      if (body === null) return Response.json({ message: "Invalid request" }, { status: 400 });
+
+      const result = body.record
+        ? await Effect.runPromise(
+            Effect.result(
+              intel.settleResearch(
+                { userId: principal.userId, activeWorkspaceId: principal.workspaceId },
+                { ...body.record, outcome: body.outcome },
+              ),
+            ),
+          )
+        : null;
+
+      // The slot is freed whatever happened to the record; the queue checks the job's workspace.
+      if (body.job) await research.finished(principal.workspaceId, body.job);
+
+      return result === null || Result.isSuccess(result)
+        ? new Response(null, { status: 204, headers: noStore })
+        : proxyFailure(result.failure);
+    });
+
+    yield* router.add("POST", "/api/agent/research/settle", () =>
+      HttpEffect.fromWebHandler(settle),
+    );
   }),
 );
 

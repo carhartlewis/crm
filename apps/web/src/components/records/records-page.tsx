@@ -13,6 +13,7 @@ import { sessionQuery } from "../../lib/session.ts";
 import { shortcuts } from "../../lib/shortcuts.ts";
 import { HotkeyTooltip } from "../hotkey-tooltip.tsx";
 import { WorkspacePageHeader } from "../shell/page-header.tsx";
+import { ResearchActivity } from "./research-indicator.tsx";
 
 const CREATE_SHORTCUTS = {
   company: shortcuts.newCompany,
@@ -27,11 +28,14 @@ export function RecordsPage({
   title,
   create,
   createLabel,
+  research = false,
   children,
 }: {
   title: string;
   create: "company" | "contact" | "deal";
   createLabel: string;
+  /** Shows the workspace's research beside the New button (companies and contacts). */
+  research?: boolean;
   children: (workspaceId: string) => ReactNode;
 }) {
   const { data: current } = useSuspenseQuery(sessionQuery);
@@ -45,6 +49,7 @@ export function RecordsPage({
           <PageShellTitle>{title}</PageShellTitle>
         </PageShellHeading>
         <PageShellActions>
+          {workspaceId && research ? <ResearchActivity workspaceId={workspaceId} /> : null}
           <HotkeyTooltip shortcut={CREATE_SHORTCUTS[create]} side="left">
             <Button onClick={() => void openCreate(create)} size="sm">
               {createLabel}

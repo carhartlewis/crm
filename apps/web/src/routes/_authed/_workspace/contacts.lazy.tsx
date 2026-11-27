@@ -10,7 +10,7 @@ function Contacts() {
   const { session } = Route.useRouteContext();
 
   return (
-    <RecordsPage create="contact" createLabel="New contact" title="Contacts">
+    <RecordsPage research create="contact" createLabel="New contact" title="Contacts">
       {(workspaceId) => (
         // Another workspace is another list: fresh selection, position and filters.
         <ContactsTable key={workspaceId} userId={session.user.id} workspaceId={workspaceId} />
