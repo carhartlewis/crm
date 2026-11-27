@@ -36,14 +36,13 @@ import {
 } from "../../lib/chats.ts";
 import { haptic } from "../../lib/haptics.ts";
 import { isPageId, pageById, pageForPath } from "../../lib/pages.ts";
-import { pinnedShortcut } from "../../lib/shortcuts.ts";
+import { ariaKeyShortcuts, pinnedShortcut } from "../../lib/shortcuts.ts";
 import { recentChats } from "../../lib/sidebar-layout.ts";
 import { type ChatMenuRequest, MenuIcon, spaceColor } from "../chat/chat-menu.tsx";
 import { NameDialog } from "../chat/name-dialog.tsx";
 import { type ChatsApi, reorderPinnedAt, useChats } from "../chat/use-chats.ts";
 import { NavLink } from "./nav-link.tsx";
 import { reorderable } from "./reorder.ts";
-import { RowShortcut } from "./row-shortcut.tsx";
 
 const AddIcon = carbonIcon(add);
 const ChevronIcon = carbonIcon(chevronRight);
@@ -331,11 +330,12 @@ function ChatRow({ chat, icon, shortcutIndex, pinIndex, ...props }: ChatRowProps
     >
       <SidebarMenuButton
         isActive={props.pathname === `/chats/${chat.id}`}
+        aria-keyshortcuts={shortcut ? ariaKeyShortcuts(shortcut) : undefined}
         render={<Link to="/chats/$chatId" params={{ chatId: chat.id }} draggable={false} />}
       >
         {icon}
-        <span>{chat.title}</span>
-        <RowShortcut shortcut={shortcut} />
+        {/* One line: the hover icons take the end of the row, so the hotkey isn't shown here. */}
+        <span className="min-w-0 flex-1 truncate">{chat.title}</span>
       </SidebarMenuButton>
       {/* As for spaces: pin or unpin on hover; the chat's other actions are in its page header. */}
       <SidebarMenuAction
@@ -373,11 +373,11 @@ function SpaceRow({ space, shortcutIndex, pinIndex, ...props }: SpaceRowProps) {
     >
       <SidebarMenuButton
         isActive={props.pathname === `/spaces/${space.id}`}
+        aria-keyshortcuts={shortcut ? ariaKeyShortcuts(shortcut) : undefined}
         render={<Link to="/spaces/$spaceId" params={{ spaceId: space.id }} draggable={false} />}
       >
         <SpaceDot color={spaceColor(space.color)} />
-        <span>{space.name}</span>
-        <RowShortcut shortcut={shortcut} />
+        <span className="min-w-0 flex-1 truncate">{space.name}</span>
       </SidebarMenuButton>
       <SidebarMenuAction
         showOnHover

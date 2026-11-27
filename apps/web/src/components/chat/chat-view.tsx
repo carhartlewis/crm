@@ -10,20 +10,15 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from "@crm/ui/components/ai-elements/reasoning";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-  type ToolState,
-} from "@crm/ui/components/ai-elements/tool";
+import { ApprovalCard, type ApprovalItem } from "@crm/ui/patterns/approval-card";
+import { ToolStep, type ToolStepState } from "@crm/ui/patterns/tool-step";
 import { Button } from "@crm/ui/components/button";
 import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { chatAgentBase, type ChatHistory } from "@crm/core/api";
 import type { EveMessage, EveMessagePart, SessionStreamEvent } from "eve/client";
 import type { PermissionMode } from "@crm/core/chat";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Option, Schema } from "effect";
 import { useEveAgent } from "eve/react";
 import { toast } from "sonner";
 import { chatKeys, takeFirstMessage } from "../../lib/chat-api.ts";
@@ -36,23 +31,64 @@ type InteractionPart = Extract<EveMessagePart, { type: "interaction" }>;
 
 type Interaction = NonNullable<ToolPart["interaction"]>;
 
-/** eve's call states as AI Elements' tool states. */
-function toolState(part: ToolPart): ToolState {
+/** eve's call states as tool-step states. */
+function stepState(part: ToolPart): ToolStepState {
   switch (part.state) {
-    case "streaming":
-      return "input-streaming";
     case "approval":
-      return "approval-requested";
+      return "waiting";
     case "completed":
-      return "output-available";
+      return "done";
     case "failed":
-      return "output-error";
+      return "failed";
     case "rejected":
     case "cancelled":
-      return "output-denied";
+      return "denied";
     default:
-      return "input-available";
+      return "pending";
   }
+}
+
+/** "Connections: Create company" reads as "Create company": every CRM tool is on that connection. */
+function stepLabel(part: ToolPart) {
+  return part.label.replace(/^Connections:\s*/, "");
+}
+
+/** The fields of a call's input that name what it acts on. */
+const NamedInput = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  title: Schema.optional(Schema.String),
+  query: Schema.optional(Schema.String),
+  subject: Schema.optional(Schema.String),
+  text: Schema.optional(Schema.String),
+});
+
+const decodeNamedInput = Schema.decodeUnknownOption(NamedInput);
+
+/** What a call acts on, from its input: a name, title or query, when it has one. */
+function stepDetail(part: ToolPart): string | undefined {
+  return Option.match(decodeNamedInput(part.input), {
+    onNone: () => undefined,
+    onSome: (input) => {
+      const value = [input.name, input.title, input.query, input.subject, input.text]
+        .find((field) => field?.trim())
+        ?.trim();
+
+      return value?.slice(0, 80);
+    },
+  });
+}
+
+/** Calls waiting on an approval, oldest first, across the conversation. */
+function waitingApprovals(messages: readonly EveMessage[]) {
+  return messages.flatMap((message) =>
+    message.parts.flatMap((part) =>
+      part.type === "tool" &&
+      part.interaction?.status === "open" &&
+      part.interaction.request.kind === "approval"
+        ? [{ part, interactionId: part.interaction.interactionId }]
+        : [],
+    ),
+  );
 }
 
 export interface ChatViewProps {
@@ -101,7 +137,8 @@ export function ChatView({
   });
 
   const respond = useMutation({
-    mutationFn: (answer: { interactionId: string; optionId: string }) => agent.respond([answer]),
+    mutationFn: (answers: readonly { interactionId: string; optionId: string }[]) =>
+      agent.respond([...answers]),
     onSettled: historyChanged,
     onError: (error) => toast.error(error.message),
   });
@@ -123,7 +160,19 @@ export function ChatView({
   const working = agent.status === "busy";
 
   const answer = (interactionId: string, optionId: string) =>
-    respond.mutate({ interactionId, optionId });
+    respond.mutate([{ interactionId, optionId }]);
+
+  // Every call waiting on the person, in one card: approving ten is one click (as in comp-neo).
+  const waiting = waitingApprovals(agent.messages);
+
+  const approvalItems: ApprovalItem[] = waiting.map(({ part, interactionId }) => ({
+    id: interactionId,
+    label: stepLabel(part),
+    detail: stepDetail(part),
+  }));
+
+  const decide = (ids: readonly string[], optionId: "approve" | "deny") =>
+    respond.mutate(ids.map((interactionId) => ({ interactionId, optionId })));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -147,7 +196,21 @@ export function ChatView({
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
-      <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 pb-4">
+        {approvalItems.length > 0 && (
+          <ApprovalCard
+            title={
+              approvalItems.length === 1
+                ? "The assistant wants to make a change"
+                : `The assistant wants to make ${approvalItems.length} changes`
+            }
+            description="Approve to run them, or change the chat's mode so it asks less."
+            items={approvalItems}
+            disabled={respond.isPending}
+            onApprove={(ids) => decide(ids, "approve")}
+            onDeny={(ids) => decide(ids, "deny")}
+          />
+        )}
         <Composer
           focusOnMount
           status={working ? "streaming" : "ready"}
@@ -210,7 +273,10 @@ function ChatPart({
         </Reasoning>
       );
     case "tool":
-      return part.hidden ? null : <ToolCall part={part} onAnswer={onAnswer} />;
+      // Tool search and task controls are the agent's own housekeeping, not steps to show.
+      return part.hidden || part.kind === "control" || part.name.startsWith("eve__") ? null : (
+        <ToolCall part={part} onAnswer={onAnswer} />
+      );
     case "interaction":
       return <InteractionPrompt interaction={part} onAnswer={onAnswer} />;
     case "file":
@@ -231,16 +297,14 @@ function ToolCall({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <Tool>
-        <ToolHeader title={part.label} toolName={part.name} state={toolState(part)} />
-        <ToolContent>
-          {part.state !== "streaming" && <ToolInput input={part.input} />}
-          {(part.output !== undefined || part.error) && (
-            <ToolOutput output={part.output} errorText={part.error?.message} />
-          )}
-        </ToolContent>
-      </Tool>
-      {part.interaction?.status === "open" && (
+      <ToolStep
+        label={stepLabel(part)}
+        detail={stepDetail(part)}
+        state={stepState(part)}
+        error={part.error?.message}
+      />
+      {/* Approvals wait in one card above the composer; other questions stay with their call. */}
+      {part.interaction?.status === "open" && part.interaction.request.kind !== "approval" && (
         <InteractionPrompt interaction={part.interaction} onAnswer={onAnswer} />
       )}
     </div>

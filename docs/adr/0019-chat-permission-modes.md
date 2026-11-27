@@ -31,6 +31,11 @@ permissions. We want the same.
 - The CRM's own tools declare honest hints: reads are read-only; `create_company`,
   `update_company` and `remember` are non-destructive changes; `forget` is destructive.
 
+- **Approvals wait in one card** above the composer, as in comp-neo: it lists every call the
+  agent waits on, with Approve all and Deny all (one `respond` with every answer) and, with
+  several, Approve or Deny per row. Tool calls show as one quiet line each (`ToolStep` in
+  `@crm/ui/patterns`); the agent's own tool search is not shown.
+
 ## Consequences
 
 - Without a risk check, a tool with no annotations is risky, so it asks even in Auto. comp-neo

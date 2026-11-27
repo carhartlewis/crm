@@ -10,7 +10,6 @@
     "./components/ai-elements/message": "./src/components/ai-elements/message.tsx",
     "./components/ai-elements/prompt-input": "./src/components/ai-elements/prompt-input.tsx",
     "./components/ai-elements/reasoning": "./src/components/ai-elements/reasoning.tsx",
-    "./components/ai-elements/tool": "./src/components/ai-elements/tool.tsx",
     "./globals.css": "./src/styles/globals.css",
     "./hooks/*": "./src/hooks/*.ts",
     "./lib/*": "./src/lib/*.ts",
@@ -56,7 +55,9 @@
     "./patterns/ui-copy": "./src/patterns/ui-copy.ts",
     "./patterns/visually-hidden": "./src/patterns/visually-hidden.tsx",
     "./patterns/memory-graph": "./src/patterns/memory-graph.tsx",
-    "./components/space-dot": "./src/components/space-dot.tsx"
+    "./components/space-dot": "./src/components/space-dot.tsx",
+    "./patterns/tool-step": "./src/patterns/tool-step.tsx",
+    "./patterns/approval-card": "./src/patterns/approval-card.tsx"
   },
   "scripts": {
     "check-types": "bun check --no-script --project tsconfig.json"
