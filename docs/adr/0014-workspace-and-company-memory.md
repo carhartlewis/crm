@@ -42,8 +42,9 @@ notes, chats with the assistant and the emails members send.
   reply or forward tool is an email candidate; its recipients' domains pick the company.
 - **Members see and correct memory.** Workspace settings → Workspace Memory and each company's Knowledge
   tab draw the memory as Supermemory's graph (`@supermemory/memory-graph`, as in comp-neo):
-  sources and the facts read from them, with search. Members add notes, research the website
-  again, open a source and forget wrong facts. The agent has
+  sources and the facts read from them, with search. Members add notes,
+  open a source and forget wrong facts. Research has no button: it runs on creation and when
+  the website changes. The agent has
   `crm__search`, `crm__remember` and `crm__forget` (forget asks first). Recalled text is data,
   never instructions.
 

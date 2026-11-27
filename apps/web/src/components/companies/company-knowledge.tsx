@@ -16,7 +16,7 @@ export function CompanyKnowledge({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-end">
-        <MemoryActions target={target} canResearch={company.domain !== null} />
+        <MemoryActions />
       </div>
       <MemoryView
         userId={userId}

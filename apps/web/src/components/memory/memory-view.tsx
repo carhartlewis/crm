@@ -1,5 +1,4 @@
 import add from "@carbon/icons/es/add/16.js";
-import renew from "@carbon/icons/es/renew/16.js";
 import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { preloadable } from "@crm/ui/lib/preloadable";
@@ -8,16 +7,14 @@ import {
   MemoryGraphToolbar,
   type MemoryGraphLabels,
 } from "@crm/ui/patterns/memory-graph";
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { parseAsBoolean, parseAsString, useQueryStates } from "nuqs";
 import { Suspense } from "react";
-import { toast } from "sonner";
 import {
   knowledgeQuery,
   type MemoryTarget,
   memoryGraphQuery,
   memorySearchQuery,
-  researchMutation,
 } from "../../lib/memory.ts";
 import { AddNoteSheet } from "./add-note-sheet.tsx";
 import { sourceKindLabel } from "./memory-copy.ts";
@@ -26,7 +23,6 @@ import { SourceSheet } from "./source-sheet.tsx";
 const MemoryCanvas = preloadable(() => import("./memory-canvas.tsx"));
 
 const AddIcon = carbonIcon(add);
-const RenewIcon = carbonIcon(renew);
 
 const POLL_MS = 4_000;
 
@@ -62,44 +58,22 @@ export interface MemoryViewProps {
   readonly fill?: boolean;
 }
 
-/** Add a note, and read the website again when there is one. */
-export function MemoryActions({
-  target,
-  canResearch,
-}: {
-  target: MemoryTarget;
-  canResearch: boolean;
-}) {
+/**
+ * Add a note. Website research needs no button: it runs when the workspace or company is
+ * created, and when its website changes.
+ */
+export function MemoryActions() {
   const [, setState] = useQueryStates(params, { history: "push" });
 
-  const research = useMutation({
-    ...researchMutation,
-    onSuccess: () => toast.success("Reading the website. New facts appear in a minute."),
-    onError: (error) => toast.error(error.message),
-  });
-
   return (
-    <div className="flex items-center gap-2">
-      {canResearch ? (
-        <Button
-          variant="outline"
-          size="sm"
-          loading={research.isPending}
-          onClick={() => research.mutate(target)}
-        >
-          <RenewIcon data-icon="inline-start" />
-          Research website
-        </Button>
-      ) : null}
-      <Button
-        size="sm"
-        onPointerEnter={() => void MemoryCanvas.preload()}
-        onClick={() => void setState({ note: true })}
-      >
-        <AddIcon data-icon="inline-start" />
-        Add note
-      </Button>
-    </div>
+    <Button
+      size="sm"
+      onPointerEnter={() => void MemoryCanvas.preload()}
+      onClick={() => void setState({ note: true })}
+    >
+      <AddIcon data-icon="inline-start" />
+      Add note
+    </Button>
   );
 }
 
