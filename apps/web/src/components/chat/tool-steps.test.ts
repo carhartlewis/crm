@@ -66,10 +66,11 @@ describe("tool step runs", () => {
     expect(blocks).toHaveLength(1);
   });
 
-  test("a run is waiting or running while any call is, and failed when one failed", () => {
+  test("a run is waiting or running while any call is, and done when one succeeded", () => {
     expect(runState(["done", "pending", "failed"])).toBe("pending");
     expect(runState(["done", "waiting"])).toBe("waiting");
-    expect(runState(["done", "failed", "done"])).toBe("failed");
+    expect(runState(["done", "failed", "done"])).toBe("done");
+    expect(runState(["failed", "denied"])).toBe("failed");
     expect(runState(["denied", "done"])).toBe("done");
     expect(runState(["denied", "denied"])).toBe("denied");
   });

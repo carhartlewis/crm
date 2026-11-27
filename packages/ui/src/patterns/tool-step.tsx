@@ -1,6 +1,5 @@
 import checkmark from "@carbon/icons/es/checkmark/16.js";
 import chevronRight from "@carbon/icons/es/chevron--right/16.js";
-import warning from "@carbon/icons/es/warning--alt/16.js";
 import {
   Collapsible,
   CollapsibleContent,
@@ -12,13 +11,13 @@ import { cn } from "cn";
 import type { ReactNode } from "react";
 
 const CheckIcon = carbonIcon(checkmark);
-const WarningIcon = carbonIcon(warning);
 const ChevronIcon = carbonIcon(chevronRight);
 
 /**
  * One line for each tool the agent calls, as in comp-neo: "Create company". While it runs, the dot
  * matrix pulses and the label dims; waiting (for an approval) holds the dots still; done shows a
- * small check; failed a warning with the error beneath; denied is the dimmed label alone.
+ * small check; failed and denied are the dimmed label alone. A failed call isn't flagged: the
+ * agent works around it, and the reply says what matters.
  * The state is also read out after the label, so it doesn't rest on the icon alone.
  */
 export const TOOL_STEP_STATES = ["pending", "waiting", "done", "failed", "denied"] as const;
@@ -37,29 +36,21 @@ export function ToolStep({
   label,
   detail,
   state,
-  error,
 }: {
   /** What the tool does, such as "Create company". */
   label: ReactNode;
   /** What it acts on, such as the company's name; dimmed after the label. */
   detail?: ReactNode;
   state: ToolStepState;
-  /** Why it failed, shown under the label when `state` is "failed". */
-  error?: ReactNode;
 }) {
   return (
     <div
-      className="flex min-w-0 flex-col gap-1 select-none"
+      className="flex min-w-0 items-center gap-2 text-sm select-none"
       data-slot="tool-step"
       data-state={state}
     >
-      <div className="flex min-w-0 items-center gap-2 text-sm">
-        <StepIcon state={state} />
-        <StepLabel label={label} detail={detail} state={state} />
-      </div>
-      {state === "failed" && error && (
-        <p className="pl-6 text-xs text-pretty text-destructive select-text">{error}</p>
-      )}
+      <StepIcon state={state} />
+      <StepLabel label={label} detail={detail} state={state} />
     </div>
   );
 }
@@ -70,7 +61,6 @@ function StepIcon({ state }: { state: ToolStepState }) {
       {state === "pending" && <DotMatrix decorative />}
       {state === "waiting" && <DotMatrix decorative still />}
       {state === "done" && <CheckIcon className="size-3.5" />}
-      {state === "failed" && <WarningIcon className="size-3.5 text-destructive" />}
     </span>
   );
 }
@@ -90,7 +80,7 @@ function StepLabel({
     <span
       className={cn(
         "relative min-w-0 truncate",
-        state === "done" || state === "failed" ? "text-foreground" : "text-muted-foreground",
+        state === "done" ? "text-foreground" : "text-muted-foreground",
       )}
     >
       {/* A running step's label shimmers, as in T3 Code. */}
@@ -103,7 +93,7 @@ function StepLabel({
 
 /**
  * A run of calls to one tool as one line, such as "Lookup company · Capgo, Docspring and 4 more".
- * Its state is the run's: waiting or running while any call is, failed when one failed. The
+ * Its state is the run's: waiting or running while any call is, done when one succeeded. The
  * calls themselves open beneath it.
  */
 export function ToolStepGroup({

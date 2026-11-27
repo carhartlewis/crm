@@ -107,7 +107,7 @@ export function messageBlocks(parts: readonly EveMessagePart[]): Block[] {
 
 /** A run's state: waiting or running while any call is; failed when one failed. */
 export function runState(states: readonly ToolStepState[]): ToolStepState {
-  const order: ToolStepState[] = ["waiting", "pending", "failed", "done"];
+  const order: ToolStepState[] = ["waiting", "pending", "done", "failed"];
 
   return order.find((state) => states.includes(state)) ?? "denied";
 }
