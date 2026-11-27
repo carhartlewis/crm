@@ -558,9 +558,11 @@
     cursor: pointer;
   }
 
+  /* The row is the link, so its name doesn't underline on its own. */
   & [data-markdown="table"] td [data-slot="record-chip"] {
     position: static;
     cursor: pointer;
+    text-decoration: none;
   }
 
   & [data-markdown="table"] td [data-slot="record-chip"]::after {

@@ -129,10 +129,9 @@ function SpaceBody({
   return (
     <div className="animate-enter flex flex-col gap-2">
       {space && (
-        <p className="text-sm text-pretty text-muted-foreground select-text">
-          {[space.description, `${members} ${members === 1 ? "member" : "members"}`]
-            .filter(Boolean)
-            .join(" · ")}
+        <p className="text-sm text-pretty text-muted-foreground">
+          {space.description && <span className="select-text">{space.description} · </span>}
+          {members} {members === 1 ? "member" : "members"}
         </p>
       )}
       {!joined && space && (

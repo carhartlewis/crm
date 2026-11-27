@@ -44,7 +44,8 @@ function SpacesList({ userId, workspaceId }: { userId: string; workspaceId: stri
         </PageShellActions>
       </WorkspacePageHeader>
       <PageShellContent>
-        <ul className="animate-enter flex flex-col">
+        {/* Rows are interface chrome; a space's name and description stay copyable. */}
+        <ul className="animate-enter flex flex-col select-none">
           <li className="flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-muted/50">
             <Link
               to="/spaces/$spaceId"
@@ -75,9 +76,10 @@ function SpacesList({ userId, workspaceId }: { userId: string; workspaceId: stri
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-medium select-text">{space.name}</span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {[space.description, `${members} ${members === 1 ? "member" : "members"}`]
-                        .filter(Boolean)
-                        .join(" · ")}
+                      {space.description && (
+                        <span className="select-text">{space.description} · </span>
+                      )}
+                      {members} {members === 1 ? "member" : "members"}
                     </span>
                   </span>
                 </Link>

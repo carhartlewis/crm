@@ -5,13 +5,16 @@ import { cn } from "cn";
  * A table cell's text as its `title`, so a cell cut short by "…" shows in full on hover. The
  * cell's HTML is already escaped by the renderer; only a raw `"` could end the attribute.
  */
+/** Shorter cells fit their column, so a tooltip would only repeat them. */
+const TITLED_CELL_MIN = 28;
+
 function titledCell(html: string) {
   const text = html
     .replace(/<[^>]*>/g, "")
     .replaceAll('"', "&quot;")
     .trim();
 
-  return text ? html.replace(/^<td\b/, `<td title="${text}"`) : html;
+  return text.length >= TITLED_CELL_MIN ? html.replace(/^<td\b/, `<td title="${text}"`) : html;
 }
 
 /** Hooks on the HTML the renderer makes (trusted code). Stable, so it never resets a stream. */
