@@ -1,5 +1,6 @@
 import {
   AgentUnavailable,
+  CHAT_SPACE_MEMBERS_SYNC_PATH,
   CHAT_SPACES_SYNC_PATH,
   CHATS_SYNC_PATH,
   COMPANIES_SYNC_PATH,
@@ -35,6 +36,7 @@ import { AuthenticationLive } from "./Authentication.ts";
 import { clientIp, withClientIp } from "./client-ip.ts";
 import { callbackFromUrl, startFromUrl } from "./desktop.ts";
 import {
+  chatSpaceMembersSync,
   chatSpacesSync,
   chatsSync,
   companiesSync,
@@ -152,6 +154,12 @@ const ChatSpacesHandlers = HttpApiBuilder.group(CrmApi, "chatSpaces", (handlers)
       )
       .handle("remove", ({ params }) =>
         Effect.flatMap(chatActor, (who) => chats.removeSpace(who, params.id)),
+      )
+      .handle("join", ({ params }) =>
+        Effect.flatMap(chatActor, (who) => chats.joinSpace(who, params.id)),
+      )
+      .handle("leave", ({ params }) =>
+        Effect.flatMap(chatActor, (who) => chats.leaveSpace(who, params.id)),
       );
   }),
 );
@@ -331,6 +339,7 @@ const synced: ReadonlyArray<
   [MEMORY_FACTS_SYNC_PATH, (workspaceId) => memoryFactsSync(workspaceId)],
   [CHATS_SYNC_PATH, (workspaceId, userId) => chatsSync(workspaceId, userId)],
   [CHAT_SPACES_SYNC_PATH, (workspaceId) => chatSpacesSync(workspaceId)],
+  [CHAT_SPACE_MEMBERS_SYNC_PATH, (workspaceId) => chatSpaceMembersSync(workspaceId)],
   [SIDEBAR_SYNC_PATH, (workspaceId, userId) => sidebarSync(workspaceId, userId)],
 ];
 

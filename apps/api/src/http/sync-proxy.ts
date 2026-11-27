@@ -189,13 +189,15 @@ export function memoryFactsSync(workspaceId: string): SyncSpec {
 }
 
 /**
- * The chats a user may see in one workspace (ADR 0018): every shared chat, and their own private
- * ones. `session_id` stays on the server: only the agent proxy needs it.
+ * The chats a user may see in one workspace (ADR 0020): the ones they started, and the ones in
+ * spaces they joined. Joining or leaving moves chats in or out of the shape. `session_id` stays
+ * on the server: only the agent proxy needs it.
  */
 export function chatsSync(workspaceId: string, userId: string): SyncSpec {
   return {
     table: "chat",
-    where: "workspace_id = $1 AND (space_id IS NOT NULL OR created_by_id = $2)",
+    where:
+      "workspace_id = $1 AND (created_by_id = $2 OR space_id IN (SELECT space_id FROM chat_space_member WHERE user_id = $2))",
     params: [workspaceId, userId],
     columns: [
       "id",
@@ -214,6 +216,11 @@ export function chatsSync(workspaceId: string, userId: string): SyncSpec {
 /** Chat spaces of one workspace; every member sees every space. */
 export function chatSpacesSync(workspaceId: string): SyncSpec {
   return { table: "chat_space", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/** Who joined each space of one workspace (ADR 0020). */
+export function chatSpaceMembersSync(workspaceId: string): SyncSpec {
+  return { table: "chat_space_member", where: "workspace_id = $1", params: [workspaceId] };
 }
 
 /** One user's sidebar row (pins and folders) in one workspace. */

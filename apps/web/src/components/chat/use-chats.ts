@@ -8,6 +8,7 @@ import { readChatSnapshot, writeChatSnapshot } from "../../lib/chat-snapshot.ts"
 import {
   type Chat,
   chatSpacesCollection,
+  chatSpaceMembersCollection,
   chatsCollection,
   oldestFirst,
   saveLayout,
@@ -66,10 +67,18 @@ export function useChats(workspaceId: string, userId: string) {
   const chats = useLiveQuery(() => chatsCollection(workspaceId));
   const spaces = useLiveQuery(() => chatSpacesCollection(workspaceId));
   const rows = useLiveQuery(() => sidebarCollection(workspaceId));
+  const members = useLiveQuery(() => chatSpaceMembersCollection(workspaceId));
   // Until each sync is ready, draw the device's last copy: the sidebar shows in the first frame.
   const [snapshot] = useState(() => readChatSnapshot(userId, workspaceId));
   const chatRows = chats.isReady ? (chats.data ?? []) : snapshot.chats;
   const spaceRows = oldestFirst(spaces.isReady ? spaces.data : snapshot.spaces);
+  const memberRows = members.data ?? [];
+
+  const joinedSpaceIds = new Set(
+    members.isReady
+      ? memberRows.flatMap((member) => (member.user_id === userId ? [member.space_id] : []))
+      : snapshot.joinedSpaceIds,
+  );
 
   // The device's copy of the order: ⌥1–⌥9 and the shell read it before this chunk loads.
   const stored = usePinnedOrder(userId);
@@ -100,7 +109,12 @@ export function useChats(workspaceId: string, userId: string) {
 
     // Keeps the device's copy current once all three syncs are ready.
     const save = () => {
-      const all = [chatsCollection(workspaceId), chatSpacesCollection(workspaceId), collection];
+      const all = [
+        chatsCollection(workspaceId),
+        chatSpacesCollection(workspaceId),
+        chatSpaceMembersCollection(workspaceId),
+        collection,
+      ];
 
       if (!all.every((item) => item.isReady())) return;
 
@@ -110,6 +124,9 @@ export function useChats(workspaceId: string, userId: string) {
         chats: [...chatsCollection(workspaceId).values()],
         spaces: [...chatSpacesCollection(workspaceId).values()],
         folders: current ? decodeStoredLayout(current).folders : [],
+        joinedSpaceIds: [...chatSpaceMembersCollection(workspaceId).values()].flatMap((member) =>
+          member.user_id === userId ? [member.space_id] : [],
+        ),
       });
     };
 
@@ -118,6 +135,7 @@ export function useChats(workspaceId: string, userId: string) {
       collection.subscribeChanges(save, { includeInitialState: true }),
       chatsCollection(workspaceId).subscribeChanges(save, { includeInitialState: true }),
       chatSpacesCollection(workspaceId).subscribeChanges(save, { includeInitialState: true }),
+      chatSpaceMembersCollection(workspaceId).subscribeChanges(save, { includeInitialState: true }),
     ];
 
     return () => {
@@ -141,6 +159,10 @@ export function useChats(workspaceId: string, userId: string) {
     chats: chatRows,
     chatById: (id: string) => byId.get(id),
     spaces: spaceRows,
+    joinedSpaceIds,
+    /** The user ids that joined a space. */
+    membersOf: (spaceId: string) =>
+      memberRows.filter((member) => member.space_id === spaceId).map((member) => member.user_id),
     layout,
     // Whether the synced data (not the device's copy) is in: empty states wait for it.
     isReady: chats.isReady && spaces.isReady && rows.isReady,

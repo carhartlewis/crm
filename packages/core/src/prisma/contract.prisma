@@ -26,6 +26,7 @@ model User {
   chats              Chat[]
   chatSpaces         ChatSpace[]
   sidebars           Sidebar[]
+  spaceMemberships   ChatSpaceMember[]
 
   @@map("user")
 }
@@ -101,6 +102,7 @@ model Workspace {
   chats       Chat[]
   chatSpaces  ChatSpace[]
   sidebars    Sidebar[]
+  spaceMembers ChatSpaceMember[]
 
   @@map("workspace")
 }
@@ -471,12 +473,15 @@ model ChatSpace {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name        String
+  // What the space is for, shown on the Spaces page and searched in ⌘K. Empty when none.
+  description String    @default("")
   // One of the palette names in `@crm/core/chat` (`SPACE_COLORS`).
   color       String
   createdById String?   @map("created_by_id")
   createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime  @map("created_at")
   chats       Chat[]
+  members     ChatSpaceMember[]
 
   @@index([workspaceId])
   @@map("chat_space")
@@ -498,4 +503,22 @@ model Sidebar {
 
   @@unique([workspaceId, userId])
   @@map("sidebar")
+}
+
+// Who joined a space (ADR 0020). Joining follows a space: its chats join your Recents. Every
+// member of the workspace still sees every space and its chats.
+
+model ChatSpaceMember {
+  spaceId     String    @map("space_id")
+  space       ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Kept on the row so the shape filters by workspace without a join.
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime  @map("joined_at")
+
+  @@id([spaceId, userId])
+  @@index([workspaceId])
+  @@map("chat_space_member")
 }

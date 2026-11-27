@@ -56,6 +56,7 @@ export function forgetChat(layout: SidebarLayout, chatId: string): SidebarLayout
 
 export interface RecentChat {
   readonly id: string;
+  readonly space_id: string | null;
   readonly created_by_id: string | null;
   readonly last_message_at: string;
 }
@@ -63,13 +64,14 @@ export interface RecentChat {
 export const RECENTS_LIMIT = 20;
 
 /**
- * Recents: the chats you started that are neither pinned nor in a folder, newest message first.
- * Teammates' shared chats live in their spaces instead.
+ * Recents: the chats you started and the chats in spaces you joined (ADR 0020) that are neither
+ * pinned nor in a folder, newest message first.
  */
 export function recentChats<C extends RecentChat>(
   chats: readonly C[],
   layout: SidebarLayout,
   userId: string,
+  joinedSpaceIds: ReadonlySet<string> = new Set(),
 ): C[] {
   const placed = new Set([
     ...layout.folders.flatMap((folder) => folder.chatIds),
@@ -77,7 +79,12 @@ export function recentChats<C extends RecentChat>(
   ]);
 
   return chats
-    .filter((chat) => chat.created_by_id === userId && !placed.has(chat.id))
+    .filter(
+      (chat) =>
+        (chat.created_by_id === userId ||
+          (chat.space_id !== null && joinedSpaceIds.has(chat.space_id))) &&
+        !placed.has(chat.id),
+    )
     .toSorted((a, b) => b.last_message_at.localeCompare(a.last_message_at))
     .slice(0, RECENTS_LIMIT);
 }

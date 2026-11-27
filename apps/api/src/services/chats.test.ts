@@ -169,18 +169,36 @@ async function sharedAndPrivate() {
 
   await run(context.chats.create(alice, { id: shared, title: "Pipeline", spaceId: space }));
   await run(context.chats.create(alice, { id: secret, title: "Mine", spaceId: null }));
+  // Bob joined the space; Dana didn't.
+  await run(context.chats.joinSpace(bob, space));
 
   return { ...context, space, shared, secret };
 }
 
 describe("who sees and changes a chat", () => {
-  test("a private chat is only its starter's; a shared one is the workspace's", async () => {
-    const { chats, shared, secret } = await sharedAndPrivate();
+  test("a private chat is only its starter's; a space chat is its members'", async () => {
+    const { chats, shared, secret, space } = await sharedAndPrivate();
 
     expect(await outcome(chats.history(bob, secret))).toBe("NotFound");
     expect(await outcome(chats.history(bob, shared))).toBe("Success");
+    expect(await outcome(chats.history(dana, shared))).toBe("NotFound");
+
+    // Joining gives access; leaving takes it away.
+    await run(chats.joinSpace(dana, space));
+    expect(await outcome(chats.history(dana, shared))).toBe("Success");
+    await run(chats.leaveSpace(dana, space));
+    expect(await outcome(chats.history(dana, shared))).toBe("NotFound");
     // Another workspace's chat is not found: ids reveal nothing.
     expect(await outcome(chats.history(mallory, shared))).toBe("NotFound");
+  });
+
+  test("a chat moves only into a space the mover joined", async () => {
+    const { chats, shared } = await sharedAndPrivate();
+    const elsewhere = spaceId();
+
+    await run(chats.createSpace(dana, { id: elsewhere, name: "Dana's", color: "green" }));
+
+    expect(await outcome(chats.update(bob, shared, { spaceId: elsewhere }))).toBe("Forbidden");
   });
 
   test("anyone who sees a chat may rename it and move it between spaces", async () => {
@@ -283,6 +301,7 @@ describe("the agent proxy", () => {
 
     await run(chats.createSpace(alice, { id: space, name: "Sales", color: "blue" }));
     await run(chats.create(alice, { id, title: "Hi", spaceId: space }));
+    await run(chats.joinSpace(bob, space));
 
     const before = rows().chats.get(id)?.lastMessageAt ?? 0;
     const message = new Request("http://api.test/x", { method: "POST", body: "{}" });
@@ -373,5 +392,33 @@ describe("permission modes", () => {
     await run(chats.create(alice, { id, title: "Hi", spaceId: null, permissionMode: "auto" }));
 
     expect(await outcome(chats.update(alice, id, { permissionMode: "never" }))).toBe("Invalid");
+  });
+});
+
+describe("joining spaces", () => {
+  test("the maker joins; anyone in the workspace joins and leaves", async () => {
+    const { chats, rows } = setup();
+    const space = spaceId();
+
+    await run(chats.createSpace(alice, { id: space, name: "Sales", color: "blue" }));
+    expect(rows().members.has(`${space}:alice`)).toBe(true);
+
+    await run(chats.joinSpace(bob, space));
+    // Joining again changes nothing.
+    await run(chats.joinSpace(bob, space));
+    expect(rows().members.has(`${space}:bob`)).toBe(true);
+
+    await run(chats.leaveSpace(bob, space));
+    expect(rows().members.has(`${space}:bob`)).toBe(false);
+    expect(await outcome(chats.leaveSpace(bob, space))).toBe("NotFound");
+  });
+
+  test("another workspace's space can't be joined", async () => {
+    const { chats } = setup();
+    const space = spaceId();
+
+    await run(chats.createSpace(alice, { id: space, name: "Sales", color: "blue" }));
+
+    expect(await outcome(chats.joinSpace(mallory, space))).toBe("NotFound");
   });
 });

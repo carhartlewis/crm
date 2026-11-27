@@ -6,6 +6,8 @@ export const CreateCompanySheet = preloadable(
   () => import("../companies/create-company-sheet.tsx"),
 );
 
+export const CreateSpaceSheet = preloadable(() => import("../chat/create-space-sheet.tsx"));
+
 /** Every create sheet, mounted once in the shell so hotkeys open them from any page. */
 export function CreateSheets({ userId, workspaceId }: { userId: string; workspaceId: string }) {
   const [kind, setKind] = useCreateSheet();
@@ -15,6 +17,14 @@ export function CreateSheets({ userId, workspaceId }: { userId: string; workspac
     <Suspense fallback={null}>
       <CreateCompanySheet
         open={kind === "company"}
+        onOpenChange={(open) => {
+          if (!open) void setKind(null);
+        }}
+        userId={userId}
+        workspaceId={workspaceId}
+      />
+      <CreateSpaceSheet
+        open={kind === "space"}
         onOpenChange={(open) => {
           if (!open) void setKind(null);
         }}

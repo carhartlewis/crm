@@ -1,6 +1,7 @@
 import add from "@carbon/icons/es/add/16.js";
 import book from "@carbon/icons/es/book/16.js";
 import edit from "@carbon/icons/es/edit/16.js";
+import grid from "@carbon/icons/es/grid/16.js";
 import link from "@carbon/icons/es/link/16.js";
 import logout from "@carbon/icons/es/logout/16.js";
 import screen from "@carbon/icons/es/screen/16.js";
@@ -26,6 +27,8 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import { rankCommands, type Searchable } from "../../lib/command-search.ts";
+import { useChatSpaces } from "../../lib/chat-spaces.ts";
+import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { useMemoryFacts } from "../../lib/memory-facts.ts";
 import { parsePinKey } from "@crm/core/chat";
 import { isPageId, pageById, pageForPath, type Page } from "../../lib/pages.ts";
@@ -41,14 +44,15 @@ import type { FileRoutesByTo } from "../../routeTree.gen.ts";
 const AddIcon = carbonIcon(add);
 const KnowledgeIcon = carbonIcon(book);
 const NewChatIcon = carbonIcon(edit);
+const SpacesIcon = carbonIcon(grid);
 const LinkIcon = carbonIcon(link);
 const LogoutIcon = carbonIcon(logout);
 const ThemeIcon = carbonIcon(screen);
 const SwitchIcon = carbonIcon(arrowsHorizontal);
 const SidebarIcon = carbonIcon(sidePanelOpen);
 
-/** Every page ⌘K can go to: New chat, the pinned pages, settings, and a new workspace. */
-type Listed = "/" | Page["to"] | SettingsPath | "/new-workspace";
+/** Every page ⌘K can go to: New chat, Spaces, the pinned pages, settings, and a new workspace. */
+type Listed = "/" | "/spaces" | Page["to"] | SettingsPath | "/new-workspace";
 
 /**
  * Routes ⌘K leaves out: signed-out and first-run pages, an old URL that redirects, and single
@@ -136,6 +140,7 @@ export default function CommandPalette({
   const navigate = useNavigate();
   const { toggleSidebar } = useSidebar();
   const { setTheme } = useTheme();
+  const [, setCreate] = useCreateSheet();
   const order = usePinnedOrder(userId);
   const current = useRouterState({ select: (state) => pageForPath(state.location.pathname) });
   const { data: session } = useQuery(sessionQuery);
@@ -192,6 +197,16 @@ export default function CommandPalette({
     };
   });
 
+  // Spaces (ADR 0020), searched by name and description while typing; Enter opens the space.
+  const spaces: PaletteCommand[] = useChatSpaces(workspaceId).map((space) => ({
+    id: `space:${space.id}`,
+    label: space.name,
+    section: "Spaces",
+    keywords: space.description ? [space.description] : [],
+    icon: SpacesIcon,
+    run: () => void navigate({ to: "/spaces/$spaceId", params: { spaceId: space.id } }),
+  }));
+
   const commands: PaletteCommand[] = [
     ...(current
       ? [
@@ -212,6 +227,22 @@ export default function CommandPalette({
       icon: NewChatIcon,
       shortcut: shortcuts.newChat,
       run: () => void navigate({ to: "/" }),
+    },
+    {
+      id: "go:/spaces",
+      label: "Spaces",
+      section: "Go to",
+      keywords: ["teams", "shared", "join"],
+      icon: SpacesIcon,
+      run: () => void navigate({ to: "/spaces" }),
+    },
+    {
+      id: "create:space",
+      label: "New space",
+      section: "Go to",
+      keywords: ["create", "add", "team"],
+      icon: SpacesIcon,
+      run: () => void setCreate("space"),
     },
     // Pinned chats and spaces are in the sidebar; ⌘K lists the pages, with their pinned shortcut.
     ...order.flatMap((key, index) => {
@@ -299,7 +330,7 @@ export default function CommandPalette({
     >
       <PaletteSearch
         commands={commands}
-        records={[...records, ...facts]}
+        records={[...records, ...spaces, ...facts]}
         select={select}
         placeholder={
           current ? `Search ${current.label.toLowerCase()} and commands…` : "Search or jump to…"

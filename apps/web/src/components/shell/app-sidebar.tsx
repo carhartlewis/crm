@@ -1,4 +1,5 @@
 import edit from "@carbon/icons/es/edit/16.js";
+import grid from "@carbon/icons/es/grid/16.js";
 import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import {
@@ -8,6 +9,9 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarRail,
 } from "@crm/ui/components/sidebar";
 import { preloadable } from "@crm/ui/lib/preloadable";
@@ -25,6 +29,7 @@ import { TitleBarControls } from "./title-bar.tsx";
 import { WorkspaceMenu } from "./workspace-menu.tsx";
 
 const EditIcon = carbonIcon(edit);
+const SpacesIcon = carbonIcon(grid);
 
 // Pinned chats and spaces, Spaces, Folders and Recents read synced data: their own chunk. It is
 // the sidebar's main content, so it starts loading with the shell, not on idle.
@@ -67,16 +72,32 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
         {isSettingsPath(pathname) ? (
           <SettingsNav />
         ) : (
-          <Suspense
-            fallback={
-              <SidebarGroup>
-                <SidebarGroupLabel>Pinned</SidebarGroupLabel>
-                <PinnedNav userId={userId} workspaceId={workspaceId} />
-              </SidebarGroup>
-            }
-          >
-            <ChatNav key={workspaceId} userId={userId} workspaceId={workspaceId} />
-          </Suspense>
+          <>
+            {/* As in Glass: Spaces is a page; the sidebar keeps what you pinned and your chats. */}
+            <SidebarGroup>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/spaces" || pathname.startsWith("/spaces/")}
+                    render={<Link to="/spaces" />}
+                  >
+                    <SpacesIcon />
+                    <span>Spaces</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+            <Suspense
+              fallback={
+                <SidebarGroup>
+                  <SidebarGroupLabel>Pinned</SidebarGroupLabel>
+                  <PinnedNav userId={userId} workspaceId={workspaceId} />
+                </SidebarGroup>
+              }
+            >
+              <ChatNav key={workspaceId} userId={userId} workspaceId={workspaceId} />
+            </Suspense>
+          </>
         )}
       </SidebarContent>
       <SidebarFooter>

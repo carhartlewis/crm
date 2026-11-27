@@ -16,6 +16,10 @@
       "model": "ChatSpace",
       "namespace": "public"
     },
+    "chat_space_member": {
+      "model": "ChatSpaceMember",
+      "namespace": "public"
+    },
     "company": {
       "model": "Company",
       "namespace": "public"
@@ -466,6 +470,13 @@
                   "kind": "scalar"
                 }
               },
+              "description": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -520,6 +531,21 @@
                   "namespace": "public"
                 }
               },
+              "members": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "spaceId"
+                  ]
+                },
+                "to": {
+                  "model": "ChatSpaceMember",
+                  "namespace": "public"
+                }
+              },
               "workspace": {
                 "cardinality": "N:1",
                 "nullable": false,
@@ -548,6 +574,9 @@
                 "createdById": {
                   "column": "created_by_id"
                 },
+                "description": {
+                  "column": "description"
+                },
                 "id": {
                   "column": "id"
                 },
@@ -560,6 +589,109 @@
               },
               "namespaceId": "public",
               "table": "chat_space"
+            }
+          },
+          "ChatSpaceMember": {
+            "fields": {
+              "joinedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "spaceId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "workspaceId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "space": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "spaceId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "ChatSpace",
+                  "namespace": "public"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "workspace": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "workspaceId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Workspace",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "joinedAt": {
+                  "column": "joined_at"
+                },
+                "spaceId": {
+                  "column": "space_id"
+                },
+                "userId": {
+                  "column": "user_id"
+                },
+                "workspaceId": {
+                  "column": "workspace_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "chat_space_member"
             }
           },
           "Company": {
@@ -3496,6 +3628,21 @@
                   "model": "Skill",
                   "namespace": "public"
                 }
+              },
+              "spaceMemberships": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "ChatSpaceMember",
+                  "namespace": "public"
+                }
               }
             },
             "storage": {
@@ -3794,6 +3941,21 @@
                 },
                 "to": {
                   "model": "Skill",
+                  "namespace": "public"
+                }
+              },
+              "spaceMembers": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "workspaceId"
+                  ]
+                },
+                "to": {
+                  "model": "ChatSpaceMember",
                   "namespace": "public"
                 }
               }
@@ -4148,6 +4310,15 @@
                   "dataType": "pg/text",
                   "nullable": true
                 },
+                "description": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "default": {
+                    "kind": "literal",
+                    "value": ""
+                  },
+                  "nullable": false
+                },
                 "id": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
@@ -4227,6 +4398,128 @@
               "primaryKey": {
                 "columns": [
                   "id"
+                ]
+              },
+              "uniques": []
+            },
+            "chat_space_member": {
+              "columns": {
+                "joined_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "nullable": false,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
+                "space_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "user_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "workspace_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "index": {
+                    "name": "chat_space_member_space_id_idx_5ce13788"
+                  },
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "space_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "chat_space_member"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "chat_space"
+                  }
+                },
+                {
+                  "index": {
+                    "name": "chat_space_member_user_id_idx_6c952402"
+                  },
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "user_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "chat_space_member"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "index": {
+                    "name": "chat_space_member_workspace_id_idx_90a9f461"
+                  },
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "workspace_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "chat_space_member"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "workspace"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "space_id"
+                  ],
+                  "name": "chat_space_member_space_id_idx_5ce13788",
+                  "prefix": "chat_space_member_space_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "name": "chat_space_member_user_id_idx_6c952402",
+                  "prefix": "chat_space_member_user_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "workspace_id"
+                  ],
+                  "name": "chat_space_member_workspace_id_idx_90a9f461",
+                  "prefix": "chat_space_member_workspace_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "space_id",
+                  "user_id"
                 ]
               },
               "uniques": []
@@ -6554,7 +6847,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "8f095540a6efe28d5ee6b4b746fc95c14fb8ecd5f4163649b47db0060510b8c0"
+    "storageHash": "6cf217e5f10326624439bdfcc4a496bc8a4b1582e38e22e244b300d0a66b388c"
   },
   "execution": {
     "executionHash": "bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f",

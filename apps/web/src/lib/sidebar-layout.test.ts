@@ -6,8 +6,9 @@ import { forgetChat, moveToFolder, recentChats, togglePin } from "./sidebar-layo
 const chat = () => createId(ID_PREFIXES.chat);
 const folder = () => createId(ID_PREFIXES.folder);
 
-const row = (id: string, by: string, at: string) => ({
+const row = (id: string, by: string, at: string, space: string | null = null) => ({
   id,
+  space_id: space,
   created_by_id: by,
   last_message_at: at,
 });
@@ -74,5 +75,22 @@ describe("sidebar layout", () => {
     );
 
     expect(recents.map((item) => item.id)).toEqual([newer, older]);
+  });
+
+  test("Recents also holds teammates' chats in spaces you joined", () => {
+    const joined = chat();
+    const other = chat();
+
+    const recents = recentChats(
+      [
+        row(joined, "them", "2026-11-26T13:00:00Z", "spc_joined"),
+        row(other, "them", "2026-11-26T14:00:00Z", "spc_other"),
+      ],
+      { pinned: [], folders: [] },
+      "me",
+      new Set(["spc_joined"]),
+    );
+
+    expect(recents.map((item) => item.id)).toEqual([joined]);
   });
 });

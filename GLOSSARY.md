@@ -72,11 +72,13 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **New chat**: The page at `/`: the composer and a space picker. It replaced Home.
 
-**Space**: A shared place for chats (table `chat_space`), seen by every member of the workspace. **Private** is not a space row: it is the chats only you see.
+**Space**: A shared place for chats (table `chat_space`), with a name, description and colour. Everyone in the workspace can find and join it; its chats are seen by its members (ADR 0020). **Private** is not a space row: it is the chats only you see.
+
+**Space member**: Someone who joined a space (`chat_space_member`). Joining shows the space's chats and adds them to Recents; leaving hides them.
 
 **Folder**: A personal group of chats in the sidebar. Kept in the user's `sidebar` row; teammates never see it.
 
-**Recents**: The sidebar list of the chats you started that are not pinned and not in a folder, newest message first.
+**Recents**: The sidebar list of the chats you started and the chats in spaces you joined, that are not pinned and not in a folder, newest message first.
 
 **Prewarmed session**: An eve session the API creates before the first message and keeps in Redis for 10 minutes, so a new chat answers sooner.
 

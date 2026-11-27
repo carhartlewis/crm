@@ -582,11 +582,14 @@ export const CreateSpace = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   color: Schema.String,
+  /** What the space is for; may be empty. */
+  description: Schema.optional(Schema.String),
 });
 
 export const UpdateSpace = Schema.Struct({
   name: Schema.optional(Schema.String),
   color: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
 });
 
 export class ChatSpacesApi extends HttpApiGroup.make("chatSpaces")
@@ -599,6 +602,17 @@ export class ChatSpacesApi extends HttpApiGroup.make("chatSpaces")
       error: ChatErrors,
     }),
     HttpApiEndpoint.delete("remove", "/:id", {
+      params: { id: Schema.String },
+      success: TxId,
+      error: ChatErrors,
+    }),
+    /** Joins the space: its chats join the caller's Recents (ADR 0020). */
+    HttpApiEndpoint.post("join", "/:id/members", {
+      params: { id: Schema.String },
+      success: TxId,
+      error: ChatErrors,
+    }),
+    HttpApiEndpoint.delete("leave", "/:id/members", {
       params: { id: Schema.String },
       success: TxId,
       error: ChatErrors,
@@ -668,6 +682,9 @@ export const CHATS_SYNC_PATH = "/api/shapes/chats";
 
 /** The active workspace's chat spaces (same `?workspace=` rule). */
 export const CHAT_SPACES_SYNC_PATH = "/api/shapes/chat-spaces";
+
+/** Who joined each space of the active workspace (same `?workspace=` rule; ADR 0020). */
+export const CHAT_SPACE_MEMBERS_SYNC_PATH = "/api/shapes/chat-space-members";
 
 /** The caller's own sidebar row in the active workspace (same `?workspace=` rule). */
 export const SIDEBAR_SYNC_PATH = "/api/shapes/sidebar";

@@ -9,6 +9,7 @@ import { ID_PREFIXES, isId } from "../ids/index.ts";
 export const CHAT_TITLE_MAX = 120;
 export const SPACE_NAME_MAX = 60;
 export const FOLDER_NAME_MAX = 60;
+export const SPACE_DESCRIPTION_MAX = 280;
 
 /** The longest title made from a first message, before the ellipsis. */
 const DERIVED_TITLE_MAX = 60;
@@ -42,6 +43,23 @@ export const normalizeSpaceName = (input: string) =>
 
 export const normalizeFolderName = (input: string) =>
   normalizeName(input, FOLDER_NAME_MAX, "Enter a name");
+
+/** A space's description: trimmed, may be empty, at most 280 characters. */
+export function normalizeSpaceDescription(input: string): NameResult {
+  const value = input.trim().replaceAll(/\s+/g, " ");
+
+  if (value.length > SPACE_DESCRIPTION_MAX) {
+    return { ok: false, message: `Keep it under ${SPACE_DESCRIPTION_MAX} characters` };
+  }
+
+  return { ok: true, value };
+}
+
+export function spaceDescriptionError(value: string) {
+  const result = normalizeSpaceDescription(value);
+
+  return result.ok ? undefined : result.message;
+}
 
 /** A chat's first title: the first line of the first message, cut at a word near 60 characters. */
 export function titleFromMessage(message: string) {

@@ -15,6 +15,7 @@ import {
   isSpaceId,
   normalizeChatTitle,
   type PermissionMode,
+  normalizeSpaceDescription,
   normalizeSpaceName,
   parseSidebarLayout,
   type FolderInput,
@@ -49,6 +50,7 @@ export interface SpaceRow {
   readonly id: string;
   readonly workspaceId: string;
   readonly name: string;
+  readonly description: string;
   readonly color: string;
   readonly createdById: string | null;
 }
@@ -63,6 +65,7 @@ export interface ChatPatch {
 /** The space columns its maker (or an admin) may change. */
 export interface SpacePatch {
   name?: string;
+  description?: string;
   color?: string;
 }
 
@@ -78,6 +81,11 @@ export interface ChatTx {
   insertSpace(row: SpaceRow): Promise<void>;
   updateSpace(id: string, patch: SpacePatch): Promise<void>;
   deleteSpace(id: string): Promise<void>;
+  isSpaceMember(spaceId: string, userId: string): Promise<boolean>;
+  /** Joins a space; joining twice changes nothing. */
+  joinSpace(row: { spaceId: string; userId: string; workspaceId: string }): Promise<void>;
+  /** `false` when the user hadn't joined. */
+  leaveSpace(spaceId: string, userId: string): Promise<boolean>;
   /** The id of the user's sidebar row in the workspace, if there is one. */
   sidebarId(workspaceId: string, userId: string): Promise<string | null>;
   saveSidebar(row: {
@@ -92,6 +100,7 @@ export interface ChatStore {
   transact<A>(fn: (tx: ChatTx) => Promise<A>): Promise<{ result: A; txid: number }>;
   role(workspaceId: string, userId: string): Promise<string | null>;
   chat(id: string): Promise<ChatRow | null>;
+  isSpaceMember(spaceId: string, userId: string): Promise<boolean>;
   /** Marks a message sent now (Recents order). */
   touch(id: string): Promise<void>;
 }
@@ -127,9 +136,19 @@ const agentDown = () =>
 const ok = <A>(value: A): Outcome<A> => ({ ok: true, value });
 const fail = (error: Failure): Outcome<never> => ({ ok: false, error });
 
-/** A private chat is its starter's; a shared chat is the whole workspace's. */
-export const canSee = (chat: ChatRow, userId: string) =>
-  chat.spaceId !== null || chat.createdById === userId;
+/**
+ * Who sees a chat (ADR 0020): the person who started it, and the members of its space. The chat
+ * shape uses the same rule (`chatsSync`).
+ */
+export async function canSee(
+  chat: ChatRow,
+  userId: string,
+  isSpaceMember: (spaceId: string, userId: string) => Promise<boolean>,
+) {
+  if (chat.createdById === userId) return true;
+
+  return chat.spaceId !== null && isSpaceMember(chat.spaceId, userId);
+}
 
 const isManager = (role: string | null) => role === "owner" || role === "admin";
 
@@ -163,14 +182,21 @@ export interface ChatsService {
   readonly history: (actor: ChatActor, id: string) => Effect.Effect<ChatHistory, Failure>;
   readonly createSpace: (
     actor: ChatActor,
-    input: { id: string; name: string; color: string },
+    input: { id: string; name: string; color: string; description?: string | undefined },
   ) => Effect.Effect<TxId, Failure>;
   readonly updateSpace: (
     actor: ChatActor,
     id: string,
-    input: { name?: string | undefined; color?: string | undefined },
+    input: {
+      name?: string | undefined;
+      color?: string | undefined;
+      description?: string | undefined;
+    },
   ) => Effect.Effect<TxId, Failure>;
   readonly removeSpace: (actor: ChatActor, id: string) => Effect.Effect<TxId, Failure>;
+  /** Join and leave a space (ADR 0020). Any member of the workspace may join any space. */
+  readonly joinSpace: (actor: ChatActor, id: string) => Effect.Effect<TxId, Failure>;
+  readonly leaveSpace: (actor: ChatActor, id: string) => Effect.Effect<TxId, Failure>;
   readonly saveSidebar: (
     actor: ChatActor,
     input: { id: string; pinned: readonly string[]; folders: readonly FolderInput[] },
@@ -226,6 +252,8 @@ const callerIn = (
   permissionMode: permissionMode ?? DEFAULT_PERMISSION_MODE,
 });
 
+const notMember = () => new Forbidden({ message: "Join the space first" });
+
 const badMode = () => new Invalid({ message: "Choose Manual, Auto or Bypass permissions" });
 
 /** The chats use cases over an injected store, agent and KV (Redis in production). */
@@ -260,7 +288,9 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
 
     const chat = isChatId(id) ? await store.chat(id) : null;
 
-    return chat && chat.workspaceId === workspaceId && canSee(chat, actor.id)
+    return chat &&
+      chat.workspaceId === workspaceId &&
+      (await canSee(chat, actor.id, store.isSpaceMember))
       ? ok(chat)
       : fail(notFound());
   };
@@ -333,6 +363,10 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
             return fail(new Invalid({ message: "That space doesn't exist" }));
           }
 
+          if (input.spaceId !== null && !(await tx.isSpaceMember(input.spaceId, actor.id))) {
+            return fail(notMember());
+          }
+
           await tx.insertChat({
             id: input.id,
             workspaceId,
@@ -361,7 +395,11 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
       return write(actor, "update", async (workspaceId, _, tx) => {
         const chat = isChatId(id) ? await tx.chat(id) : null;
 
-        if (!chat || chat.workspaceId !== workspaceId || !canSee(chat, actor.id)) {
+        if (
+          !chat ||
+          chat.workspaceId !== workspaceId ||
+          !(await canSee(chat, actor.id, tx.isSpaceMember))
+        ) {
           return fail(notFound());
         }
 
@@ -376,6 +414,9 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
         if (spaceId !== undefined && !(await spaceIn(tx, workspaceId, spaceId))) {
           return fail(new Invalid({ message: "That space doesn't exist" }));
         }
+
+        // Moving a chat into a space you haven't joined would hide it from you.
+        if (spaceId && !(await tx.isSpaceMember(spaceId, actor.id))) return fail(notMember());
 
         const patch: ChatPatch = {};
 
@@ -397,7 +438,11 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
       return write(actor, "remove", async (workspaceId, _, tx) => {
         const chat = isChatId(id) ? await tx.chat(id) : null;
 
-        if (!chat || chat.workspaceId !== workspaceId || !canSee(chat, actor.id)) {
+        if (
+          !chat ||
+          chat.workspaceId !== workspaceId ||
+          !(await canSee(chat, actor.id, tx.isSpaceMember))
+        ) {
           return fail(notFound());
         }
 
@@ -475,6 +520,10 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
       if (!isSpaceColor(input.color))
         return Effect.fail(new Invalid({ message: "Choose a colour" }));
 
+      const description = normalizeSpaceDescription(input.description ?? "");
+
+      if (!description.ok) return Effect.fail(new Invalid({ message: description.message }));
+
       return write(actor, "createSpace", async (workspaceId, _, tx) => {
         if (await tx.space(input.id)) {
           return fail(new Invalid({ message: "A space with this id already exists" }));
@@ -484,9 +533,13 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
           id: input.id,
           workspaceId,
           name: name.value,
+          description: description.value,
           color: input.color,
           createdById: actor.id,
         });
+
+        // The person who makes a space joins it.
+        await tx.joinSpace({ spaceId: input.id, userId: actor.id, workspaceId });
 
         return ok(undefined);
       });
@@ -499,6 +552,13 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
 
       if (input.color !== undefined && !isSpaceColor(input.color)) {
         return Effect.fail(new Invalid({ message: "Choose a colour" }));
+      }
+
+      const description =
+        input.description === undefined ? undefined : normalizeSpaceDescription(input.description);
+
+      if (description && !description.ok) {
+        return Effect.fail(new Invalid({ message: description.message }));
       }
 
       return write(actor, "updateSpace", async (workspaceId, role, tx) => {
@@ -521,6 +581,8 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
         if (name?.ok) patch.name = name.value;
 
         if (input.color !== undefined) patch.color = input.color;
+
+        if (description?.ok) patch.description = description.value;
 
         await tx.updateSpace(id, patch);
 
@@ -546,6 +608,30 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
 
         // Its chats become private to the people who started them (ON DELETE SET NULL).
         await tx.deleteSpace(id);
+
+        return ok(undefined);
+      }),
+
+    joinSpace: (actor, id) =>
+      write(actor, "joinSpace", async (workspaceId, _, tx) => {
+        const space = isSpaceId(id) ? await tx.space(id) : null;
+
+        if (space?.workspaceId !== workspaceId) {
+          return fail(new NotFound({ message: "Space not found" }));
+        }
+
+        await tx.joinSpace({ spaceId: id, userId: actor.id, workspaceId });
+
+        return ok(undefined);
+      }),
+
+    leaveSpace: (actor, id) =>
+      write(actor, "leaveSpace", async (workspaceId, _, tx) => {
+        const space = isSpaceId(id) ? await tx.space(id) : null;
+
+        if (space?.workspaceId !== workspaceId || !(await tx.leaveSpace(id, actor.id))) {
+          return fail(new NotFound({ message: "You haven't joined this space" }));
+        }
 
         return ok(undefined);
       }),
@@ -632,6 +718,17 @@ function chatTx(tx: DbTx): ChatTx {
     deleteSpace: async (id) => {
       await spaces.where({ id }).delete();
     },
+    isSpaceMember: async (spaceId, userId) =>
+      (await tx.orm.public.ChatSpaceMember.where({ spaceId, userId }).first()) !== null,
+    joinSpace: async (row) => {
+      const members = tx.orm.public.ChatSpaceMember;
+
+      if (await members.where({ spaceId: row.spaceId, userId: row.userId }).first()) return;
+
+      await members.create({ ...row, joinedAt: new Date() });
+    },
+    leaveSpace: async (spaceId, userId) =>
+      (await tx.orm.public.ChatSpaceMember.where({ spaceId, userId }).delete()) !== null,
     sidebarId: async (workspaceId, userId) =>
       (await sidebars.where({ workspaceId, userId }).first())?.id ?? null,
     saveSidebar: async (row) => {
@@ -667,6 +764,8 @@ export function prismaChatStore(db: Db): ChatStore {
       (await db.orm.public.Member.where({ organizationId: workspaceId, userId }).first())?.role ??
       null,
     chat: async (id) => db.orm.public.Chat.where({ id }).first(),
+    isSpaceMember: async (spaceId, userId) =>
+      (await db.orm.public.ChatSpaceMember.where({ spaceId, userId }).first()) !== null,
     touch: async (id) => {
       const now = new Date();
 

@@ -12,12 +12,15 @@ interface Rows {
   chats: Map<string, ChatRow & { lastMessageAt: number }>;
   spaces: Map<string, SpaceRow>;
   sidebars: Map<string, MemorySidebar>;
+  /** `spaceId:userId` of each joined space. */
+  members: Set<string>;
 }
 
 const copy = (rows: Rows): Rows => ({
   chats: new Map(rows.chats),
   spaces: new Map(rows.spaces),
   sidebars: new Map(rows.sidebars),
+  members: new Set(rows.members),
 });
 
 /**
@@ -34,7 +37,7 @@ export function createMemoryChatStore(members: Iterable<string>, now = () => Dat
     roles.set(`${workspaceId}:${userId}`, role);
   }
 
-  let rows: Rows = { chats: new Map(), spaces: new Map(), sidebars: new Map() };
+  let rows: Rows = { chats: new Map(), spaces: new Map(), sidebars: new Map(), members: new Set() };
   let txid = 1000;
 
   const role = async (workspaceId: string, userId: string) =>
@@ -43,6 +46,7 @@ export function createMemoryChatStore(members: Iterable<string>, now = () => Dat
   const store: ChatStore = {
     role,
     chat: async (id) => rows.chats.get(id) ?? null,
+    isSpaceMember: async (spaceId, userId) => rows.members.has(`${spaceId}:${userId}`),
     touch: async (id) => {
       const chat = rows.chats.get(id);
 
@@ -74,8 +78,17 @@ export function createMemoryChatStore(members: Iterable<string>, now = () => Dat
 
           if (space) draft.spaces.set(id, { ...space, ...patch });
         },
+        isSpaceMember: async (spaceId, userId) => draft.members.has(`${spaceId}:${userId}`),
+        joinSpace: async ({ spaceId, userId }) => {
+          draft.members.add(`${spaceId}:${userId}`);
+        },
+        leaveSpace: async (spaceId, userId) => draft.members.delete(`${spaceId}:${userId}`),
         deleteSpace: async (id) => {
           draft.spaces.delete(id);
+
+          for (const member of draft.members) {
+            if (member.startsWith(`${id}:`)) draft.members.delete(member);
+          }
 
           for (const [chatId, chat] of draft.chats) {
             if (chat.spaceId === id) draft.chats.set(chatId, { ...chat, spaceId: null });

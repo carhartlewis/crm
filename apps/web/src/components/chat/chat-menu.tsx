@@ -112,16 +112,19 @@ export function ChatMenu({ chat, api, userId, workspaceId, trigger, onRequest }:
                 Private
               </DropdownMenuItem>
             )}
-            {api.spaces.map((space) => (
-              <DropdownMenuItem
-                key={space.id}
-                disabled={chat.space_id === space.id}
-                onClick={() => update.mutate({ workspaceId, id: chat.id, spaceId: space.id })}
-              >
-                <SpaceDot color={spaceColor(space.color)} />
-                {space.name}
-              </DropdownMenuItem>
-            ))}
+            {/* Only spaces you joined: a chat moved elsewhere would leave your sight. */}
+            {api.spaces
+              .filter((space) => api.joinedSpaceIds.has(space.id))
+              .map((space) => (
+                <DropdownMenuItem
+                  key={space.id}
+                  disabled={chat.space_id === space.id}
+                  onClick={() => update.mutate({ workspaceId, id: chat.id, spaceId: space.id })}
+                >
+                  <SpaceDot color={spaceColor(space.color)} />
+                  {space.name}
+                </DropdownMenuItem>
+              ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuItem onClick={() => onRequest({ kind: "rename", chat })}>

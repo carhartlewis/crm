@@ -1,4 +1,9 @@
-import { CHAT_SPACES_SYNC_PATH, CHATS_SYNC_PATH, SIDEBAR_SYNC_PATH } from "@crm/core/api";
+import {
+  CHAT_SPACE_MEMBERS_SYNC_PATH,
+  CHAT_SPACES_SYNC_PATH,
+  CHATS_SYNC_PATH,
+  SIDEBAR_SYNC_PATH,
+} from "@crm/core/api";
 import {
   decodeStoredLayout,
   type Json,
@@ -38,9 +43,18 @@ export type ChatSpace = {
   readonly id: string;
   readonly workspace_id: string;
   readonly name: string;
+  readonly description: string;
   readonly color: string;
   readonly created_by_id: string | null;
   readonly created_at: string;
+};
+
+/** Someone who joined a space (ADR 0020). */
+export type ChatSpaceMember = {
+  readonly space_id: string;
+  readonly user_id: string;
+  readonly workspace_id: string;
+  readonly joined_at: string;
 };
 
 export type SidebarRow = {
@@ -151,6 +165,7 @@ function createSpacesCollection(workspaceId: string) {
               id: modified.id,
               name: modified.name,
               color: modified.color,
+              description: modified.description,
             }),
           ),
         );
@@ -162,7 +177,7 @@ function createSpacesCollection(workspaceId: string) {
               collection.utils.awaitTxId,
               `/api/chat-spaces/${encodeURIComponent(original.id)}`,
               "PATCH",
-              { name: changes.name, color: changes.color },
+              { name: changes.name, color: changes.color, description: changes.description },
             ),
           ),
         );
@@ -175,6 +190,34 @@ function createSpacesCollection(workspaceId: string) {
               `/api/chat-spaces/${encodeURIComponent(original.id)}`,
               "DELETE",
             ),
+          ),
+        );
+      },
+    }),
+  );
+}
+
+const membersPath = (spaceId: string) => `/api/chat-spaces/${encodeURIComponent(spaceId)}/members`;
+
+function createSpaceMembersCollection(workspaceId: string) {
+  return createCollection(
+    electricCollectionOptions<ChatSpaceMember>({
+      id: `chat-space-members:${workspaceId}`,
+      getKey: (member) => `${member.space_id}:${member.user_id}`,
+      // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- TanStack DB's option name (an Electric "shape").
+      shapeOptions: syncedFrom(CHAT_SPACE_MEMBERS_SYNC_PATH, workspaceId),
+      // Joining and leaving are the caller's own rows: insert joins, delete leaves.
+      onInsert: async ({ transaction, collection }) => {
+        await Promise.all(
+          transaction.mutations.map(({ modified }) =>
+            writeAndAwait(collection.utils.awaitTxId, membersPath(modified.space_id), "POST"),
+          ),
+        );
+      },
+      onDelete: async ({ transaction, collection }) => {
+        await Promise.all(
+          transaction.mutations.map(({ original }) =>
+            writeAndAwait(collection.utils.awaitTxId, membersPath(original.space_id), "DELETE"),
           ),
         );
       },
@@ -225,6 +268,8 @@ export const chatSpacesCollection = perWorkspace(createSpacesCollection);
 
 export const sidebarCollection = perWorkspace(createSidebarCollection);
 
+export const chatSpaceMembersCollection = perWorkspace(createSpaceMembersCollection);
+
 export type ChatsCollection = ReturnType<typeof createChatsCollection>;
 
 export type ChatSpacesCollection = ReturnType<typeof createSpacesCollection>;
@@ -241,6 +286,7 @@ export function preloadChats(workspaceId: string) {
   void chatsCollection(workspaceId).preload();
   void chatSpacesCollection(workspaceId).preload();
   void sidebarCollection(workspaceId).preload();
+  void chatSpaceMembersCollection(workspaceId).preload();
 }
 
 interface StartChat {
@@ -323,19 +369,23 @@ interface SaveSpace {
   readonly workspaceId: string;
   readonly userId: string;
   readonly name: string;
+  readonly description: string;
   readonly color: SpaceColor;
 }
 
 export const createSpaceMutation = mutationOptions({
   mutationKey: ["chat-spaces", "create"],
-  mutationFn: async ({ workspaceId, userId, name, color }: SaveSpace) => {
+  mutationFn: async ({ workspaceId, userId, name, description, color }: SaveSpace) => {
     const id = createId(ID_PREFIXES.chat_space);
+
+    // The maker joins the space: the API adds that row in the same transaction, and it syncs.
 
     await chatSpacesCollection(workspaceId)
       .insert({
         id,
         workspace_id: workspaceId,
         name,
+        description,
         color,
         created_by_id: userId,
         created_at: new Date().toISOString(),
@@ -346,22 +396,52 @@ export const createSpaceMutation = mutationOptions({
   },
 });
 
-export const renameSpaceMutation = mutationOptions({
-  mutationKey: ["chat-spaces", "rename"],
-  mutationFn: async ({
-    workspaceId,
-    id,
-    name,
-  }: {
-    workspaceId: string;
-    id: string;
-    name: string;
-  }) => {
+interface UpdateSpace {
+  readonly workspaceId: string;
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly color: SpaceColor;
+}
+
+export const updateSpaceMutation = mutationOptions({
+  mutationKey: ["chat-spaces", "update"],
+  mutationFn: async ({ workspaceId, id, name, description, color }: UpdateSpace) => {
     await chatSpacesCollection(workspaceId)
       .update(id, (draft) => {
         draft.name = name;
+        draft.description = description;
+        draft.color = color;
       })
       .when("settled");
+  },
+});
+
+interface SpaceMembership {
+  readonly workspaceId: string;
+  readonly userId: string;
+  readonly spaceId: string;
+}
+
+/** Joins a space: its chats join the caller's Recents at once. */
+export const joinSpaceMutation = mutationOptions({
+  mutationKey: ["chat-spaces", "join"],
+  mutationFn: async ({ workspaceId, userId, spaceId }: SpaceMembership) => {
+    await chatSpaceMembersCollection(workspaceId)
+      .insert({
+        space_id: spaceId,
+        user_id: userId,
+        workspace_id: workspaceId,
+        joined_at: new Date().toISOString(),
+      })
+      .when("settled");
+  },
+});
+
+export const leaveSpaceMutation = mutationOptions({
+  mutationKey: ["chat-spaces", "leave"],
+  mutationFn: async ({ workspaceId, userId, spaceId }: SpaceMembership) => {
+    await chatSpaceMembersCollection(workspaceId).delete(`${spaceId}:${userId}`).when("settled");
   },
 });
 

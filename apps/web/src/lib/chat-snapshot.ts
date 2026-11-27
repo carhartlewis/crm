@@ -23,6 +23,7 @@ const SnapshotSpace = Schema.Struct({
   id: Schema.String,
   workspace_id: Schema.String,
   name: Schema.String,
+  description: Schema.optional(Schema.String),
   color: Schema.String,
   created_by_id: Schema.NullOr(Schema.String),
   created_at: Schema.String,
@@ -33,6 +34,7 @@ const Snapshot = Schema.fromJsonString(
     chats: Schema.Array(SnapshotChat),
     spaces: Schema.Array(SnapshotSpace),
     folders: Schema.Array(FolderInput),
+    joinedSpaceIds: Schema.optional(Schema.Array(Schema.String)),
   }),
 );
 
@@ -42,9 +44,11 @@ export interface ChatSnapshot {
   readonly chats: readonly Chat[];
   readonly spaces: readonly ChatSpace[];
   readonly folders: readonly Folder[];
+  /** The spaces this person joined (ADR 0020). */
+  readonly joinedSpaceIds: readonly string[];
 }
 
-const EMPTY: ChatSnapshot = { chats: [], spaces: [], folders: [] };
+const EMPTY: ChatSnapshot = { chats: [], spaces: [], folders: [], joinedSpaceIds: [] };
 
 /** The newest chats are enough for Recents, pins and folders on first paint. */
 const MAX_CHATS = 200;
@@ -58,8 +62,9 @@ export function readChatSnapshot(userId: string, workspaceId: string): ChatSnaps
       onNone: () => EMPTY,
       onSome: (stored) => ({
         chats: stored.chats,
-        spaces: stored.spaces,
+        spaces: stored.spaces.map((space) => ({ ...space, description: space.description ?? "" })),
         folders: parseSidebarLayout([], stored.folders).folders,
+        joinedSpaceIds: stored.joinedSpaceIds ?? [],
       }),
     });
   } catch {
@@ -75,7 +80,12 @@ export function writeChatSnapshot(userId: string, workspaceId: string, snapshot:
   try {
     localStorage.setItem(
       storageKey(userId, workspaceId),
-      JSON.stringify({ chats, spaces: snapshot.spaces, folders: snapshot.folders }),
+      JSON.stringify({
+        chats,
+        spaces: snapshot.spaces,
+        folders: snapshot.folders,
+        joinedSpaceIds: snapshot.joinedSpaceIds,
+      }),
     );
   } catch {
     // Storage is full or blocked: the next load waits for sync.

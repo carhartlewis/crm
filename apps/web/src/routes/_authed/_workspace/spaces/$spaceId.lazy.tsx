@@ -11,6 +11,7 @@ import {
 } from "@crm/ui/patterns/page-shell";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { spaceColor } from "../../../../components/chat/chat-menu.tsx";
+import { SpaceActions } from "../../../../components/chat/space-actions.tsx";
 import { useChats } from "../../../../components/chat/use-chats.ts";
 import { WorkspacePageHeader } from "../../../../components/shell/page-header.tsx";
 
@@ -22,10 +23,31 @@ export const Route = createLazyFileRoute("/_authed/_workspace/spaces/$spaceId")(
 function SpacePage() {
   const { spaceId } = Route.useParams();
   const { session } = Route.useRouteContext();
-  const userId = session.user.id;
-  const api = useChats(session.session.activeOrganizationId ?? "", userId);
+  const workspaceId = session.session.activeOrganizationId ?? "";
+
+  return (
+    <SpaceView
+      key={`${workspaceId}:${spaceId}`}
+      spaceId={spaceId}
+      userId={session.user.id}
+      workspaceId={workspaceId}
+    />
+  );
+}
+
+function SpaceView({
+  spaceId,
+  userId,
+  workspaceId,
+}: {
+  spaceId: string;
+  userId: string;
+  workspaceId: string;
+}) {
+  const api = useChats(workspaceId, userId);
   const isPrivate = spaceId === "private";
   const space = api.spaces.find((item) => item.id === spaceId);
+  const joined = isPrivate || api.joinedSpaceIds.has(spaceId);
 
   const chats = api.chats
     .filter((chat) =>
@@ -36,6 +58,7 @@ function SpacePage() {
     .toSorted((a, b) => b.last_message_at.localeCompare(a.last_message_at));
 
   const title = isPrivate ? "Private" : (space?.name ?? "Space");
+  const members = api.membersOf(spaceId).length;
 
   return (
     <PageShell width="narrow">
@@ -49,18 +72,37 @@ function SpacePage() {
           </PageShellTitle>
         </PageShellHeading>
         <PageShellActions>
-          <Button size="sm" render={<Link to="/" search={isPrivate ? {} : { space: spaceId }} />}>
-            New chat
-          </Button>
+          {joined && (
+            <Button
+              size="sm"
+              variant="outline"
+              render={<Link to="/" search={isPrivate ? {} : { space: spaceId }} />}
+            >
+              New chat
+            </Button>
+          )}
+          {space && (
+            <SpaceActions space={space} api={api} userId={userId} workspaceId={workspaceId} full />
+          )}
         </PageShellActions>
       </WorkspacePageHeader>
       <PageShellContent>
         <div className="animate-enter flex flex-col gap-2">
-          {api.isReady && chats.length === 0 && (
+          {space && (
+            <p className="text-sm text-pretty text-muted-foreground select-text">
+              {[space.description, `${members} ${members === 1 ? "member" : "members"}`]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
+          {!joined && (
             <p className="text-sm text-pretty text-muted-foreground">
-              {isPrivate
-                ? "Chats only you see appear here."
-                : "No chats yet. Chats in this space are shared with everyone in the workspace."}
+              Join this space to see its chats and start new ones in it.
+            </p>
+          )}
+          {joined && api.isReady && chats.length === 0 && (
+            <p className="text-sm text-pretty text-muted-foreground">
+              {isPrivate ? "Chats only you see appear here." : "No chats in this space yet."}
             </p>
           )}
           {chats.map((chat) => (

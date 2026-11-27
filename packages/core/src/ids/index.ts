@@ -45,6 +45,7 @@ export const ID_EXEMPTIONS = {
   oauthConsent: "managed by better-auth",
   oauthClientAssertion: "managed by better-auth",
   memory_fact: "a copy keyed by Supermemory's fact id (ADR 0017)",
+  chat_space_member: "a join row keyed by (space_id, user_id) (ADR 0020)",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

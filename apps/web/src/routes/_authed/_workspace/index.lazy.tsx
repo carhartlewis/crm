@@ -21,7 +21,12 @@ import { lastPermissionMode, rememberPermissionMode } from "../../../lib/permiss
 import { spaceColor } from "../../../components/chat/chat-menu.tsx";
 import { WorkspacePageHeader } from "../../../components/shell/page-header.tsx";
 import { prewarmChat, queueFirstMessage, seedNewChat } from "../../../lib/chat-api.ts";
-import { chatSpacesCollection, oldestFirst, startChatMutation } from "../../../lib/chats.ts";
+import {
+  chatSpaceMembersCollection,
+  chatSpacesCollection,
+  oldestFirst,
+  startChatMutation,
+} from "../../../lib/chats.ts";
 
 const ChatIcon = carbonIcon(chat);
 const ChevronIcon = carbonIcon(chevronDown);
@@ -49,7 +54,14 @@ function NewChatForm({ userId, workspaceId }: { userId: string; workspaceId: str
 
   // Read once per mount: the page remounts (`key`) for another workspace.
   const spaces = useLiveQuery(() => chatSpacesCollection(workspaceId));
-  const spaceRows = oldestFirst(spaces.data);
+  const members = useLiveQuery(() => chatSpaceMembersCollection(workspaceId));
+
+  // A chat starts only in a space you joined (ADR 0020).
+  const joined = new Set(
+    (members.data ?? []).flatMap((member) => (member.user_id === userId ? [member.space_id] : [])),
+  );
+
+  const spaceRows = oldestFirst(spaces.data).filter((item) => joined.has(item.id));
   const space = spaceRows.find((item) => item.id === spaceId);
 
   const start = useMutation({

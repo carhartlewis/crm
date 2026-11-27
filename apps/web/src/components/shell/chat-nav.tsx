@@ -1,15 +1,10 @@
 import add from "@carbon/icons/es/add/16.js";
 import chevronRight from "@carbon/icons/es/chevron--right/16.js";
 import folderIcon from "@carbon/icons/es/folder/16.js";
+import logout from "@carbon/icons/es/logout/16.js";
 import pinGlyph from "@carbon/icons/es/pin/16.js";
-import {
-  chatTitleError,
-  folderNameError,
-  parsePinKey,
-  pinKey,
-  SPACE_COLORS,
-  spaceNameError,
-} from "@crm/core/chat";
+import pinFilled from "@carbon/icons/es/pin--filled/16.js";
+import { chatTitleError, folderNameError, parsePinKey, pinKey } from "@crm/core/chat";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,22 +25,20 @@ import {
 } from "@crm/ui/components/sidebar";
 import { SpaceDot } from "@crm/ui/components/space-dot";
 import { useMutation } from "@tanstack/react-query";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import {
   type Chat,
   type ChatSpace,
-  createSpaceMutation,
-  deleteSpaceMutation,
-  renameSpaceMutation,
+  leaveSpaceMutation,
   updateChatMutation,
 } from "../../lib/chats.ts";
 import { haptic } from "../../lib/haptics.ts";
 import { isPageId, pageById, pageForPath } from "../../lib/pages.ts";
 import { pinnedShortcut } from "../../lib/shortcuts.ts";
 import { recentChats } from "../../lib/sidebar-layout.ts";
-import { ChatMenu, type ChatMenuRequest, MenuIcon, spaceColor } from "../chat/chat-menu.tsx";
+import { type ChatMenuRequest, MenuIcon, spaceColor } from "../chat/chat-menu.tsx";
 import { NameDialog } from "../chat/name-dialog.tsx";
 import { type ChatsApi, reorderPinnedAt, useChats } from "../chat/use-chats.ts";
 import { NavLink } from "./nav-link.tsx";
@@ -56,11 +49,11 @@ const AddIcon = carbonIcon(add);
 const ChevronIcon = carbonIcon(chevronRight);
 const FolderIcon = carbonIcon(folderIcon);
 const PinIcon = carbonIcon(pinGlyph);
+const PinnedIcon = carbonIcon(pinFilled);
+const LeaveIcon = carbonIcon(logout);
 
 type Dialog =
   | ChatMenuRequest
-  | { readonly kind: "new-space" }
-  | { readonly kind: "rename-space"; readonly space: ChatSpace }
   | { readonly kind: "new-folder-empty" }
   | { readonly kind: "rename-folder"; readonly id: string; readonly name: string };
 
@@ -84,14 +77,12 @@ export default function ChatNav({ userId, workspaceId }: NavProps) {
   return (
     <div>
       <PinnedGroup {...rowProps} />
-      <SpacesGroup {...rowProps} />
       <FoldersGroup {...rowProps} />
       <RecentsGroup {...rowProps} />
       {dialog && (
         <ChatDialogs
           dialog={dialog}
           api={api}
-          userId={userId}
           workspaceId={workspaceId}
           onClose={() => setDialog(null)}
         />
@@ -203,47 +194,6 @@ function PinnedGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps
   );
 }
 
-function SpacesGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps) {
-  const pinned = new Set(api.layout.pinned);
-
-  return (
-    <SidebarGroup>
-      <SidebarGroupLabel>Spaces</SidebarGroupLabel>
-      <SidebarMenu aria-label="Spaces">
-        <SidebarMenuItem>
-          <SidebarMenuButton
-            isActive={pathname === "/spaces/private"}
-            render={<Link to="/spaces/$spaceId" params={{ spaceId: "private" }} />}
-          >
-            <SpaceDot color="private" />
-            <span>Private</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        {/* A pinned space shows once, in Pinned. */}
-        {api.spaces
-          .filter((space) => !pinned.has(pinKey("space", space.id)))
-          .map((space) => (
-            <SpaceRow
-              key={space.id}
-              space={space}
-              api={api}
-              userId={userId}
-              workspaceId={workspaceId}
-              pathname={pathname}
-              onRequest={onRequest}
-            />
-          ))}
-        <SidebarMenuItem>
-          <SidebarMenuButton onClick={() => onRequest({ kind: "new-space" })}>
-            <AddIcon />
-            <span>Add space</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </SidebarGroup>
-  );
-}
-
 function FoldersGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps) {
   const pinned = new Set(api.layout.pinned);
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
@@ -336,7 +286,7 @@ function FoldersGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
 }
 
 function RecentsGroup({ api, userId, workspaceId, pathname, onRequest }: RowProps) {
-  const recents = recentChats(api.chats, api.layout, userId);
+  const recents = recentChats(api.chats, api.layout, userId, api.joinedSpaceIds);
 
   if (recents.length === 0) return null;
 
@@ -371,6 +321,8 @@ interface ChatRowProps extends RowProps {
 /** A chat in the sidebar. Hovering preloads its route, so its history is fetched before the click. */
 function ChatRow({ chat, icon, shortcutIndex, pinIndex, ...props }: ChatRowProps) {
   const shortcut = shortcutIndex === undefined ? undefined : pinnedShortcut(shortcutIndex);
+  const key = pinKey("chat", chat.id);
+  const pinned = props.api.layout.pinned.includes(key);
 
   return (
     <SidebarMenuItem
@@ -385,18 +337,14 @@ function ChatRow({ chat, icon, shortcutIndex, pinIndex, ...props }: ChatRowProps
         <span>{chat.title}</span>
         <RowShortcut shortcut={shortcut} />
       </SidebarMenuButton>
-      <ChatMenu
-        chat={chat}
-        api={props.api}
-        userId={props.userId}
-        workspaceId={props.workspaceId}
-        onRequest={props.onRequest}
-        trigger={
-          <SidebarMenuAction showOnHover aria-label={`${chat.title} options`}>
-            <MenuIcon />
-          </SidebarMenuAction>
-        }
-      />
+      {/* As for spaces: pin or unpin on hover; the chat's other actions are in its page header. */}
+      <SidebarMenuAction
+        showOnHover
+        aria-label={pinned ? `Unpin ${chat.title}` : `Pin ${chat.title}`}
+        onClick={() => props.api.togglePin(key)}
+      >
+        {pinned ? <PinnedIcon /> : <PinIcon />}
+      </SidebarMenuAction>
     </SidebarMenuItem>
   );
 }
@@ -409,18 +357,15 @@ interface SpaceRowProps extends RowProps {
 
 function SpaceRow({ space, shortcutIndex, pinIndex, ...props }: SpaceRowProps) {
   const { api, workspaceId, userId } = props;
-  const navigate = useNavigate();
   const shortcut = shortcutIndex === undefined ? undefined : pinnedShortcut(shortcutIndex);
-  const pinned = api.layout.pinned.includes(pinKey("space", space.id));
+  const joined = api.joinedSpaceIds.has(space.id);
 
-  const remove = useMutation({
-    ...deleteSpaceMutation,
-    onSuccess: () => {
-      if (pinned) api.togglePin(pinKey("space", space.id));
-    },
+  const leave = useMutation({
+    ...leaveSpaceMutation,
     onError: (error) => toast.error(error.message),
   });
 
+  // As in Glass: a pinned space shows Unpin and Leave on hover; its other actions are on its page.
   return (
     <SidebarMenuItem
       data-reorder-item={pinIndex === undefined ? undefined : true}
@@ -434,38 +379,23 @@ function SpaceRow({ space, shortcutIndex, pinIndex, ...props }: SpaceRowProps) {
         <span>{space.name}</span>
         <RowShortcut shortcut={shortcut} />
       </SidebarMenuButton>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <SidebarMenuAction showOnHover aria-label={`${space.name} options`}>
-              <MenuIcon />
-            </SidebarMenuAction>
-          }
-        />
-        <DropdownMenuContent align="start">
-          <DropdownMenuItem onClick={() => api.togglePin(pinKey("space", space.id))}>
-            {pinned ? "Unpin" : "Pin"}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => void navigate({ to: "/", search: { space: space.id } })}>
-            New chat here
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => props.onRequest({ kind: "rename-space", space })}>
-            Rename…
-          </DropdownMenuItem>
-          {/* The server also lets workspace admins delete; it refuses anyone else. */}
-          {space.created_by_id === userId && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => remove.mutate({ workspaceId, id: space.id })}
-              >
-                Delete space
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <SidebarMenuAction
+        showOnHover
+        className={joined ? "right-7" : undefined}
+        aria-label={`Unpin ${space.name}`}
+        onClick={() => api.togglePin(pinKey("space", space.id))}
+      >
+        <PinnedIcon />
+      </SidebarMenuAction>
+      {joined && (
+        <SidebarMenuAction
+          showOnHover
+          aria-label={`Leave ${space.name}`}
+          onClick={() => leave.mutate({ workspaceId, userId, spaceId: space.id })}
+        >
+          <LeaveIcon />
+        </SidebarMenuAction>
+      )}
     </SidebarMenuItem>
   );
 }
@@ -474,20 +404,15 @@ function SpaceRow({ space, shortcutIndex, pinIndex, ...props }: SpaceRowProps) {
 function ChatDialogs({
   dialog,
   api,
-  userId,
   workspaceId,
   onClose,
 }: {
   dialog: Dialog;
   api: ChatsApi;
-  userId: string;
   workspaceId: string;
   onClose: () => void;
 }) {
-  const navigate = useNavigate();
   const updateChat = useMutation(updateChatMutation);
-  const createSpace = useMutation(createSpaceMutation);
-  const renameSpace = useMutation(renameSpaceMutation);
   const common = { onClose };
 
   switch (dialog.kind) {
@@ -528,35 +453,6 @@ function ChatDialogs({
           initial={dialog.name}
           validate={folderNameError}
           onSave={async (name) => api.renameFolder(dialog.id, name)}
-        />
-      );
-    case "new-space":
-      return (
-        <NameDialog
-          {...common}
-          title="Add space"
-          description="Everyone in the workspace sees the chats in a space."
-          label="Name"
-          action="Add space"
-          validate={spaceNameError}
-          onSave={async (name) => {
-            const color = SPACE_COLORS[api.spaces.length % SPACE_COLORS.length] ?? "blue";
-            const id = await createSpace.mutateAsync({ workspaceId, userId, name, color });
-
-            void navigate({ to: "/spaces/$spaceId", params: { spaceId: id } });
-          }}
-        />
-      );
-    case "rename-space":
-      return (
-        <NameDialog
-          {...common}
-          title="Rename space"
-          label="Name"
-          action="Rename"
-          initial={dialog.space.name}
-          validate={spaceNameError}
-          onSave={(name) => renameSpace.mutateAsync({ workspaceId, id: dialog.space.id, name })}
         />
       );
     default:
