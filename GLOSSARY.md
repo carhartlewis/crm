@@ -66,7 +66,7 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Memory**: What the CRM remembers about a subject: the workspace's own company, or one company record. Stored in Supermemory, one namespace per subject (ADR 0014).
 
-**Source**: A document memory reads facts from: website research, a member's note, a chat, a sent email, or a fact the assistant saved. Each has a stable id, so saving it again replaces it.
+**Source**: A document memory reads facts from: website research, the agent's research on a contact or deal, a member's note, a chat, a sent email, or a fact the assistant saved. Each has a stable id, so saving it again replaces it.
 
 **Fact**: One statement Supermemory extracted from sources. Members can forget a wrong fact; a newer fact can replace an older one.
 

@@ -6,13 +6,13 @@ import { Database } from "./Database.ts";
 import { Postgres } from "./Postgres.ts";
 
 /**
- * Research that starts by itself (ADR 0025): when a company or contact is added, the API starts
- * a background agent session about it, in Auto permissions, and the agent fills the record from
- * the web through `crm__` tools. Nobody waits on it: the sheet shows "Researching" and the values
+ * Research that starts by itself (ADR 0025): when a company, contact or deal is added, the API
+ * starts a background agent session about it, in Auto permissions, and the agent fills the record
+ * from the web through `crm__` tools. A deal's research is a brief in its memory (ADR 0029). Nobody waits on it: the sheet shows "Researching" and the values
  * arrive through sync. The API only starts the session; the agent judges what is true.
  */
 
-export type ResearchKind = "company" | "contact";
+export type ResearchKind = "company" | "contact" | "deal";
 
 export interface ResearchActor {
   readonly userId: string;
@@ -26,9 +26,12 @@ export interface FillRequest {
   readonly label: string;
 }
 
-/** A record that was added but never researched, and the member to research it as. */
+/**
+ * A record that was added but never researched, and the member to research it as. Deals have
+ * no research state, so the sweep never retries them (ADR 0029).
+ */
 export interface PendingRecord {
-  readonly kind: ResearchKind;
+  readonly kind: Exclude<ResearchKind, "deal">;
   readonly id: string;
   readonly workspaceId: string;
   readonly userId: string;
@@ -72,6 +75,7 @@ export const RESEARCH_PROMPTS: Record<ResearchKind, string> = {
     "This company was just added to the CRM. Research it and fill in its profile, then add its key people as contacts, following your research-company skill. This runs in the background: nobody is watching, so don't ask questions. Fill only what sources say, never overwrite what a member typed with a guess, and mark the research complete, skipped or failed when you finish.",
   contact:
     "This contact was just added to the CRM. Research them and fill in their profile, following your research-contact skill: find their work email, phone number, LinkedIn, title and photo, record each fact you are sure of, and write their background. This runs in the background: nobody is watching, so don't ask questions. Mark the research complete, skipped or failed when you finish.",
+  deal: "This deal was just added to the CRM. Research it following your research-deal skill: read the deal, its company, its people and what the CRM already knows, research the buyer's situation that matters to this deal, and save what you find with write_deal_brief. This runs in the background: nobody is watching, so don't ask questions and don't change the deal's stage, amount or close date.",
 };
 
 /** How often the sweep looks for records that never got research. */
@@ -239,7 +243,7 @@ export class Research extends Context.Service<Research, ResearchService>()(
  */
 async function pendingRecords(pool: Pool): Promise<readonly PendingRecord[]> {
   const result = await pool.query<{
-    kind: ResearchKind;
+    kind: PendingRecord["kind"];
     id: string;
     workspace_id: string;
     user_id: string | null;

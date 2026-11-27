@@ -1,6 +1,6 @@
 # 0025: Records fill themselves
 
-**Status:** accepted (2026-11). Supersedes the "member accepts each fact" part of [0024](0024-fields-money-views-intel-tracking.md). People lookup, email and phone facts and photos are amended by [0027](0027-enrichment-through-treg.md).
+**Status:** accepted (2026-11). Supersedes the "member accepts each fact" part of [0024](0024-fields-money-views-intel-tracking.md). People lookup, email and phone facts and photos are amended by [0027](0027-enrichment-through-treg.md). Extended to deals by [0029](0029-contact-and-deal-research-is-memory.md).
 
 ## Context
 

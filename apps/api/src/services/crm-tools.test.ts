@@ -48,6 +48,7 @@ const memory: CrmToolDeps["memory"] = {
     return { ok: true, value: null };
   },
   forget: async () => ({ ok: false, status: 404, message: "No such fact" }),
+  research: async () => ({ ok: true, value: null }),
 };
 
 function setup() {
@@ -117,6 +118,18 @@ describe("CRM tools", () => {
     const invalid = await byName(tools, "create_company").call({ name: "" });
 
     expect(invalid.isError).toBe(true);
+  });
+
+  test("never adds a person without their company", async () => {
+    const { tools } = setup();
+
+    const results = await Promise.all([
+      byName(tools, "create_contact").call({ first_name: "David" }),
+      byName(tools, "create_contact").call({ first_name: "David", company_id: null }),
+      byName(tools, "update_contact").call({ id: "ctc_x", company_id: null }),
+    ]);
+
+    expect(results.map((result) => result.isError)).toEqual([true, true, true]);
   });
 
   test("refuses input that doesn't match the schema", async () => {

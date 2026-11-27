@@ -70,7 +70,7 @@ export function createInMemoryStore(options: { now?: () => Date } = {}) {
           text,
           version: 1,
           isLatest: true,
-          isStatic: source.kind === "website_research",
+          isStatic: source.kind === "website_research" || source.kind === "research",
           isInference: false,
           createdAt,
           sourceId: source.sourceId,

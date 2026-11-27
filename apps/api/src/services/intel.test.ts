@@ -3,7 +3,7 @@ import { createId } from "@crm/core/ids";
 import { Cause, Effect, Exit, Option, References } from "effect";
 import { type FactJudge, type IntelActor, makeIntel } from "./Intel.ts";
 import { createMemoryIntelStore } from "./intel-store-memory.ts";
-import { intelTools } from "./intel-tools.ts";
+import { contactResearch, intelTools, type ResearchMemory } from "./intel-tools.ts";
 
 const alice: IntelActor = { userId: "user_alice", activeWorkspaceId: "ws_a" };
 const bob: IntelActor = { userId: "user_bob", activeWorkspaceId: "ws_b" };
@@ -317,15 +317,37 @@ describe("email and meeting activity", () => {
   });
 });
 
+/** Research saved to memory, as `<record id>: <content>`; the deal `del_gone…` is unknown. */
+function researchMemory() {
+  const saved: string[] = [];
+
+  const memory: ResearchMemory = {
+    research: async (_caller, input) => {
+      if (input.dealId?.startsWith("del_gone")) {
+        return { ok: false, status: 404, message: "No such record in this workspace." };
+      }
+
+      saved.push(`${input.contactId ?? input.dealId}: ${input.content}`);
+
+      return { ok: true, value: null };
+    },
+  };
+
+  return { memory, saved };
+}
+
+const caller = { userId: "user_alice", workspaceId: "ws_a" };
+
 describe("agent tools", () => {
   test("every tool writes, none is destructive, and calls run as the caller", async () => {
     const env = setup();
-    const tools = intelTools(env.intel, { userId: "user_alice", workspaceId: "ws_a" });
+    const tools = intelTools(env.intel, caller, researchMemory().memory);
 
     expect(tools.map((item) => item.tool.name)).toEqual([
       "crm__set_enrichment_status",
       "crm__record_contact_fact",
       "crm__write_contact_brief",
+      "crm__write_deal_brief",
       "crm__log_email",
       "crm__log_meeting",
     ]);
@@ -349,6 +371,86 @@ describe("agent tools", () => {
     const refused = await logEmail?.call({ thread_id: "t-10", subject: "x", occurred_at: "soon" });
 
     expect(refused?.isError).toBe(true);
+  });
+
+  test("a contact brief is also saved as the contact's research in memory", async () => {
+    const env = setup();
+    const { memory, saved } = researchMemory();
+    const tools = intelTools(env.intel, caller, memory, () => now);
+    const brief = tools.find((item) => item.tool.name === "crm__write_contact_brief");
+
+    const result = await brief?.call({
+      contact_id: env.contactId,
+      narrative: "Wile runs procurement at Acme.",
+      current_role: "Head of Procurement",
+      previous_roles: [{ title: "Buyer", company: "Beta Labs", years: "2019–2022" }],
+      location: null,
+    });
+
+    expect(result?.isError).toBeUndefined();
+    expect(saved).toEqual([
+      `${env.contactId}: # Profile research
+Researched on 2026-11-26.
+
+Wile runs procurement at Acme.
+
+- Current role: Head of Procurement
+- Previous roles:
+  - Buyer at Beta Labs (2019–2022)`,
+    ]);
+  });
+
+  test("a brief that fails is not remembered", async () => {
+    const env = setup();
+    const { memory, saved } = researchMemory();
+    const tools = intelTools(env.intel, caller, memory);
+    const brief = tools.find((item) => item.tool.name === "crm__write_contact_brief");
+
+    const result = await brief?.call({ contact_id: createId("ctc"), narrative: "Nobody." });
+
+    expect(result?.isError).toBe(true);
+    expect(saved).toEqual([]);
+  });
+
+  test("a deal brief is saved as the deal's research; an unknown deal is refused", async () => {
+    const env = setup();
+    const { memory, saved } = researchMemory();
+    const tools = intelTools(env.intel, caller, memory, () => now);
+    const brief = tools.find((item) => item.tool.name === "crm__write_deal_brief");
+
+    const result = await brief?.call({
+      deal_id: env.dealId,
+      narrative: "Acme is replacing its rocket supplier.",
+      why_now: "A failed launch in October.",
+      risks: ["Budget not approved", " "],
+    });
+
+    expect(result?.isError).toBeUndefined();
+    expect(saved).toEqual([
+      `${env.dealId}: # Deal research
+Researched on 2026-11-26.
+
+Acme is replacing its rocket supplier.
+
+- Why now: A failed launch in October.
+- Risks:
+  - Budget not approved`,
+    ]);
+
+    const refused = await brief?.call({
+      deal_id: "del_gone00000000000000000000",
+      narrative: "x",
+    });
+
+    expect(refused?.isError).toBe(true);
+  });
+});
+
+describe("research text", () => {
+  test("leaves out what the brief doesn't say", () => {
+    expect(contactResearch({ narrative: "Wile runs procurement." }, now)).toBe(
+      "# Profile research\nResearched on 2026-11-26.\n\nWile runs procurement.",
+    );
   });
 });
 

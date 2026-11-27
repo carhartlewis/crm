@@ -184,6 +184,8 @@ const baseFields = (base: DealBase): RecordPatch => ({
 export interface RecordEvents {
   /** A contact was added: the agent researches them in the background (ADR 0025). */
   readonly contactCreated?: (actor: Actor, contactId: string) => void;
+  /** A deal was added: the agent writes its research brief in the background (ADR 0029). */
+  readonly dealCreated?: (actor: Actor, dealId: string) => void;
 }
 
 export function makeRecords(
@@ -370,7 +372,7 @@ export function makeRecords(
         });
 
         return done;
-      });
+      }).pipe(Effect.tap(() => Effect.sync(() => events.dealCreated?.(actor, input.id))));
     },
 
     update: (actor, id, input) => {
@@ -636,6 +638,7 @@ export class Records extends Context.Service<Records, RecordsService>()(
 
       return makeRecords(prismaRecordStore(yield* Database), undefined, rates, {
         contactCreated: (actor, id) => research.start(actor, "contact", id),
+        dealCreated: (actor, id) => research.start(actor, "deal", id),
       });
     }),
   ).pipe(Layer.provide([Database.layer, Postgres.layer, Research.layer]));

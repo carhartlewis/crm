@@ -2,15 +2,19 @@ import { CONTACT_FACT_FIELDS, FACT_BANDS } from "@crm/core/records";
 import type { LocalTool } from "@crm/integrations/gateway";
 import type { FactOutcome } from "@crm/core/records";
 import { Effect, Schema } from "effect";
-import { run, tool } from "./crm-tools.ts";
+import { answer, refuse, run, tool } from "./crm-tools.ts";
 import type { IntelService } from "./Intel.ts";
-import type { AgentCaller } from "./Memory.ts";
+import type { AgentCaller, MemoryService } from "./Memory.ts";
 
 /**
  * The agent's research and sync tools (ADR 0024): it judges, the CRM stores. Research marks a
  * record's enrichment state, records contact facts (filled at once, ADR 0025), and writes a
- * contact brief; mail and calendar sync logs one activity per thread or event.
+ * contact brief or a deal brief, which also become the record's memory (ADR 0029); mail and
+ * calendar sync logs one activity per thread or event.
  */
+
+/** Where research is remembered: the record's research source in memory. */
+export type ResearchMemory = Pick<MemoryService["agent"], "research">;
 
 const Text = (description: string) =>
   Schema.optional(Schema.NullOr(Schema.String)).annotate({ description });
@@ -37,6 +41,122 @@ const OUTCOME_NOTES: Record<FactOutcome, string> = {
 
 const FIELD_HELP = CONTACT_FACT_FIELDS.map((field) => field.column).join(", ");
 
+const Lines = (description: string) =>
+  Schema.optional(Schema.Array(Schema.String)).annotate({ description });
+
+type Line = string | null | undefined;
+
+/**
+ * Markdown for memory: a heading, the narrative, then one line per labelled value and one nested
+ * list per labelled list it has. Empty parts are left out.
+ */
+function researchText(
+  heading: string,
+  narrative: string,
+  parts: {
+    readonly values: readonly (readonly [string, Line])[];
+    readonly lists: readonly (readonly [string, readonly string[] | undefined])[];
+  },
+  date: Date,
+) {
+  const values = parts.values.flatMap(([label, value]) => {
+    const text = value?.trim();
+
+    return text ? [`- ${label}: ${text}`] : [];
+  });
+
+  const lists = parts.lists.flatMap(([label, list]) => {
+    const items = (list ?? []).map((item) => item.trim()).filter(Boolean);
+
+    return items.length > 0 ? [`- ${label}:`, ...items.map((item) => `  - ${item}`)] : [];
+  });
+
+  return [
+    `# ${heading}`,
+    `Researched on ${date.toISOString().slice(0, 10)}.`,
+    "",
+    narrative.trim(),
+    "",
+    ...values,
+    ...lists,
+  ]
+    .join("\n")
+    .trim();
+}
+
+export interface ContactBriefInput {
+  readonly narrative: string;
+  readonly current_role?: Line;
+  readonly tenure?: Line;
+  readonly previous_roles?:
+    | readonly { readonly title: string; readonly company: string; readonly years?: Line }[]
+    | undefined;
+  readonly seniority?: Line;
+  readonly function?: Line;
+  readonly location?: Line;
+  readonly source_url?: Line;
+}
+
+/** A contact brief as the contact's research source in memory. */
+export const contactResearch = (input: ContactBriefInput, date: Date) =>
+  researchText(
+    "Profile research",
+    input.narrative,
+    {
+      values: [
+        ["Current role", input.current_role],
+        ["Tenure", input.tenure],
+        ["Seniority", input.seniority],
+        ["Function", input.function],
+        ["Location", input.location],
+        ["Source", input.source_url],
+      ],
+      lists: [
+        [
+          "Previous roles",
+          (input.previous_roles ?? []).map((role) =>
+            [`${role.title} at ${role.company}`, role.years ? `(${role.years})` : ""]
+              .join(" ")
+              .trim(),
+          ),
+        ],
+      ],
+    },
+    date,
+  );
+
+export interface DealBriefInput {
+  readonly narrative: string;
+  readonly why_now?: Line;
+  readonly needs?: readonly string[] | undefined;
+  readonly buying_group?: readonly string[] | undefined;
+  readonly competitors?: readonly string[] | undefined;
+  readonly risks?: readonly string[] | undefined;
+  readonly open_questions?: readonly string[] | undefined;
+  readonly next_steps?: readonly string[] | undefined;
+  readonly sources?: readonly string[] | undefined;
+}
+
+/** A deal brief as the deal's research source in memory. */
+export const dealResearch = (input: DealBriefInput, date: Date) =>
+  researchText(
+    "Deal research",
+    input.narrative,
+    {
+      values: [["Why now", input.why_now]],
+      lists: [
+        ["Needs", input.needs],
+        ["Buying group", input.buying_group],
+        ["Competitors and current tools", input.competitors],
+        ["Risks", input.risks],
+        ["Open questions", input.open_questions],
+        ["Next steps", input.next_steps],
+        ["Sources", input.sources],
+      ],
+    },
+    date,
+  );
+
 /** The record ids a log call names, as the service takes them. */
 const links = (input: {
   contact_id?: string | null | undefined;
@@ -44,7 +164,12 @@ const links = (input: {
   deal_id?: string | null | undefined;
 }) => ({ contactId: input.contact_id, companyId: input.company_id, dealId: input.deal_id });
 
-export function intelTools(intel: IntelService, caller: AgentCaller): readonly LocalTool[] {
+export function intelTools(
+  intel: IntelService,
+  caller: AgentCaller,
+  memory: ResearchMemory,
+  now: () => Date = () => new Date(),
+): readonly LocalTool[] {
   const actor = { userId: caller.userId, activeWorkspaceId: caller.workspaceId };
 
   return [
@@ -135,20 +260,66 @@ export function intelTools(intel: IntelService, caller: AgentCaller): readonly L
       },
       (input) =>
         run(
-          intel.writeBrief(actor, {
-            contactId: input.contact_id,
-            narrative: input.narrative,
-            sections: {
-              currentRole: input.current_role,
-              tenure: input.tenure,
-              previousRoles: input.previous_roles,
-              seniority: input.seniority,
-              function: input.function,
-              location: input.location,
-            },
-            sourceUrl: input.source_url,
-          }),
+          intel
+            .writeBrief(actor, {
+              contactId: input.contact_id,
+              narrative: input.narrative,
+              sections: {
+                currentRole: input.current_role,
+                tenure: input.tenure,
+                previousRoles: input.previous_roles,
+                seniority: input.seniority,
+                function: input.function,
+                location: input.location,
+              },
+              sourceUrl: input.source_url,
+            })
+            .pipe(
+              // The brief is also the contact's memory. Memory being off never fails the brief.
+              Effect.tap(() =>
+                Effect.promise(() =>
+                  memory.research(caller, {
+                    contactId: input.contact_id,
+                    content: contactResearch(input, now()),
+                  }),
+                ),
+              ),
+            ),
         ),
+    ),
+    tool(
+      {
+        name: "write_deal_brief",
+        description:
+          "Write or replace a deal's research brief, saved as the deal's memory (its Knowledge tab and what you recall about it later): a narrative of who is buying, what they need and why, plus why now, the buying group, competitors and tools they use today, risks, open questions and next steps. Only what sources and the CRM say; leave out what you don't know.",
+        readOnly: false,
+        input: Schema.Struct({
+          deal_id: Schema.String.annotate({ description: "A deal id (del_…)." }),
+          narrative: Schema.String.annotate({
+            description: "Three to five sentences on the buyer, their need and the deal's state.",
+          }),
+          why_now: Text("What makes this deal timely: funding, hiring, a deadline, an incident."),
+          needs: Lines("What the buyer needs from the workspace's product, one per line."),
+          buying_group: Lines(
+            "Who decides and who influences, one per line: name, role and their part in the deal.",
+          ),
+          competitors: Lines("Competitors in the deal and tools the buyer uses today."),
+          risks: Lines("What could stall or lose the deal."),
+          open_questions: Lines("What to find out next."),
+          next_steps: Lines("Agreed or suggested next steps."),
+          sources: Lines("The pages the brief came from, as URLs."),
+        }),
+      },
+      async (input) => {
+        const result = await memory.research(caller, {
+          dealId: input.deal_id,
+          content: dealResearch(input, now()),
+        });
+
+        return result.ok
+          ? answer({ saved: true, note: "Facts appear in memory a few seconds after saving." })
+          : refuse(result.message);
+      },
     ),
     tool(
       {

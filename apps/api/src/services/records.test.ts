@@ -188,6 +188,25 @@ describe("contacts", () => {
 });
 
 describe("deals", () => {
+  test("a new deal starts its research once it is saved; a refused one doesn't", async () => {
+    const env = setup();
+    const companyId = await withCompany(env);
+    const started: string[] = [];
+
+    const records = makeRecords(env.store, () => env.at, undefined, {
+      dealCreated: (actor, id) => started.push(`${actor.userId} ${id}`),
+    });
+
+    const id = createId("del");
+
+    await run(records.deals.create(alice, { id, name: "Pilot", company_id: companyId }));
+
+    expect(
+      await outcome(records.deals.create(alice, { id, name: "Pilot", company_id: companyId })),
+    ).toBe("Invalid");
+    expect(started).toEqual([`user_alice ${id}`]);
+  });
+
   test("a stage change stamps the time, closes won deals and logs a stage change", async () => {
     const env = setup();
     const companyId = await withCompany(env);

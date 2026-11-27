@@ -1,7 +1,8 @@
 # 0026: The record's website research is the memory graph's core
 
 **Status:** accepted (2026-11). Supersedes the "drawn core" part of
-[0021](0021-jev-alone-decides-chat-memory.md).
+[0021](0021-jev-alone-decides-chat-memory.md). Extended to contact and deal research by
+[0029](0029-contact-and-deal-research-is-memory.md).
 
 ## Context
 

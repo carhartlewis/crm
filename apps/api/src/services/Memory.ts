@@ -171,10 +171,26 @@ export interface MemoryService {
       caller: AgentCaller,
       input: Target & { factId: string },
     ) => Promise<AgentResult<null>>;
+    /**
+     * Saves what the agent's research found about a contact or deal as the record's research
+     * source, replacing the earlier one. It becomes the core of the record's graph (ADR 0029).
+     */
+    readonly research: (
+      caller: AgentCaller,
+      input: Target & { content: string },
+    ) => Promise<AgentResult<null>>;
   };
 }
 
+/**
+ * The record's research source: website research for the workspace and companies, the agent's
+ * research for contacts and deals. One per memory; the graph draws it as the core (ADR 0026).
+ */
 const RESEARCH_SOURCE = "website-research";
+
+/** Research holds a profile or a deal brief, so it may be longer than a note. */
+const MAX_RESEARCH_CHARACTERS = 12_000;
+
 const FACT_LIMIT = 100;
 const SOURCE_LIMIT = 20;
 const RECALL_COMPANIES = 3;
@@ -1096,6 +1112,37 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
           await memory.forgetFacts(namespace(caller.workspaceId, subject), [input.factId]);
           await deps.mirror.remove(caller.workspaceId, [input.factId]);
+
+          return { ok: true, value: null };
+        }),
+
+      research: (caller, input) =>
+        agentCall(caller, async (memory) => {
+          const content = input.content.trim();
+
+          if (!content || content.length > MAX_RESEARCH_CHARACTERS) {
+            return { ok: false, status: 400, message: "Research must be 1 to 12,000 characters." };
+          }
+
+          const subject = await agentTarget(caller, input);
+
+          if (!subject) return noRecord;
+
+          // Companies and the workspace keep their website research (ADR 0014).
+          if (subject.type !== "contact" && subject.type !== "deal") {
+            return { ok: false, status: 400, message: "Save research on a contact or a deal." };
+          }
+
+          const about = await describe(caller.workspaceId, subject);
+
+          await write(memory, namespace(caller.workspaceId, subject), {
+            sourceId: RESEARCH_SOURCE,
+            workspaceId: caller.workspaceId,
+            kind: "research",
+            title: `Research: ${about?.title ?? "record"}`,
+            content,
+            supportingContext: about?.context ?? "",
+          });
 
           return { ok: true, value: null };
         }),

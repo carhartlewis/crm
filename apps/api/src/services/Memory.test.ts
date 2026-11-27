@@ -551,6 +551,65 @@ describe("contact and deal memory", () => {
     ).toMatchObject({ ok: false, status: 404 });
   });
 
+  test("the agent's research on a contact or deal replaces the last and becomes the core", async () => {
+    const { memory, store } = setup();
+    const caller = { userId: "alice", workspaceId: "ws1" };
+
+    await memory.agent.remember(caller, {
+      kind: "agent_fact",
+      dealId: DEAL,
+      text: "Budget is 40k.",
+    });
+
+    expect(
+      await memory.agent.research(caller, { dealId: DEAL, content: "Acme is buying rockets." }),
+    ).toEqual({ ok: true, value: null });
+    expect(
+      await memory.agent.research(caller, { dealId: DEAL, content: "Acme needs rockets by May." }),
+    ).toEqual({ ok: true, value: null });
+
+    const deal = await Effect.runPromise(memory.knowledge(alice, { dealId: DEAL }));
+
+    expect(deal.sources.filter((source) => source.kind === "research")).toEqual([
+      expect.objectContaining({ title: "Research: Acme rockets" }),
+    ]);
+    expect(deal.facts.map((fact) => fact.text).toSorted()).toEqual([
+      "Acme needs rockets by May.",
+      "Budget is 40k.",
+    ]);
+
+    const graph = await Effect.runPromise(memory.graph(alice, { dealId: DEAL }));
+
+    expect(graph.documents[0]).toMatchObject({ title: "Acme rockets", documentType: "deal" });
+    expect(graph.documents[0]?.memories.map((fact) => fact.memory)).toEqual([
+      "Acme needs rockets by May.",
+    ]);
+    expect(store.namespaces()).not.toContain(ns("ws1"));
+  });
+
+  test("research is refused on a company, in another workspace, or when empty", async () => {
+    const { memory } = setup();
+
+    expect(
+      await memory.agent.research(
+        { userId: "alice", workspaceId: "ws1" },
+        { companyId: ACME, content: "Acme makes anvils." },
+      ),
+    ).toMatchObject({ ok: false, status: 400 });
+    expect(
+      await memory.agent.research(
+        { userId: "mallory", workspaceId: "ws2" },
+        { contactId: CONTACT, content: "Wile runs procurement." },
+      ),
+    ).toMatchObject({ ok: false, status: 404 });
+    expect(
+      await memory.agent.research(
+        { userId: "alice", workspaceId: "ws1" },
+        { contactId: CONTACT, content: "  " },
+      ),
+    ).toMatchObject({ ok: false, status: 400 });
+  });
+
   test("contact and deal facts are not copied for ⌘K", async () => {
     const { memory, copy } = setup();
 

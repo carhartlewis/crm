@@ -110,7 +110,7 @@ export interface CrmToolDeps {
   readonly directory: CrmDirectory;
   readonly companies: CompaniesService;
   readonly records: RecordsService;
-  readonly memory: Pick<MemoryService["agent"], "search" | "remember" | "forget">;
+  readonly memory: Pick<MemoryService["agent"], "search" | "remember" | "forget" | "research">;
   /** context.dev, when the API has a key; without it the web tools aren't listed. */
   readonly web: WebReader | null;
   /** Jev, to file a fact under the company it is about; without it facts the agent gives no
@@ -408,7 +408,7 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "create_contact",
         description:
-          "Add a person to the CRM, optionally at a company. The caller becomes the owner, and the CRM then researches them in the background (email, phone, photo, background). Check crm__list_contacts first so nobody is added twice. Set `found_by_search` when the person came from crm__find_people.",
+          "Add a person to the CRM at their company. Every contact needs one: find it with crm__list_companies, or add it with crm__create_company first (for a founder or angel, the company they run or work at). The caller becomes the owner, and the CRM then researches them in the background (email, phone, photo, background). Check crm__list_contacts first so nobody is added twice. Set `found_by_search` when the person came from crm__find_people.",
         readOnly: false,
         input: Schema.Struct({
           first_name: Schema.String,
@@ -417,7 +417,7 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
           email: Text("Work email."),
           phone: Text("Phone number."),
           linkedin_url: Text("Their LinkedIn profile URL."),
-          company_id: Schema.optional(Schema.NullOr(CompanyId)),
+          company_id: CompanyId,
           found_by_search: Schema.optional(Schema.Boolean),
         }),
       },
@@ -450,7 +450,9 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
           github_url: Text("GitHub URL."),
           seniority: Text("Seniority, such as Executive or Manager."),
           function: Text("Function, such as Engineering or Finance."),
-          company_id: Schema.optional(Schema.NullOr(CompanyId)),
+          company_id: Schema.optional(CompanyId).annotate({
+            description: "Move them to another company. A contact always keeps one.",
+          }),
           owner_id: OwnerId,
           archived: Schema.optional(Schema.Boolean),
         }),
@@ -664,7 +666,7 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       },
       async (input) => fromAgent(await deps.memory.forget(caller, input), { forgotten: true }),
     ),
-    ...(deps.intel ? intelTools(deps.intel, caller) : []),
+    ...(deps.intel ? intelTools(deps.intel, caller, deps.memory) : []),
     ...(deps.fields ? fieldTools(deps.fields, caller) : []),
   ];
 }

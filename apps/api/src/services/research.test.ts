@@ -47,6 +47,20 @@ describe("background research", () => {
     ]);
   });
 
+  test("a deal's session is about the deal and asks for its brief", async () => {
+    const env = setup();
+
+    env.research.start(alice, "deal", "del_1");
+    await settle();
+
+    expect(env.sessions[0]).toMatchObject({
+      caller: { record: { kind: "deal", id: "del_1" }, permissionMode: "auto" },
+      operationId: "research:del_1",
+    });
+    expect(env.sessions[0]?.message).toContain("research-deal");
+    expect(env.sessions[0]?.message).toContain("write_deal_brief");
+  });
+
   test("skips callers without a workspace or a user, and caps each workspace", async () => {
     const env = setup();
 

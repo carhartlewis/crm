@@ -12,6 +12,8 @@ export type MemorySubject =
 export const MEMORY_SOURCE_KINDS = [
   /** context.dev brand data and the website's home page. */
   "website_research",
+  /** What the agent found about a contact or deal on the web: its profile or deal brief. */
+  "research",
   /** A note a member wrote on the Workspace knowledge page or a record. */
   "member_note",
   /** A fact the agent saved with its `remember` tool, or that Jev kept from a chat. */

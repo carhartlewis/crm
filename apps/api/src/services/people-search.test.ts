@@ -205,8 +205,15 @@ describe("people search, end to end", () => {
     expect(found.people[1].contactId).toBe(env.sam.id);
     expect(found.usage).toMatchObject({ priceMicro: 2600, outcome: "hit" });
 
-    // 2. Adding Ada files her as found by a search, and her research starts by itself.
+    // 2. Adding Ada (at her company) files her as found by a search, and her research starts
+    // by itself.
+    const company = await call(env.tools, "create_company", {
+      name: "Example Ventures",
+      domain: "example-ventures.com",
+    });
+
     const added = await call(env.tools, "create_contact", {
+      company_id: company.id,
       first_name: "Ada",
       last_name: "Park",
       title: "Founder & CEO",
@@ -218,6 +225,7 @@ describe("people search, end to end", () => {
       {
         id: added.id,
         firstName: "Ada",
+        companyId: company.id,
         source: "search",
         linkedinUrl: "https://www.linkedin.com/in/ada-park",
       },
@@ -276,4 +284,5 @@ const NO_MEMORY = {
   search: async () => ({ ok: true as const, value: [] }),
   remember: async () => ({ ok: true as const, value: null }),
   forget: async () => ({ ok: true as const, value: null }),
+  research: async () => ({ ok: true as const, value: null }),
 };

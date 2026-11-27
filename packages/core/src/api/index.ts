@@ -484,6 +484,7 @@ export class SkillsApi extends HttpApiGroup.make("skills")
 /** Where a remembered source came from (see `@crm/memory`). */
 export const MemorySourceKind = Schema.Literals([
   "website_research",
+  "research",
   "member_note",
   "agent_fact",
   "chat",
