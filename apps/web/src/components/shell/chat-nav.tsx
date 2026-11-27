@@ -103,10 +103,37 @@ export default function ChatNav({ userId, workspaceId }: NavProps) {
     [workspaceId, userId, moveChat],
   );
 
+  // ⌥1–⌥9 run through Pinned's pages, then on through the pinned chats.
+  const pinnedPages = api.layout.pinned.filter((key) => {
+    const pin = parsePinKey(key);
+
+    return pin?.kind === "page" && isPageId(pin.id);
+  }).length;
+
+  const pinnedChats = api.layout.pinned.some((key) => {
+    const pin = parsePinKey(key);
+
+    return pin?.kind === "chat" && api.chatById(pin.id) !== undefined;
+  });
+
   return (
     <div ref={dragRef}>
-      <PinGroup label="Pinned" kinds={["page", "chat"]} {...rowProps} />
+      {/* With no pinned chats yet, Pinned takes the first one dropped. */}
+      <PinGroup
+        label="Pinned"
+        kinds={["page"]}
+        hotkeyOffset={0}
+        takesChats={!pinnedChats}
+        {...rowProps}
+      />
       <PinGroup label="Spaces" kinds={["space"]} {...rowProps} />
+      <PinGroup
+        label="Pinned chats"
+        kinds={["chat"]}
+        hotkeyOffset={pinnedPages}
+        takesChats
+        {...rowProps}
+      />
       <FoldersGroup {...rowProps} />
       <RecentsGroup {...rowProps} />
       {dialog && (
@@ -127,18 +154,32 @@ interface RowProps extends NavProps {
   readonly onRequest: (dialog: Dialog) => void;
 }
 
-/** Pinned: drag to reorder (a haptic tick per slot), ⌥1–⌥9 to open the first nine. */
 interface PinGroupProps extends RowProps {
   readonly label: string;
-  /** Which pins this group shows: pages and chats in Pinned, spaces in Spaces. */
+  /** Which pins this group shows: pages in Pinned, spaces in Spaces, chats in Pinned chats. */
   readonly kinds: readonly PinKind[];
+  /** The ⌥ number before this group's first row; no hotkeys when absent. */
+  readonly hotkeyOffset?: number;
+  /** Chats dragged from Recents or a folder can be dropped between its rows. */
+  readonly takesChats?: boolean;
 }
 
 /**
- * A group of pins in the user's one pinned order: Pinned (pages and chats, ⌥1–⌥9) or Spaces
- * (pinned spaces). Drag to reorder within the group, a haptic tick per slot.
+ * A group of pins in the user's one pinned order: Pinned (pages), Spaces (pinned spaces) or
+ * Pinned chats. Drag to reorder within the group, a haptic tick per slot; ⌥1–⌥9 open the first
+ * nine of Pinned and Pinned chats.
  */
-function PinGroup({ label, kinds, api, userId, workspaceId, pathname, onRequest }: PinGroupProps) {
+function PinGroup({
+  label,
+  kinds,
+  hotkeyOffset,
+  takesChats = false,
+  api,
+  userId,
+  workspaceId,
+  pathname,
+  onRequest,
+}: PinGroupProps) {
   const shown = new Set(kinds);
 
   // Pins whose chat or space is gone (deleted, or not synced yet) are skipped, not shown empty.
@@ -177,16 +218,14 @@ function PinGroup({ label, kinds, api, userId, workspaceId, pathname, onRequest 
 
   if (visible.length === 0) return null;
 
-  // ⌥1–⌥9 open Pinned's items; pinned spaces have no hotkeys.
-  const hotkeys = kinds.includes("page");
-
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
-      {/* Pinned takes chats dropped between its rows (chat-drag.ts). */}
-      <SidebarMenu ref={listRef} aria-label={label} data-drop-pinned={hotkeys || undefined}>
+      {/* Chats dropped between its rows are pinned there (chat-drag.ts). */}
+      <SidebarMenu ref={listRef} aria-label={label} data-drop-pinned={takesChats || undefined}>
         {visible.map(({ key, index: pinIndex, pin: item }, index) => {
-          const shortcut = hotkeys ? pinnedShortcut(index) : undefined;
+          const shortcutIndex = hotkeyOffset === undefined ? undefined : hotkeyOffset + index;
+          const shortcut = shortcutIndex === undefined ? undefined : pinnedShortcut(shortcutIndex);
 
           if (item.kind === "page" && isPageId(item.id)) {
             return (
@@ -209,8 +248,7 @@ function PinGroup({ label, kinds, api, userId, workspaceId, pathname, onRequest 
               <ChatRow
                 key={key}
                 chat={chat}
-                icon={<PinIcon />}
-                shortcutIndex={hotkeys ? index : undefined}
+                shortcutIndex={shortcutIndex}
                 pinIndex={pinIndex}
                 api={api}
                 userId={userId}
@@ -227,7 +265,7 @@ function PinGroup({ label, kinds, api, userId, workspaceId, pathname, onRequest 
             <SpaceRow
               key={key}
               space={space}
-              shortcutIndex={hotkeys ? index : undefined}
+              shortcutIndex={shortcutIndex}
               pinIndex={pinIndex}
               api={api}
               userId={userId}
@@ -360,14 +398,13 @@ function RecentsGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
 
 interface ChatRowProps extends RowProps {
   readonly chat: Chat;
-  readonly icon?: React.ReactNode;
   readonly shortcutIndex?: number;
   /** Its place in the Pinned order, when it is a pinned row (drag to reorder). */
   readonly pinIndex?: number;
 }
 
 /** A chat in the sidebar. Hovering preloads its route, so its history is fetched before the click. */
-function ChatRow({ chat, icon, shortcutIndex, pinIndex, ...props }: ChatRowProps) {
+function ChatRow({ chat, shortcutIndex, pinIndex, ...props }: ChatRowProps) {
   const shortcut = shortcutIndex === undefined ? undefined : pinnedShortcut(shortcutIndex);
   const key = pinKey("chat", chat.id);
   const pinned = props.api.layout.pinned.includes(key);
@@ -396,7 +433,6 @@ function ChatRow({ chat, icon, shortcutIndex, pinIndex, ...props }: ChatRowProps
           />
         }
       >
-        {icon}
         {/* One line: the hover icons take the end of the row, so the hotkey isn't shown here. */}
         <span className="min-w-0 flex-1 truncate">{chat.title}</span>
       </SidebarMenuButton>
