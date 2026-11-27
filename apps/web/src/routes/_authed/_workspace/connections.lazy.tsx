@@ -202,8 +202,9 @@ function Connections() {
   const outcome = outcomeMessage(search, appName);
 
   return (
-    <PageLayout page={pageById("connections")} actions={actions}>
-      <div className="flex flex-col gap-6">
+    // Skills are tables, which fill the page; connectors are cards, which scroll.
+    <PageLayout page={pageById("connections")} actions={actions} contained={tab === "skills"}>
+      <div className="flex min-h-0 flex-1 flex-col gap-6">
         {outcome ? (
           <output
             className={`flex items-center justify-between gap-3 text-sm ${outcome.ok ? "text-foreground" : "text-destructive"}`}

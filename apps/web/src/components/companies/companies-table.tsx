@@ -183,13 +183,19 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
     void record.open(id);
   };
 
+  // Keyboard moves turn the page with the active row.
+  const moveTo = (next: ListPosition) => {
+    setPosition(next);
+    list.reveal(next.activeId);
+  };
+
   const current = rows.find((row) => row.id === record.id);
   const sheetOpen = record.id !== null;
 
   useListKeys({
     ids,
     position,
-    setPosition,
+    setPosition: moveTo,
     selection: list.selection,
     enabled: !sheetOpen && createKind === null,
     onOpen: open,
@@ -197,7 +203,7 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
   });
 
   return (
-    <div ref={frame} className="flex flex-col gap-4">
+    <div ref={frame} className="flex min-h-0 flex-1 flex-col gap-4">
       <DataTable
         {...list.tableProps}
         columns={columns}

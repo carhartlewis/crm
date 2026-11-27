@@ -144,6 +144,8 @@ export default function SourceSheet({
               getRowId={(fact) => fact.id}
               empty="No facts read from this source yet. New sources take up to a minute."
               columns={FACT_COLUMNS}
+              // The sheet scrolls and facts wrap, so pages hold a fixed count.
+              fit={false}
               rowActions={factMenu((fact) => forget.mutate({ ...target, factId: fact.id }))}
             />
           ),

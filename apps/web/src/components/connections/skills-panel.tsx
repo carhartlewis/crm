@@ -228,7 +228,7 @@ export function SkillsPanel({
           onOpen={(id) => void setOpen(id)}
         />
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex min-h-0 flex-1 flex-col gap-6">
           <ConnectionsToolbar {...toolbar} />
           <DiscoverSkills
             scope={scope}
@@ -347,6 +347,8 @@ function DiscoverSkills({
 
   return (
     <StaticTable
+      // A new search starts on its first page.
+      key={text}
       label={text ? "Matching skills" : "Top skills"}
       columns={columns}
       rows={rows}
@@ -354,7 +356,6 @@ function DiscoverSkills({
       onRowClick={(row) => (row.skill ? onOpen(row.skill.id) : undefined)}
       rowActions={(row) => (row.skill ? menu(row.skill) : null)}
       loading={results.isPending}
-      loadingRows={8}
       empty={
         results.isError ? (
           <span className="text-destructive">{results.error.message}</span>

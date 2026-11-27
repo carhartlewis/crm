@@ -16,18 +16,23 @@ import { WorkspacePageHeader } from "./page-header.tsx";
 import type { ReactNode } from "react";
 import type { Page } from "../../lib/pages.ts";
 
-/** A workspace page in the vms.dev page shell: title bar (with optional actions), then content. */
+/**
+ * A workspace page in the vms.dev page shell: title bar (with optional actions), then content.
+ * `contained` pages don't scroll: a data table fills the height and pages what fits.
+ */
 export function PageLayout({
   page,
   actions,
+  contained = false,
   children,
 }: {
   page: Page;
   actions?: ReactNode;
+  contained?: boolean;
   children: ReactNode;
 }) {
   return (
-    <PageShell>
+    <PageShell contained={contained}>
       <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>{page.label}</PageShellTitle>

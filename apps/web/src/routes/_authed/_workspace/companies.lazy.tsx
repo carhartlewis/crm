@@ -26,7 +26,7 @@ function Companies() {
   const [, setCreate] = useCreateSheet();
 
   return (
-    <PageShell>
+    <PageShell contained>
       <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>Companies</PageShellTitle>

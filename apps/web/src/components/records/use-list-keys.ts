@@ -1,5 +1,4 @@
 import type { TableSelection } from "@crm/ui/patterns/data-table/use-table-selection";
-import type { Dispatch, SetStateAction } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import {
   extend,
@@ -22,7 +21,7 @@ export interface ListKeysOptions {
   /** Row ids in display order (after filter and sort). */
   readonly ids: readonly string[];
   readonly position: ListPosition;
-  readonly setPosition: Dispatch<SetStateAction<ListPosition>>;
+  readonly setPosition: (position: ListPosition) => void;
   /** The table's own selection: x and ⇧j/⇧k change it, as the checkboxes do. */
   readonly selection: TableSelection;
   /** Off while a sheet or dialog is open: derived from that state, so it can't drift. */

@@ -5,9 +5,10 @@ import type { ListInput, ListSearchParams } from "./list-search-params";
 import { TableCount } from "./table-cells";
 import { TableEmpty } from "./table-empty";
 import type { TableQueryState } from "./table-query";
+import { useFitRows } from "./use-fit-rows";
 import { useTableQuery } from "./use-table-query";
 import { type TableSelection, useTableSelection } from "./use-table-selection";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 import { clientTable, type SortValues } from "./client-table";
 import { type TableView, tableViews } from "./table-views";
@@ -48,8 +49,11 @@ export type ListTable<TRow, TTab extends string, TFacet extends string> = {
   input: ListInput<TTab, TFacet>;
   visible: TRow[];
   selection: TableSelection;
+  /** Turns to the page that holds the row, so keyboard navigation never leaves the screen. */
+  reveal: (id: string | null) => void;
   tableProps: {
     query: TableQueryState;
+    fitRef: Ref<HTMLDivElement>;
     rows: TRow[];
     total: number;
     getRowId: (row: TRow) => string;
@@ -85,8 +89,12 @@ export function useListTable<
   blank,
   filtered,
 }: ListTableOptions<TRow, TTab, TFacet, TColumn>): ListTable<TRow, TTab, TFacet> {
-  const { query, input } = useTableQuery(searchParams);
-  const { tabId, scope } = searchParams.config;
+  const { query: urlQuery, input: urlInput } = useTableQuery(searchParams);
+  const { tabId, scope, pageSize: unmeasured } = searchParams.config;
+  // A page is as many rows as fit the table's box; the configured size is only the first guess.
+  const fit = useFitRows(unmeasured);
+  const query: TableQueryState = { ...urlQuery, pageSize: fit.rows };
+  const input = { ...urlInput, pageSize: fit.rows };
   const tab = tabId ? input[tabId] : "all";
 
   const views = tableViews(viewConfig?.items ?? [], all, tab);
@@ -130,12 +138,24 @@ export function useListTable<
       filtered(tab)
     );
 
+  const reveal = (id: string | null) => {
+    const index = id === null ? -1 : table.visible.findIndex((row) => getRowId(row) === id);
+
+    if (index < 0) return;
+
+    const page = Math.floor(index / fit.rows) + 1;
+
+    if (page !== query.page) void query.setPage(page);
+  };
+
   return {
     input,
     visible: table.visible,
     selection,
+    reveal,
     tableProps: {
       query,
+      fitRef: fit.ref,
       rows: table.rows,
       total: table.total,
       getRowId,

@@ -53,6 +53,7 @@ import {
   Fragment,
   type MouseEvent,
   type ReactNode,
+  type Ref,
   useId,
   useState,
   useSyncExternalStore,
@@ -61,6 +62,7 @@ import {
 import { type ColumnKind, type ColumnLayout, columnLayout, orderColumns } from "./column-kinds";
 import { LIST_SEARCH_PARAM } from "./list-search-params";
 import { useOverflowTooltip } from "./overflow-tooltip";
+import { useFitRows } from "./use-fit-rows";
 import {
   parseStoredColumns,
   readStoredColumns,
@@ -137,6 +139,11 @@ type DataTableSelection<TRow> = {
 
 export type DataTableProps<TRow, TSub, TColumn extends string = string> = {
   query: TableQueryState;
+  /**
+   * The box the rows and pager fill (`useListTable` measures it). The table takes the height its
+   * parent leaves, so give it a bounded parent (a `contained` page) and pages hold what fits.
+   */
+  fitRef?: Ref<HTMLDivElement>;
   columns: DataTableColumn<TRow, TColumn>[];
   getRowId: (row: TRow) => string;
   rows: TRow[];
@@ -287,6 +294,14 @@ function TableFrame({
     </section>
   );
 }
+
+/**
+ * The rows and pager take the height left under the toolbar, and a page holds what fits
+ * (`useFitRows` measures this box). Short pages keep the pager under the last row.
+ */
+const FIT_BOX_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col";
+
+const UNMEASURED_PAGE_SIZE = 25;
 
 const TABLE_EMPTY_OVERLAY_CLASS =
   "absolute inset-0 flex items-center justify-center px-4 py-8 text-center text-muted-foreground";
@@ -689,6 +704,7 @@ function EndColumnHeader({
 
 export function DataTable<TRow, TSub = unknown, TColumn extends string = string>({
   query,
+  fitRef,
   columns: givenColumns,
   getRowId,
   rows,
@@ -974,269 +990,276 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
         </div>
       </div>
 
-      <TableFrame
-        compact={compactEmpty}
-        overlay={
-          rows.length === 0 && !loading ? (
-            <div className={TABLE_EMPTY_OVERLAY_CLASS}>{empty ?? UI_COPY.noResultsFound}</div>
-          ) : null
-        }
-      >
-        <Table {...overflow.handlers} aria-busy={loading || undefined} className={TABLE_CLASS}>
-          {rows.length > 0 || loading || headingsWhenEmpty ? (
-            <TableHeader className={TABLE_HEADER_CLASS}>
-              <TableRow className="hover:bg-transparent">
-                {selection && (
-                  <TableHead className="h-11 w-12 min-w-12 max-w-12 px-0 text-center">
-                    {rows.length > 0 && (
-                      <CellControl>
-                        <Checkbox
-                          checked={selection.state.allSelected}
-                          indeterminate={selection.state.someSelected}
-                          onCheckedChange={(checked) => selection.state.toggleAll(checked)}
-                          aria-label={UI_COPY.selectAllRows}
-                        />
-                      </CellControl>
-                    )}
-                  </TableHead>
-                )}
-                {anyExpandable && (
-                  <TableHead className="h-11 w-12 min-w-12 max-w-12 px-0 text-center">
-                    <span className="sr-only">{UI_COPY.detail}</span>
-                  </TableHead>
-                )}
-                {visibleColumns.map((column) => {
-                  const isActive = query.sort === column.id;
-
-                  return (
-                    <TableHead
-                      key={column.id}
-                      {...layoutAttributes(column)}
-                      className={COLUMN_HEAD_CLASS}
-                      aria-sort={ariaSort(isActive, query.dir)}
-                    >
-                      {column.sortable ? (
-                        <SortHeader
-                          active={isActive}
-                          align={columnLayout(column.kind).align}
-                          dir={query.dir}
-                          onToggle={() => query.toggleSort(column.id)}
-                        >
-                          {column.header}
-                        </SortHeader>
-                      ) : (
-                        <ColumnHeader column={column} />
-                      )}
-                    </TableHead>
-                  );
-                })}
-
-                <TableHead className={END_COLUMN_CLASS}>
-                  <EndColumnHeader
-                    columns={hideable}
-                    hidden={hidden}
-                    onShownChange={setColumnShown}
-                    rowActions={rowActions !== undefined}
-                  />
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-          ) : null}
-          <TableBody>
-            {loading && rows.length === 0 ? (
-              <LoadingRows
-                columns={visibleColumns}
-                endColumn
-                expandable={anyExpandable}
-                fitted
-                selectable={!!selection}
-              />
-            ) : null}
-            {rows.map((row, index) => {
-              const id = getRowId(row);
-              const group = groupHeader?.(row, rows[index - 1]);
-              const canExpand = expandable?.isExpandable(row) ?? false;
-              const isOpen = canExpand && expanded.has(id);
-              const isSelected = selection?.state.has(id) ?? false;
-              const isActive = activeRowId != null && activeRowId === id;
-              const disabled = rowDisabled?.(row) ?? false;
-              const clickable = !disabled && (canExpand || !!onRowClick);
-
-              const handleClick = () => {
-                if (canExpand) {
-                  void setExpandedIds((prev) => {
-                    const set = new Set(prev);
-
-                    if (set.has(id)) set.delete(id);
-                    else set.add(id);
-                    const next = [...set];
-
-                    return next.length > 0 ? next : null;
-                  });
-                } else {
-                  onRowClick?.(row);
-                }
-              };
-
-              return (
-                <Fragment key={id}>
-                  {group ? (
-                    <TableRow className="relative bg-muted/40 hover:bg-muted/40">
-                      {selection && (
-                        <TableCell className="h-13 w-12 min-w-12 max-w-12 px-0 text-center" />
-                      )}
-                      {anyExpandable && (
-                        <TableCell className="h-13 w-12 min-w-12 max-w-12 px-0 text-center" />
-                      )}
-                      {visibleColumns.map((column, columnIndex) => (
-                        <TableCell
-                          key={column.id}
-                          {...layoutAttributes(column)}
-                          className={cn(COLUMN_CELL_CLASS, "h-13")}
-                        >
-                          {columnIndex === 0 ? (
-                            <div className="absolute inset-y-0 right-4 left-4 flex min-w-0 items-center *:min-w-0 *:flex-1">
-                              {group}
-                            </div>
-                          ) : null}
-                        </TableCell>
-                      ))}
-
-                      <TableCell className={cn(END_COLUMN_CLASS, "h-13")} />
-                    </TableRow>
-                  ) : null}
-                  <TableRow
-                    ref={isActive ? revealActiveRow : undefined}
-                    data-row-id={id}
-                    data-active={isActive || undefined}
-                    data-state={isSelected ? "selected" : undefined}
-                    tabIndex={clickable ? 0 : undefined}
-                    aria-expanded={canExpand ? isOpen : undefined}
-                    onClick={clickable ? handleClick : undefined}
-                    onKeyDown={
-                      clickable
-                        ? (event) => {
-                            if (
-                              event.target === event.currentTarget &&
-                              (event.key === "Enter" || event.key === " ")
-                            ) {
-                              event.preventDefault();
-                              handleClick();
-                            }
-                          }
-                        : undefined
-                    }
-                    onMouseEnter={onRowHover && !disabled ? () => onRowHover(row) : undefined}
-                    onFocus={onRowHover && !disabled ? () => onRowHover(row) : undefined}
-                    aria-disabled={disabled || undefined}
-                    className={cn(
-                      ROW_ACTIVE,
-                      clickable && (anyExpandable ? ROW_ACCENT_EXPANDABLE : ROW_ACCENT),
-                      clickable && "outline-none focus-visible:bg-muted/50",
-                      disabled && "cursor-default",
-                    )}
-                  >
+      <div className={FIT_BOX_CLASS} ref={fitRef}>
+        <div className="flex min-w-0 flex-col gap-3">
+          <TableFrame
+            compact={compactEmpty}
+            overlay={
+              rows.length === 0 && !loading ? (
+                <div className={TABLE_EMPTY_OVERLAY_CLASS}>{empty ?? UI_COPY.noResultsFound}</div>
+              ) : null
+            }
+          >
+            <Table {...overflow.handlers} aria-busy={loading || undefined} className={TABLE_CLASS}>
+              {rows.length > 0 || loading || headingsWhenEmpty ? (
+                <TableHeader className={TABLE_HEADER_CLASS}>
+                  <TableRow className="hover:bg-transparent">
                     {selection && (
-                      <TableCell
-                        className="w-12 min-w-12 max-w-12 px-0 text-center py-3"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <CellControl>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => selection.state.toggle(id, checked)}
-                            aria-label={
-                              selection.rowLabel
-                                ? UI_COPY.selectNamedRow(selection.rowLabel(row))
-                                : UI_COPY.selectRow
-                            }
-                          />
-                        </CellControl>
-                      </TableCell>
+                      <TableHead className="h-11 w-12 min-w-12 max-w-12 px-0 text-center">
+                        {rows.length > 0 && (
+                          <CellControl>
+                            <Checkbox
+                              checked={selection.state.allSelected}
+                              indeterminate={selection.state.someSelected}
+                              onCheckedChange={(checked) => selection.state.toggleAll(checked)}
+                              aria-label={UI_COPY.selectAllRows}
+                            />
+                          </CellControl>
+                        )}
+                      </TableHead>
                     )}
                     {anyExpandable && (
-                      <TableCell className="w-12 min-w-12 max-w-12 px-0 text-center py-3 align-middle text-muted-foreground">
-                        {canExpand && (
-                          <ChevronRight
-                            className={cn(
-                              "inline-block size-4 transition-transform",
-                              isOpen && "rotate-90",
-                            )}
-                          />
-                        )}
-                      </TableCell>
+                      <TableHead className="h-11 w-12 min-w-12 max-w-12 px-0 text-center">
+                        <span className="sr-only">{UI_COPY.detail}</span>
+                      </TableHead>
                     )}
-                    {visibleColumns.map((column) => (
-                      <TableCell
-                        key={column.id}
-                        {...layoutAttributes(column)}
-                        className={cn(COLUMN_CELL_CLASS, "py-3")}
-                      >
-                        <ColumnContent kind={column.kind}>{column.cell(row)}</ColumnContent>
-                      </TableCell>
-                    ))}
-
-                    <TableCell
-                      className={cn(END_COLUMN_CLASS, "py-3")}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {rowActions ? <CellControl>{rowActions(row)}</CellControl> : null}
-                    </TableCell>
-                  </TableRow>
-                  {isOpen &&
-                    expandable?.getSubRows(row).map((sub) => {
-                      const subClickable = !!expandable.onSubRowClick;
+                    {visibleColumns.map((column) => {
+                      const isActive = query.sort === column.id;
 
                       return (
-                        <TableRow
-                          key={expandable.getSubRowId(sub, row)}
-                          onClick={
-                            subClickable ? () => expandable.onSubRowClick?.(sub, row) : undefined
-                          }
-                          className={cn(
-                            "bg-muted/30",
-                            subClickable && (anyExpandable ? ROW_ACCENT_EXPANDABLE : ROW_ACCENT),
-                          )}
+                        <TableHead
+                          key={column.id}
+                          {...layoutAttributes(column)}
+                          className={COLUMN_HEAD_CLASS}
+                          aria-sort={ariaSort(isActive, query.dir)}
                         >
+                          {column.sortable ? (
+                            <SortHeader
+                              active={isActive}
+                              align={columnLayout(column.kind).align}
+                              dir={query.dir}
+                              onToggle={() => query.toggleSort(column.id)}
+                            >
+                              {column.header}
+                            </SortHeader>
+                          ) : (
+                            <ColumnHeader column={column} />
+                          )}
+                        </TableHead>
+                      );
+                    })}
+
+                    <TableHead className={END_COLUMN_CLASS}>
+                      <EndColumnHeader
+                        columns={hideable}
+                        hidden={hidden}
+                        onShownChange={setColumnShown}
+                        rowActions={rowActions !== undefined}
+                      />
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+              ) : null}
+              <TableBody>
+                {loading && rows.length === 0 ? (
+                  <LoadingRows
+                    columns={visibleColumns}
+                    endColumn
+                    expandable={anyExpandable}
+                    fitted
+                    rows={pageSize}
+                    selectable={!!selection}
+                  />
+                ) : null}
+                {rows.map((row, index) => {
+                  const id = getRowId(row);
+                  const group = groupHeader?.(row, rows[index - 1]);
+                  const canExpand = expandable?.isExpandable(row) ?? false;
+                  const isOpen = canExpand && expanded.has(id);
+                  const isSelected = selection?.state.has(id) ?? false;
+                  const isActive = activeRowId != null && activeRowId === id;
+                  const disabled = rowDisabled?.(row) ?? false;
+                  const clickable = !disabled && (canExpand || !!onRowClick);
+
+                  const handleClick = () => {
+                    if (canExpand) {
+                      void setExpandedIds((prev) => {
+                        const set = new Set(prev);
+
+                        if (set.has(id)) set.delete(id);
+                        else set.add(id);
+                        const next = [...set];
+
+                        return next.length > 0 ? next : null;
+                      });
+                    } else {
+                      onRowClick?.(row);
+                    }
+                  };
+
+                  return (
+                    <Fragment key={id}>
+                      {group ? (
+                        <TableRow className="relative bg-muted/40 hover:bg-muted/40">
                           {selection && (
-                            <TableCell className="w-12 min-w-12 max-w-12 px-0 text-center py-2.5" />
+                            <TableCell className="h-13 w-12 min-w-12 max-w-12 px-0 text-center" />
                           )}
                           {anyExpandable && (
-                            <TableCell className="w-12 min-w-12 max-w-12 px-0 text-center py-2.5" />
+                            <TableCell className="h-13 w-12 min-w-12 max-w-12 px-0 text-center" />
                           )}
-                          {visibleColumns.map((column) => (
+                          {visibleColumns.map((column, columnIndex) => (
                             <TableCell
                               key={column.id}
                               {...layoutAttributes(column)}
-                              className={cn(COLUMN_CELL_CLASS, "py-2.5")}
+                              className={cn(COLUMN_CELL_CLASS, "h-13")}
                             >
-                              <ColumnContent kind={column.kind}>
-                                {expandable.renderSubCell(sub, column.id, row)}
-                              </ColumnContent>
+                              {columnIndex === 0 ? (
+                                <div className="absolute inset-y-0 right-4 left-4 flex min-w-0 items-center *:min-w-0 *:flex-1">
+                                  {group}
+                                </div>
+                              ) : null}
                             </TableCell>
                           ))}
 
-                          <TableCell className={cn(END_COLUMN_CLASS, "py-2.5")} />
+                          <TableCell className={cn(END_COLUMN_CLASS, "h-13")} />
                         </TableRow>
-                      );
-                    })}
-                </Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableFrame>
-      {overflow.tooltip}
+                      ) : null}
+                      <TableRow
+                        ref={isActive ? revealActiveRow : undefined}
+                        data-row-id={id}
+                        data-active={isActive || undefined}
+                        data-state={isSelected ? "selected" : undefined}
+                        tabIndex={clickable ? 0 : undefined}
+                        aria-expanded={canExpand ? isOpen : undefined}
+                        onClick={clickable ? handleClick : undefined}
+                        onKeyDown={
+                          clickable
+                            ? (event) => {
+                                if (
+                                  event.target === event.currentTarget &&
+                                  (event.key === "Enter" || event.key === " ")
+                                ) {
+                                  event.preventDefault();
+                                  handleClick();
+                                }
+                              }
+                            : undefined
+                        }
+                        onMouseEnter={onRowHover && !disabled ? () => onRowHover(row) : undefined}
+                        onFocus={onRowHover && !disabled ? () => onRowHover(row) : undefined}
+                        aria-disabled={disabled || undefined}
+                        className={cn(
+                          ROW_ACTIVE,
+                          clickable && (anyExpandable ? ROW_ACCENT_EXPANDABLE : ROW_ACCENT),
+                          clickable && "outline-none focus-visible:bg-muted/50",
+                          disabled && "cursor-default",
+                        )}
+                      >
+                        {selection && (
+                          <TableCell
+                            className="w-12 min-w-12 max-w-12 px-0 text-center py-3"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <CellControl>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => selection.state.toggle(id, checked)}
+                                aria-label={
+                                  selection.rowLabel
+                                    ? UI_COPY.selectNamedRow(selection.rowLabel(row))
+                                    : UI_COPY.selectRow
+                                }
+                              />
+                            </CellControl>
+                          </TableCell>
+                        )}
+                        {anyExpandable && (
+                          <TableCell className="w-12 min-w-12 max-w-12 px-0 text-center py-3 align-middle text-muted-foreground">
+                            {canExpand && (
+                              <ChevronRight
+                                className={cn(
+                                  "inline-block size-4 transition-transform",
+                                  isOpen && "rotate-90",
+                                )}
+                              />
+                            )}
+                          </TableCell>
+                        )}
+                        {visibleColumns.map((column) => (
+                          <TableCell
+                            key={column.id}
+                            {...layoutAttributes(column)}
+                            className={cn(COLUMN_CELL_CLASS, "py-3")}
+                          >
+                            <ColumnContent kind={column.kind}>{column.cell(row)}</ColumnContent>
+                          </TableCell>
+                        ))}
 
-      <TablePagination
-        page={query.page}
-        totalPages={totalPages}
-        pageSize={pageSize}
-        total={total}
-        onPageChange={(page) => void query.setPage(page)}
-        loading={loading}
-        meta={meta}
-      />
+                        <TableCell
+                          className={cn(END_COLUMN_CLASS, "py-3")}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {rowActions ? <CellControl>{rowActions(row)}</CellControl> : null}
+                        </TableCell>
+                      </TableRow>
+                      {isOpen &&
+                        expandable?.getSubRows(row).map((sub) => {
+                          const subClickable = !!expandable.onSubRowClick;
+
+                          return (
+                            <TableRow
+                              key={expandable.getSubRowId(sub, row)}
+                              onClick={
+                                subClickable
+                                  ? () => expandable.onSubRowClick?.(sub, row)
+                                  : undefined
+                              }
+                              className={cn(
+                                "bg-muted/30",
+                                subClickable &&
+                                  (anyExpandable ? ROW_ACCENT_EXPANDABLE : ROW_ACCENT),
+                              )}
+                            >
+                              {selection && (
+                                <TableCell className="w-12 min-w-12 max-w-12 px-0 text-center py-2.5" />
+                              )}
+                              {anyExpandable && (
+                                <TableCell className="w-12 min-w-12 max-w-12 px-0 text-center py-2.5" />
+                              )}
+                              {visibleColumns.map((column) => (
+                                <TableCell
+                                  key={column.id}
+                                  {...layoutAttributes(column)}
+                                  className={cn(COLUMN_CELL_CLASS, "py-2.5")}
+                                >
+                                  <ColumnContent kind={column.kind}>
+                                    {expandable.renderSubCell(sub, column.id, row)}
+                                  </ColumnContent>
+                                </TableCell>
+                              ))}
+
+                              <TableCell className={cn(END_COLUMN_CLASS, "py-2.5")} />
+                            </TableRow>
+                          );
+                        })}
+                    </Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableFrame>
+          <TablePagination
+            page={query.page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={(page) => void query.setPage(page)}
+            loading={loading}
+            meta={meta}
+          />
+        </div>
+      </div>
+      {overflow.tooltip}
     </div>
   );
 }
@@ -1298,9 +1321,15 @@ export function StaticTable<TRow>({
   columnsMenu,
   groupBy,
   compactEmpty = false,
+  fit = true,
 }: {
   groupBy?: (row: TRow) => string;
   compactEmpty?: boolean;
+  /**
+   * Without `paging` the table pages its rows itself: as many as fit the height its parent leaves
+   * (give it a bounded parent), or 25 when `false`, for a table inside a scrolling panel.
+   */
+  fit?: boolean;
   label: string;
   columns: StaticTableColumn<TRow>[];
   rowActions?: (row: TRow) => ReactNode;
@@ -1328,12 +1357,32 @@ export function StaticTable<TRow>({
   const overflow = useOverflowTooltip();
   const noteId = useId();
   const [expanded, setExpanded] = useState(false);
+  const [ownPage, setOwnPage] = useState(1);
+  const fitted = useFitRows(UNMEASURED_PAGE_SIZE);
+
+  // A caller's `paging` or `preview` already limits the rows; otherwise the table pages them.
+  const selfPaged = !paging && !preview;
+  const fitting = selfPaged && fit;
+  const pageSize = fitting ? fitted.rows : UNMEASURED_PAGE_SIZE;
+  const lastPage = Math.max(1, Math.ceil(rows.length / pageSize));
+  const page = Math.min(ownPage, lastPage);
 
   const hidden = preview && !expanded ? Math.max(0, rows.length - preview.rows) : 0;
 
-  const shown = hidden > 0 ? rows.slice(0, preview?.rows) : rows;
+  const shown = selfPaged
+    ? rows.slice((page - 1) * pageSize, page * pageSize)
+    : hidden > 0
+      ? rows.slice(0, preview?.rows)
+      : rows;
 
-  return (
+  // A fitted table always shows its pager, so the measured height doesn't change with the count.
+  const pager: StaticTablePaging | undefined = paging
+    ? paging
+    : selfPaged && (fitting ? rows.length > 0 : lastPage > 1)
+      ? { page, pageSize, total: rows.length, totalPages: lastPage, onPageChange: setOwnPage }
+      : undefined;
+
+  const table = (
     <div className="@container/table flex min-w-0 flex-col gap-3">
       <TableFrame
         compact={compactEmpty}
@@ -1397,7 +1446,11 @@ export function StaticTable<TRow>({
           ) : null}
           <TableBody>
             {loading && rows.length === 0 ? (
-              <LoadingRows columns={columns} endColumn={endColumn} rows={loadingRows} />
+              <LoadingRows
+                columns={columns}
+                endColumn={endColumn}
+                rows={fitting ? pageSize : loadingRows}
+              />
             ) : null}
             {shown.map((row, index) => {
               const previous = shown[index - 1];
@@ -1512,18 +1565,30 @@ export function StaticTable<TRow>({
           {note}
         </p>
       ) : null}
-      {overflow.tooltip}
-      {paging && (paging.totalPages ?? Math.ceil(paging.total / paging.pageSize)) > 1 ? (
+      {pager && (selfPaged || (pager.totalPages ?? Math.ceil(pager.total / pager.pageSize)) > 1) ? (
         <TablePagination
-          onPageChange={paging.onPageChange}
-          page={paging.page}
-          pageSize={paging.pageSize}
-          total={paging.total}
-          totalPages={paging.totalPages ?? Math.ceil(paging.total / paging.pageSize)}
-          start={paging.start}
-          count={paging.count}
+          onPageChange={pager.onPageChange}
+          page={pager.page}
+          pageSize={pager.pageSize}
+          total={pager.total}
+          totalPages={pager.totalPages ?? Math.ceil(pager.total / pager.pageSize)}
+          start={pager.start}
+          count={pager.count}
         />
       ) : null}
     </div>
+  );
+
+  return (
+    <>
+      {fitting ? (
+        <div className={FIT_BOX_CLASS} ref={fitted.ref}>
+          {table}
+        </div>
+      ) : (
+        table
+      )}
+      {overflow.tooltip}
+    </>
   );
 }
