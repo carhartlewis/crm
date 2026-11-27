@@ -1,4 +1,4 @@
-import type { JevAnswer, JevClient } from "@crm/memory/jev";
+import type { JevAnswer, JevClient } from "./jev.ts";
 import { experimental_decide } from "ai";
 
 /**

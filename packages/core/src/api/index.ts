@@ -551,6 +551,15 @@ export type ChatHistory = typeof ChatHistory.Type;
 
 const ChatErrors = [NotFound, NoActiveWorkspace, Invalid, Forbidden, AgentUnavailable];
 
+/** A message sent while the agent works, and the task it's working on (the last request). */
+export const FollowUp = Schema.Struct({
+  message: Schema.String,
+  task: Schema.String,
+});
+
+/** `steer` redirects the running turn now; `queue` waits for it to finish. */
+export const FollowUpMode = Schema.Struct({ mode: Schema.Literals(["steer", "queue"]) });
+
 export class ChatsApi extends HttpApiGroup.make("chats")
   .add(
     /** Keeps an eve session ready for the caller's next chat (10 minutes, in Redis). */
@@ -577,6 +586,13 @@ export class ChatsApi extends HttpApiGroup.make("chats")
     HttpApiEndpoint.get("history", "/:id/history", {
       params: { id: Schema.String },
       success: ChatHistory,
+      error: ChatErrors,
+    }),
+    /** Whether a message sent mid-turn redirects the turn or waits for it (a Jev judgement). */
+    HttpApiEndpoint.post("followUp", "/:id/follow-up", {
+      params: { id: Schema.String },
+      payload: FollowUp,
+      success: FollowUpMode,
       error: ChatErrors,
     }),
   )

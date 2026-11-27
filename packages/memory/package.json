@@ -8,12 +8,14 @@
     "./supermemory": "./src/supermemory.ts",
     "./testing": "./src/in-memory-store.ts",
     "./jev": "./src/jev.ts",
+    "./jev-gateway": "./src/jev-gateway.ts",
     "./recall": "./src/recall.ts"
   },
   "scripts": {
     "check-types": "bun check --no-script --project tsconfig.json"
   },
   "dependencies": {
+    "ai": "7.0.183",
     "supermemory": "5.1.2",
     "zod": "4.6.7"
   },

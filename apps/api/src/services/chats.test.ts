@@ -336,6 +336,25 @@ describe("history", () => {
   });
 });
 
+describe("a message sent while the agent works", () => {
+  test("is judged for a chat the person can see, and steers without a judge", async () => {
+    const memory = createMemoryChatStore(["ws_a:alice", "ws_a:bob"]);
+    const eve = fakeAgent();
+    const kv = createMemoryKv();
+    const judged = makeChats(memory.store, eve.agent, kv, 10, async () => "queue");
+    const unjudged = makeChats(memory.store, eve.agent, kv);
+    const id = chatId();
+    const input = { task: "Research our customers", message: "Then email Capgo" };
+
+    await run(judged.create(alice, { id, title: "Hi", spaceId: null }));
+
+    expect(await run(judged.followUp(alice, id, input))).toEqual({ mode: "queue" });
+    expect(await run(unjudged.followUp(alice, id, input))).toEqual({ mode: "steer" });
+    // Bob can't see Alice's private chat, so he learns nothing about it.
+    expect(await outcome(judged.followUp(bob, id, input))).toBe("NotFound");
+  });
+});
+
 describe("the agent proxy", () => {
   test("forwards only the chat's own session, as the caller", async () => {
     const { chats, calls, rows } = setup();

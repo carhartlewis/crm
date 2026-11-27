@@ -8,15 +8,10 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@crm/ui/components/ai-elements/prompt-input";
-import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
-
-export interface SendOptions {
-  /** Wait for the running turn to end instead of redirecting it (⌥Enter). */
-  readonly queue: boolean;
-}
+import { type KeyboardEvent, type ReactNode, useState } from "react";
 
 export interface ComposerProps {
-  readonly onSend: (text: string, options: SendOptions) => void;
+  readonly onSend: (text: string) => void;
   /** Stops the agent's turn; the submit button becomes Stop while it works. */
   readonly onStop?: () => void;
   readonly status?: ChatStatus;
@@ -40,10 +35,9 @@ function focusField(field: HTMLTextAreaElement | null) {
 }
 
 /**
- * The chat composer: AI Elements' prompt input in the border beam. Enter sends. While the agent
- * works, as in T3 Code: Enter sends at once and redirects the reply, ⌥Enter queues the message
- * until the turn ends, and Escape stops the turn. The button is Stop while the box is empty and
- * Send once there's text.
+ * The chat composer: AI Elements' prompt input in the border beam. Enter sends, also while the
+ * agent works (the chat decides whether that redirects the reply or waits for it), and Escape
+ * stops the turn. The button is Stop while the box is empty and Send once there's text.
  */
 export function Composer({
   onSend,
@@ -57,18 +51,12 @@ export function Composer({
 }: ComposerProps) {
   const working = status === "streaming" || status === "submitted";
   const [hasText, setHasText] = useState(false);
-  // Set by the key that submits, read by the submit: ⌥Enter queues.
-  const queueNext = useRef(false);
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Escape" && working && onStop) {
       event.preventDefault();
       onStop();
-
-      return;
     }
-
-    queueNext.current = event.key === "Enter" && event.altKey;
   };
 
   return (
@@ -76,21 +64,16 @@ export function Composer({
       // The beam runs always on the chat composer, focused or not.
       beam
       onSubmit={({ text }) => {
-        const queue = queueNext.current;
-
-        queueNext.current = false;
         setHasText(false);
 
-        if (text.trim()) onSend(text.trim(), { queue });
+        if (text.trim()) onSend(text.trim());
       }}
     >
       {header && <PromptInputHeader>{header}</PromptInputHeader>}
       <PromptInputBody>
         <PromptInputTextarea
           name="message"
-          placeholder={
-            working ? "Redirect the reply, or ⌥↵ to queue · Esc to stop" : "Work on anything"
-          }
+          placeholder={working ? "Add to this, or ask something else" : "Work on anything"}
           aria-label="Message"
           ref={focusOnMount ? focusField : undefined}
           disabled={disabled}

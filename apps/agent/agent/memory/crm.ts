@@ -3,7 +3,7 @@ import { byPrincipal } from "eve/memory/scope";
 import { crmMemory } from "../lib/crm-memory.ts";
 import { crmToken } from "../lib/crm-token.ts";
 import { apiUrl } from "../lib/gateway.ts";
-import { gatewayJev } from "../lib/jev-gateway.ts";
+import { gatewayJev } from "@crm/memory/jev-gateway";
 import { crmMemoryProvider } from "../lib/memory-provider.ts";
 
 /**

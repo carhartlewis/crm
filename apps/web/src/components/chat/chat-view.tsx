@@ -20,10 +20,11 @@ import { chatAgentBase, type ChatHistory } from "@crm/core/api";
 import type { EveMessage, EveMessagePart, SessionStreamEvent } from "eve/client";
 import type { PermissionMode } from "@crm/core/chat";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { activeTurn } from "eve/events";
 import { useEveAgent } from "eve/react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
-import { chatKeys, takeFirstMessage } from "../../lib/chat-api.ts";
+import { chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { ReplyResponse } from "./reply-islands.tsx";
 import { Composer } from "./composer.tsx";
@@ -96,8 +97,14 @@ export function ChatView({
   // Sends, answers and stops resolve when the server accepts them; a refusal (such as a session
   // the agent can no longer run) shows as a toast, and the optimistic message stays marked failed.
   const send = useMutation({
-    mutationFn: ({ text, queue = false }: { text: string; queue?: boolean }) =>
-      agent.send(text, queue ? { turnPolicy: "queue" } : undefined),
+    // While a turn runs, Jev decides whether the message redirects it or waits (see the API's
+    // follow-up judge); the person never chooses.
+    mutationFn: async ({ text }: { text: string }) => {
+      const task = activeTurn(agent.view) === undefined ? null : lastRequest(agent.messages);
+      const mode = task === null ? "steer" : await followUpMode(chatId, text, task);
+
+      return agent.send(text, mode === "queue" ? { turnPolicy: "queue" } : undefined);
+    },
     onSettled: historyChanged,
     onError: (error) => toast.error(error.message),
   });
@@ -191,7 +198,7 @@ export function ChatView({
           focusOnMount
           status={working ? "streaming" : "ready"}
           disabled={agent.status === "resuming"}
-          onSend={(text, { queue }) => send.mutate({ text, queue })}
+          onSend={(text) => send.mutate({ text })}
           onStop={() => stop.mutate()}
           tools={<PermissionModeMenu value={permissionMode} onChange={onPermissionModeChange} />}
         />
@@ -404,4 +411,13 @@ function QuestionPrompt({
   );
 
   return <QuestionCard question={question} title={title} options={options} onAnswer={onAnswer} />;
+}
+
+/** The person's latest message: the task a running turn is working on. */
+function lastRequest(messages: readonly EveMessage[]) {
+  const request = messages.findLast((message) => message.role === "user");
+
+  return (
+    request?.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n") ?? ""
+  );
 }

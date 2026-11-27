@@ -137,6 +137,9 @@ const ChatsHandlers = HttpApiBuilder.group(CrmApi, "chats", (handlers) =>
       )
       .handle("history", ({ params }) =>
         Effect.flatMap(chatActor, (who) => chats.history(who, params.id)),
+      )
+      .handle("followUp", ({ params, payload }) =>
+        Effect.flatMap(chatActor, (who) => chats.followUp(who, params.id, payload)),
       );
   }),
 );

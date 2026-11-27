@@ -32,6 +32,8 @@ export const AppConfig = Config.all({
   contextDevApiKey: Config.option(Config.Redacted("CONTEXT_DEV_API_KEY")),
   // Supermemory: workspace and company memory (ADR 0014). Optional; without it, memory is off.
   supermemoryApiKey: Config.option(Config.Redacted("SUPERMEMORY_API_KEY")),
+  /** The Vercel AI Gateway, for Jev's judgements (the AI SDK reads it from the environment). */
+  aiGatewayApiKey: Config.option(Config.Redacted("AI_GATEWAY_API_KEY")),
   // Separates environments that share one Supermemory account; defaults to a hash of the
   // auth URL's origin.
   memoryPrefix: Config.option(

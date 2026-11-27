@@ -29,6 +29,13 @@ import { type AgentCaller, type ChatAgent, eveChatAgent } from "./chat-agent.ts"
 import { Database } from "./Database.ts";
 import { Kv } from "./Kv.ts";
 import { type DbTx, transactWithTxid } from "./txid.ts";
+import { gatewayJev } from "@crm/memory/jev-gateway";
+import {
+  FOLLOW_UP_WAIT_MS,
+  type FollowUpJudge,
+  type FollowUpMode,
+  jevFollowUpJudge,
+} from "./follow-up.ts";
 
 /** Who is acting: the session user (as the agent sees them) and the session's active workspace. */
 export interface ChatActor extends AgentCaller {
@@ -197,6 +204,12 @@ export interface ChatsService {
   ) => Effect.Effect<TxId, Failure>;
   readonly remove: (actor: ChatActor, id: string) => Effect.Effect<TxId, Failure>;
   readonly history: (actor: ChatActor, id: string) => Effect.Effect<ChatHistory, Failure>;
+  /** Whether a message sent mid-turn redirects the turn or waits for it. */
+  readonly followUp: (
+    actor: ChatActor,
+    id: string,
+    input: { message: string; task: string },
+  ) => Effect.Effect<{ mode: FollowUpMode }, Failure>;
   readonly createSpace: (
     actor: ChatActor,
     input: { id: string; name: string; color: string; description?: string | undefined },
@@ -293,6 +306,8 @@ export function makeChats(
   agent: ChatAgent | null,
   kv: KvStore,
   historyReadWaitMs = HISTORY_READ_WAIT_MS,
+  /** Judges messages sent mid-turn; without one (no AI Gateway key), they steer. */
+  judge: FollowUpJudge | null = null,
 ): ChatsService {
   /** Membership, the write and the txid in one transaction. */
   const write = (
@@ -517,6 +532,25 @@ export function makeChats(
         ),
       );
     },
+
+    followUp: (actor, id, input) =>
+      run("followUp", async () => {
+        const chat = await visibleChat(actor, id);
+
+        if (!chat.ok) return chat;
+
+        if (!judge) return ok({ mode: "steer" as const });
+
+        // A slow answer would hold the message back: past the wait, it steers.
+        const signal = AbortSignal.timeout(FOLLOW_UP_WAIT_MS);
+
+        const mode = await Promise.race([
+          judge({ task: input.task.slice(0, 4000), message: input.message.slice(0, 4000) }, signal),
+          Bun.sleep(FOLLOW_UP_WAIT_MS).then(() => "steer" as const),
+        ]);
+
+        return ok({ mode });
+      }),
 
     history: (actor, id) =>
       run("history", async () => {
@@ -874,7 +908,16 @@ export class Chats extends Context.Service<Chats, ChatsService>()("@crm/api/serv
         onSome: (secret) => eveChatAgent(config.agentUrl, Redacted.value(secret)),
       });
 
-      return makeChats(prismaChatStore(yield* Database), agent, yield* Kv);
+      // Jev judges messages sent mid-turn when the API can reach the AI Gateway.
+      const judge = Option.isSome(config.aiGatewayApiKey) ? jevFollowUpJudge(gatewayJev()) : null;
+
+      return makeChats(
+        prismaChatStore(yield* Database),
+        agent,
+        yield* Kv,
+        HISTORY_READ_WAIT_MS,
+        judge,
+      );
     }),
   ).pipe(Layer.provide([Database.layer, Kv.layer]));
 }

@@ -86,3 +86,16 @@ export function takeFirstMessage(chatId: string) {
 
   return text;
 }
+
+/**
+ * How to handle a message sent while the agent works: `steer` redirects the reply now, `queue`
+ * waits for it to finish. The API asks Jev; any failure steers, so a message is never held back.
+ */
+export async function followUpMode(chatId: string, message: string, task: string) {
+  const answer = await request<{ mode: "steer" | "queue" }>(
+    `/api/chats/${encodeURIComponent(chatId)}/follow-up`,
+    { method: "POST", body: JSON.stringify({ message, task }) },
+  ).catch(() => ({ mode: "steer" as const }));
+
+  return answer.mode;
+}
