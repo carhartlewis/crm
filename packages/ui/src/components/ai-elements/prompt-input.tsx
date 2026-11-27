@@ -141,6 +141,44 @@ function PromptInputHeader({ className, ...props }: PromptInputHeaderProps) {
   );
 }
 
+export interface PromptInputImage {
+  readonly id: string;
+  readonly src: string;
+  readonly name: string;
+}
+
+export interface PromptInputImagesProps {
+  readonly images: readonly PromptInputImage[];
+  readonly onRemove: (id: string) => void;
+}
+
+/** Images attached to the message, as small previews above the text; each one can be removed. */
+function PromptInputImages({ images, onRemove }: PromptInputImagesProps) {
+  if (images.length === 0) return null;
+
+  return (
+    <PromptInputHeader className="gap-2 pt-3 select-none">
+      {images.map((image) => (
+        <div
+          key={image.id}
+          data-slot="prompt-input-image"
+          className="group/image relative size-14 shrink-0 overflow-hidden rounded-md border bg-muted"
+        >
+          <img src={image.src} alt={image.name} className="size-full object-cover" />
+          <button
+            type="button"
+            aria-label={`Remove ${image.name}`}
+            className="absolute top-0.5 right-0.5 flex size-5 items-center justify-center rounded-full bg-background/90 text-foreground opacity-0 transition group-hover/image:opacity-100 focus-visible:opacity-100"
+            onClick={() => onRemove(image.id)}
+          >
+            <CloseIcon className="size-3" />
+          </button>
+        </div>
+      ))}
+    </PromptInputHeader>
+  );
+}
+
 export type PromptInputFooterProps = Omit<ComponentProps<typeof InputGroupAddon>, "align">;
 
 /** The row under the textarea: tools on the left, submit on the right. */
@@ -276,6 +314,7 @@ export {
   PromptInputButton,
   PromptInputFooter,
   PromptInputHeader,
+  PromptInputImages,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputToolbar,

@@ -59,7 +59,7 @@ function ChatPage() {
     ...startChatMutation,
     onSuccess: ({ id, sessionId }, { text }) => {
       seedNewChat(queryClient, userId, id, sessionId);
-      queueFirstMessage(id, text);
+      queueFirstMessage(id, { text, images: [] });
       void navigate({ to: "/chats/$chatId", params: { chatId: id } });
     },
     onError: (error) => toast.error(error.message),
@@ -105,7 +105,7 @@ function ChatPage() {
           rename.mutate({ workspaceId, id: chatId, permissionMode: mode });
         }}
         history={history}
-        firstMessage={peekFirstMessage(chatId)}
+        firstMessage={peekFirstMessage(chatId)?.text}
         onBranch={(transcript) => {
           const title = chat?.title ?? "Chat";
           const mode = chat?.permission_mode ?? "";

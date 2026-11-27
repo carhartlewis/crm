@@ -66,10 +66,10 @@ function NewChatForm({ userId, workspaceId }: { userId: string; workspaceId: str
 
   const start = useMutation({
     ...startChatMutation,
-    onSuccess: ({ id, sessionId }, { text }) => {
+    onSuccess: ({ id, sessionId }, { text, images = [] }) => {
       // The chat page renders without a round trip and sends the message as it mounts.
       seedNewChat(queryClient, userId, id, sessionId);
-      queueFirstMessage(id, text);
+      queueFirstMessage(id, { text, images });
       void navigate({ to: "/chats/$chatId", params: { chatId: id } });
     },
     onError: (error) => toast.error(error.message),
@@ -138,11 +138,12 @@ function NewChatForm({ userId, workspaceId }: { userId: string; workspaceId: str
                   }}
                 />
               }
-              onSend={(text) =>
+              onSend={(text, images) =>
                 start.mutate({
                   workspaceId,
                   userId,
                   text,
+                  images,
                   spaceId: space?.id ?? null,
                   permissionMode,
                 })

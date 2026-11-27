@@ -1,3 +1,4 @@
+import type { ImageAttachment } from "./attachments.ts";
 import type { ChatHistory } from "@crm/core/api";
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import { request, send } from "./api-fetch.ts";
@@ -64,14 +65,20 @@ export function prewarmUsed() {
   lastPrewarm = 0;
 }
 
+/** A message typed on New chat, with any images, before its chat existed. */
+export interface FirstMessage {
+  readonly text: string;
+  readonly images: readonly ImageAttachment[];
+}
+
 /**
  * The first message of a chat just created on New chat, handed to the chat page in memory: it is
  * temporary state, so it never goes in the URL. The page takes it once.
  */
-const outbox = new Map<string, string>();
+const outbox = new Map<string, FirstMessage>();
 
-export function queueFirstMessage(chatId: string, text: string) {
-  outbox.set(chatId, text);
+export function queueFirstMessage(chatId: string, message: FirstMessage) {
+  outbox.set(chatId, message);
 }
 
 /** Reads it without taking it: render may run twice; the send takes it once. */
@@ -80,11 +87,11 @@ export function peekFirstMessage(chatId: string) {
 }
 
 export function takeFirstMessage(chatId: string) {
-  const text = outbox.get(chatId);
+  const message = outbox.get(chatId);
 
   outbox.delete(chatId);
 
-  return text;
+  return message;
 }
 
 /**

@@ -36,6 +36,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { branchOf, chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
+import { type ImageAttachment, messageContent } from "../../lib/attachments.ts";
 import { askToNotify, chatNotice, newQuestion, notifyChat } from "../../lib/chat-notify.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { ReplyResponse } from "./reply-islands.tsx";
@@ -136,13 +137,22 @@ export function ChatView({
   const send = useMutation({
     // While a turn runs, Jev decides whether the message redirects it or waits (see the API's
     // follow-up judge); the person never chooses.
-    mutationFn: async ({ text }: { text: string }) => {
+    mutationFn: async ({
+      text,
+      images = [],
+    }: {
+      text: string;
+      images?: readonly ImageAttachment[];
+    }) => {
       askToNotify();
 
       const task = activeTurn(agent.view) === undefined ? null : lastRequest(agent.messages);
-      const mode = task === null ? "steer" : await followUpMode(chatId, text, task);
+      const mode = task === null || !text ? "steer" : await followUpMode(chatId, text, task);
 
-      return agent.send(text, mode === "queue" ? { turnPolicy: "queue" } : undefined);
+      return agent.send(
+        messageContent(text, images),
+        mode === "queue" ? { turnPolicy: "queue" } : undefined,
+      );
     },
     onSettled: historyChanged,
     onError: (error) => toast.error(error.message),
@@ -164,9 +174,9 @@ export function ChatView({
   // The first message was typed on New chat, before this chat existed; send it once the session
   // is bound. Later messages go through the composer's handler.
   useMountEffect(() => {
-    const text = takeFirstMessage(chatId);
+    const first = takeFirstMessage(chatId);
 
-    if (text) send.mutate({ text });
+    if (first) send.mutate(first);
   });
 
   const working = agent.status === "busy";
@@ -236,7 +246,9 @@ export function ChatView({
     <div className="flex min-h-0 flex-1 flex-col">
       <Conversation className="min-h-0 flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl">
-          {agent.messages.length === 0 && agent.status !== "resuming" && !firstMessage ? (
+          {agent.messages.length === 0 &&
+          agent.status !== "resuming" &&
+          firstMessage === undefined ? (
             <ConversationEmptyState
               title="What's on your mind?"
               description="Ask about a company, draft an email, or work through an idea."
@@ -281,7 +293,7 @@ export function ChatView({
           fieldRef={field}
           status={working ? "streaming" : "ready"}
           disabled={agent.status === "resuming"}
-          onSend={(text) => send.mutate({ text })}
+          onSend={(text, images) => send.mutate({ text, images })}
           onStop={() => stop.mutate()}
           tools={<PermissionModeMenu value={permissionMode} onChange={onPermissionModeChange} />}
         />
@@ -400,7 +412,14 @@ function ChatPart({
     case "interaction":
       return <InteractionPrompt interaction={part} onAnswer={onAnswer} />;
     case "file":
-      return (
+      // An attached image shows when eve kept a URL the browser can load; otherwise its name.
+      return part.url && part.mediaType.startsWith("image/") ? (
+        <img
+          src={part.url}
+          alt={part.filename ?? "Attached image"}
+          className="max-h-48 max-w-full rounded-md border object-contain"
+        />
+      ) : (
         <span className="text-xs text-muted-foreground">{part.filename ?? part.mediaType}</span>
       );
     default:
