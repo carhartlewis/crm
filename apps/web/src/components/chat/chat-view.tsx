@@ -73,6 +73,43 @@ function waitingApprovals(messages: readonly EveMessage[]) {
   );
 }
 
+/** A question with choices (the agent's `ask_question`), which the person answers with a click. */
+interface WaitingQuestion {
+  readonly interactionId: string;
+  readonly prompt: string;
+  readonly title: string | undefined;
+  readonly options: readonly QuestionOption[];
+  readonly open: boolean;
+}
+
+const isChoiceQuestion = (interaction: Interaction | InteractionPart) =>
+  interaction.request.kind === "question" && (interaction.request.options?.length ?? 0) > 0;
+
+/**
+ * The questions with choices in the latest reply, open or not, in the order asked: the agent may
+ * ask a few at once (parallel `ask_question` calls), and the person answers them one by one.
+ */
+function latestQuestions(messages: readonly EveMessage[]): WaitingQuestion[] {
+  const reply = messages.findLast((message) => message.role === "assistant");
+
+  return (reply?.parts ?? []).flatMap((part) => {
+    const interaction =
+      part.type === "tool" ? part.interaction : part.type === "interaction" ? part : undefined;
+
+    if (!interaction || !isChoiceQuestion(interaction)) return [];
+
+    return [
+      {
+        interactionId: interaction.interactionId,
+        prompt: interaction.request.prompt,
+        title: interaction.request.title,
+        options: interaction.request.options ?? [],
+        open: interaction.status === "open",
+      },
+    ];
+  });
+}
+
 export interface ChatViewProps {
   readonly chatId: string;
   readonly userId: string;
@@ -230,6 +267,18 @@ export function ChatView({
   const answer = (interactionId: string, optionId: string) =>
     respond.mutate([{ interactionId, optionId }]);
 
+  // Questions wait in one card above the composer, one at a time: "Question 2 of 3". An answer
+  // just sent counts as answered until eve settles it.
+  const sent = respond.isError ? [] : (respond.variables ?? []).map((item) => item.interactionId);
+  const questions = latestQuestions(agent.messages);
+
+  const pending = questions.filter(
+    (question) => question.open && !sent.includes(question.interactionId),
+  );
+
+  const [question] = pending;
+  const questionNumber = questions.length - pending.length + 1;
+
   // Every call waiting on the person, in one card: approving ten is one click (as in comp-neo).
   const waiting = waitingApprovals(agent.messages);
 
@@ -264,7 +313,7 @@ export function ChatView({
               />
             ))
           )}
-          {working && !visiblyWorking && waiting.length === 0 && <ThinkingIndicator />}
+          {working && !visiblyWorking && waiting.length === 0 && !question && <ThinkingIndicator />}
           {agent.error && (
             <p role="alert" className="text-sm text-pretty text-destructive">
               {agent.error.message}
@@ -274,6 +323,19 @@ export function ChatView({
         <ConversationScrollButton />
       </Conversation>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 pb-4">
+        {question && (
+          <QuestionPrompt
+            key={question.interactionId}
+            question={question.prompt}
+            title={
+              questions.length > 1
+                ? `Question ${questionNumber} of ${questions.length}`
+                : question.title
+            }
+            options={question.options}
+            onAnswer={(optionId) => answer(question.interactionId, optionId)}
+          />
+        )}
         {approvalItems.length > 0 && (
           <ApprovalCard
             title={
@@ -441,9 +503,12 @@ function ToolCalls({
 
   if (calls.length === 1) return <ToolCall part={first} onAnswer={onAnswer} />;
 
-  // A question the agent asks inside a call must be seen, so its group opens.
+  // A sign-in or open question asked inside a call must be seen, so its group opens.
   const asking = calls.some(
-    (call) => call.interaction?.status === "open" && call.interaction.request.kind !== "approval",
+    (call) =>
+      call.interaction?.status === "open" &&
+      call.interaction.request.kind !== "approval" &&
+      !isChoiceQuestion(call.interaction),
   );
 
   return (
@@ -470,10 +535,13 @@ function ToolCall({
   return (
     <div className="flex flex-col gap-2">
       <ToolStep label={stepLabel(part)} detail={stepDetail(part)} state={stepState(part)} />
-      {/* Approvals wait in one card above the composer; other questions stay with their call. */}
-      {part.interaction?.status === "open" && part.interaction.request.kind !== "approval" && (
-        <InteractionPrompt interaction={part.interaction} onAnswer={onAnswer} />
-      )}
+      {/* Approvals and questions with choices wait above the composer; sign-ins and open
+          questions stay with their call. */}
+      {part.interaction?.status === "open" &&
+        part.interaction.request.kind !== "approval" &&
+        !isChoiceQuestion(part.interaction) && (
+          <InteractionPrompt interaction={part.interaction} onAnswer={onAnswer} />
+        )}
     </div>
   );
 }
@@ -496,17 +564,8 @@ function InteractionPrompt({
     );
   }
 
-  // A question with choices (the agent's `ask_question`) is a card of answers, keys 1–9.
-  if (request.kind === "question" && request.options && request.options.length > 0) {
-    return (
-      <QuestionPrompt
-        question={request.prompt}
-        title={request.title}
-        options={request.options}
-        onAnswer={(optionId) => onAnswer(interaction.interactionId, optionId)}
-      />
-    );
-  }
+  // A question with choices waits in the card above the composer.
+  if (isChoiceQuestion(interaction)) return null;
 
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-muted/50 p-3 select-none">
