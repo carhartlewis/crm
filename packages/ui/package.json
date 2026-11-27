@@ -57,7 +57,8 @@
     "./patterns/memory-graph": "./src/patterns/memory-graph.tsx",
     "./components/space-dot": "./src/components/space-dot.tsx",
     "./patterns/tool-step": "./src/patterns/tool-step.tsx",
-    "./patterns/approval-card": "./src/patterns/approval-card.tsx"
+    "./patterns/approval-card": "./src/patterns/approval-card.tsx",
+    "./patterns/dot-matrix": "./src/patterns/dot-matrix.tsx"
   },
   "scripts": {
     "check-types": "bun check --no-script --project tsconfig.json"

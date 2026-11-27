@@ -683,3 +683,22 @@ body[data-sidebar-resizing] [data-slot="tooltip-content"] {
 [data-slot="space-dot"][data-color="pink"] {
   background: #ec8fb8;
 }
+
+/* DotMatrix (@crm/ui/patterns/dot-matrix): dots brighten in rings from the center out (the
+   rings' delays are inline). Still at half strength under reduced motion. */
+@theme {
+  --animate-dot-matrix: dot-matrix 1.4s ease-in-out infinite;
+}
+
+@keyframes dot-matrix {
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="dot-matrix"] > * {
+    animation: none;
+    opacity: 0.5;
+  }
+}

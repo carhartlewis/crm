@@ -11,6 +11,7 @@ import {
   ReasoningTrigger,
 } from "@crm/ui/components/ai-elements/reasoning";
 import { ApprovalCard, type ApprovalItem } from "@crm/ui/patterns/approval-card";
+import { ThinkingIndicator } from "@crm/ui/patterns/dot-matrix";
 import { ToolStep, type ToolStepState } from "@crm/ui/patterns/tool-step";
 import { Button } from "@crm/ui/components/button";
 import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
@@ -76,6 +77,11 @@ function stepDetail(part: ToolPart): string | undefined {
       return value?.slice(0, 80);
     },
   });
+}
+
+/** Tool search and task controls are the agent's own housekeeping, not steps to show. */
+function shownCall(part: ToolPart) {
+  return !part.hidden && part.kind !== "control" && !part.name.startsWith("eve__");
 }
 
 /** Calls waiting on an approval, oldest first, across the conversation. */
@@ -159,6 +165,15 @@ export function ChatView({
 
   const working = agent.status === "busy";
 
+  // Something on screen already shows the agent at work: text streaming in, or a tool running.
+  const visiblyWorking = agent.messages.some((message) =>
+    message.parts.some(
+      (part) =>
+        ((part.type === "text" || part.type === "reasoning") && part.state === "streaming") ||
+        (part.type === "tool" && shownCall(part) && stepState(part) === "pending"),
+    ),
+  );
+
   const answer = (interactionId: string, optionId: string) =>
     respond.mutate([{ interactionId, optionId }]);
 
@@ -188,6 +203,7 @@ export function ChatView({
               <ChatMessage key={message.id} message={message} onAnswer={answer} />
             ))
           )}
+          {working && !visiblyWorking && waiting.length === 0 && <ThinkingIndicator />}
           {agent.error && (
             <p role="alert" className="text-sm text-pretty text-destructive">
               {agent.error.message}
@@ -273,10 +289,7 @@ function ChatPart({
         </Reasoning>
       );
     case "tool":
-      // Tool search and task controls are the agent's own housekeeping, not steps to show.
-      return part.hidden || part.kind === "control" || part.name.startsWith("eve__") ? null : (
-        <ToolCall part={part} onAnswer={onAnswer} />
-      );
+      return shownCall(part) ? <ToolCall part={part} onAnswer={onAnswer} /> : null;
     case "interaction":
       return <InteractionPrompt interaction={part} onAnswer={onAnswer} />;
     case "file":

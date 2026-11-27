@@ -1,7 +1,5 @@
 "use client";
 
-import chevronDown16 from "@carbon/icons/es/chevron--down/16.js";
-import idea16 from "@carbon/icons/es/idea/16.js";
 import { cn } from "cn";
 import { createContext, use, useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import {
@@ -9,11 +7,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@crm/ui/components/collapsible";
-import { carbonIcon } from "@crm/ui/components/icon";
+import { DotMatrix } from "@crm/ui/patterns/dot-matrix";
 import { Markdown } from "@crm/ui/components/markdown";
-
-const IdeaIcon = carbonIcon(idea16);
-const ChevronDownIcon = carbonIcon(chevronDown16);
 
 interface ReasoningContextValue {
   isStreaming: boolean;
@@ -93,7 +88,7 @@ export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger> & 
 };
 
 function defaultGetThinkingMessage(isStreaming: boolean, duration?: number) {
-  if (isStreaming || duration === 0) return <span className="animate-pulse">Thinking…</span>;
+  if (isStreaming || duration === 0) return <span>Thinking</span>;
 
   if (duration === undefined) return <span>Thought for a few seconds</span>;
 
@@ -110,7 +105,7 @@ function ReasoningTrigger({
   getThinkingMessage = defaultGetThinkingMessage,
   ...props
 }: ReasoningTriggerProps) {
-  const { isStreaming, isOpen, duration } = useReasoning();
+  const { isStreaming, duration } = useReasoning();
 
   return (
     <CollapsibleTrigger
@@ -123,11 +118,8 @@ function ReasoningTrigger({
     >
       {children ?? (
         <>
-          <IdeaIcon className="size-4" />
+          {isStreaming && <DotMatrix decorative />}
           {getThinkingMessage(isStreaming, duration)}
-          <ChevronDownIcon
-            className={cn("size-4 transition-transform", isOpen ? "rotate-180" : "rotate-0")}
-          />
         </>
       )}
     </CollapsibleTrigger>

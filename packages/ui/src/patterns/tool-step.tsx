@@ -1,20 +1,17 @@
 import checkmark from "@carbon/icons/es/checkmark/16.js";
-import misuse from "@carbon/icons/es/misuse--outline/16.js";
-import time from "@carbon/icons/es/time/16.js";
 import warning from "@carbon/icons/es/warning--alt/16.js";
 import { carbonIcon } from "@crm/ui/components/icon";
+import { DotMatrix } from "@crm/ui/patterns/dot-matrix";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 
 const CheckIcon = carbonIcon(checkmark);
 const WarningIcon = carbonIcon(warning);
-const WaitingIcon = carbonIcon(time);
-const DeniedIcon = carbonIcon(misuse);
 
 /**
- * One line for each tool the agent calls, as in comp-neo: "Creating company". While it runs, three
- * dots pulse and the label dims; done shows a check; failed shows a warning with the error on its
- * own line beneath; waiting is a call the person still has to approve; denied is one they refused.
+ * One line for each tool the agent calls, as in comp-neo: "Create company". While it runs, the dot
+ * matrix pulses and the label dims; waiting (for an approval) holds the dots still; done shows a
+ * small check; failed a warning with the error beneath; denied is the dimmed label alone.
  * The state is also read out after the label, so it doesn't rest on the icon alone.
  */
 export const TOOL_STEP_STATES = ["pending", "waiting", "done", "failed", "denied"] as const;
@@ -28,16 +25,6 @@ const SPOKEN: Record<ToolStepState, string> = {
   failed: "failed",
   denied: "denied",
 };
-
-function Dots() {
-  return (
-    <span aria-hidden className="flex items-center gap-0.5">
-      <span className="size-1 animate-pulse rounded-full bg-muted-foreground" />
-      <span className="size-1 animate-pulse rounded-full bg-muted-foreground enter-delay-1" />
-      <span className="size-1 animate-pulse rounded-full bg-muted-foreground enter-delay-2" />
-    </span>
-  );
-}
 
 export function ToolStep({
   label,
@@ -61,16 +48,15 @@ export function ToolStep({
     >
       <div className="flex min-w-0 items-center gap-2 text-sm">
         <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-          {state === "pending" && <Dots />}
-          {state === "waiting" && <WaitingIcon className="size-3.5" />}
-          {state === "done" && <CheckIcon className="size-3.5 text-success" />}
+          {state === "pending" && <DotMatrix decorative />}
+          {state === "waiting" && <DotMatrix decorative still />}
+          {state === "done" && <CheckIcon className="size-3.5" />}
           {state === "failed" && <WarningIcon className="size-3.5 text-destructive" />}
-          {state === "denied" && <DeniedIcon className="size-3.5" />}
         </span>
         <span
           className={cn(
             "min-w-0 truncate",
-            state === "pending" || state === "denied" ? "text-muted-foreground" : "text-foreground",
+            state === "done" || state === "failed" ? "text-foreground" : "text-muted-foreground",
           )}
         >
           {label}
