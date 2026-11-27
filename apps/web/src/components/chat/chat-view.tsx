@@ -96,7 +96,8 @@ export function ChatView({
   // Sends, answers and stops resolve when the server accepts them; a refusal (such as a session
   // the agent can no longer run) shows as a toast, and the optimistic message stays marked failed.
   const send = useMutation({
-    mutationFn: (text: string) => agent.send(text),
+    mutationFn: ({ text, queue = false }: { text: string; queue?: boolean }) =>
+      agent.send(text, queue ? { turnPolicy: "queue" } : undefined),
     onSettled: historyChanged,
     onError: (error) => toast.error(error.message),
   });
@@ -119,7 +120,7 @@ export function ChatView({
   useMountEffect(() => {
     const text = takeFirstMessage(chatId);
 
-    if (text) send.mutate(text);
+    if (text) send.mutate({ text });
   });
 
   const working = agent.status === "busy";
@@ -190,7 +191,7 @@ export function ChatView({
           focusOnMount
           status={working ? "streaming" : "ready"}
           disabled={agent.status === "resuming"}
-          onSend={(text) => send.mutate(text)}
+          onSend={(text, { queue }) => send.mutate({ text, queue })}
           onStop={() => stop.mutate()}
           tools={<PermissionModeMenu value={permissionMode} onChange={onPermissionModeChange} />}
         />
