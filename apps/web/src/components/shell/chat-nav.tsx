@@ -14,9 +14,7 @@ import {
 } from "@crm/ui/components/dropdown-menu";
 import { carbonIcon } from "@crm/ui/components/icon";
 import {
-  SidebarGroup,
   SidebarGroupAction,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
@@ -42,7 +40,9 @@ import { folderOf, moveToFolder, pinAt, recentChats } from "../../lib/sidebar-la
 import { type ChatMenuRequest, MenuIcon, spaceColor } from "../chat/chat-menu.tsx";
 import { NameDialog } from "../chat/name-dialog.tsx";
 import { type ChatsApi, editLayoutAt, reorderPinnedAt, useChats } from "../chat/use-chats.ts";
+import type { SidebarSection } from "../../lib/sidebar-sections.ts";
 import { NavLink } from "./nav-link.tsx";
+import { NavSection } from "./nav-section.tsx";
 import { chatDragDrop } from "./chat-drag.ts";
 import { reorderable } from "./reorder.ts";
 
@@ -135,14 +135,16 @@ export default function ChatNav({ userId, workspaceId }: NavProps) {
       {/* With no pinned chats yet, Pinned takes the first one dropped. */}
       <PinGroup
         label="Pinned"
+        section="pinned"
         kinds={["page"]}
         hotkeyOffset={0}
         takesChats={!pinnedChats}
         {...rowProps}
       />
-      <PinGroup label="Spaces" kinds={["space"]} {...rowProps} />
+      <PinGroup label="Spaces" section="spaces" kinds={["space"]} {...rowProps} />
       <PinGroup
         label="Pinned chats"
+        section="pinned-chats"
         kinds={["chat"]}
         hotkeyOffset={pinnedPages}
         takesChats
@@ -170,6 +172,7 @@ interface RowProps extends NavProps {
 
 interface PinGroupProps extends RowProps {
   readonly label: string;
+  readonly section: SidebarSection;
   /** Which pins this group shows: pages in Pinned, spaces in Spaces, chats in Pinned chats. */
   readonly kinds: readonly PinKind[];
   /** The ⌥ number before this group's first row; no hotkeys when absent. */
@@ -185,6 +188,7 @@ interface PinGroupProps extends RowProps {
  */
 function PinGroup({
   label,
+  section,
   kinds,
   hotkeyOffset,
   takesChats = false,
@@ -233,8 +237,7 @@ function PinGroup({
   if (visible.length === 0) return null;
 
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{label}</SidebarGroupLabel>
+    <NavSection userId={userId} section={section} label={label}>
       {/* Chats dropped between its rows are pinned there (chat-drag.ts). */}
       <SidebarMenu ref={listRef} aria-label={label} data-drop-pinned={takesChats || undefined}>
         {visible.map(({ key, index: pinIndex, pin: item }, index) => {
@@ -290,7 +293,7 @@ function PinGroup({
           ) : null;
         })}
       </SidebarMenu>
-    </SidebarGroup>
+    </NavSection>
   );
 }
 
@@ -310,14 +313,19 @@ function FoldersGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
     });
 
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>Folders</SidebarGroupLabel>
-      <SidebarGroupAction
-        aria-label="New folder"
-        onClick={() => onRequest({ kind: "new-folder-empty" })}
-      >
-        <AddIcon />
-      </SidebarGroupAction>
+    <NavSection
+      userId={userId}
+      section="folders"
+      label="Folders"
+      action={
+        <SidebarGroupAction
+          aria-label="New folder"
+          onClick={() => onRequest({ kind: "new-folder-empty" })}
+        >
+          <AddIcon />
+        </SidebarGroupAction>
+      }
+    >
       <SidebarMenu aria-label="Folders">
         {api.layout.folders.map((folder) => {
           const open = !closed.has(folder.id);
@@ -381,7 +389,7 @@ function FoldersGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
           );
         })}
       </SidebarMenu>
-    </SidebarGroup>
+    </NavSection>
   );
 }
 
@@ -391,8 +399,7 @@ function RecentsGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
   if (recents.length === 0) return null;
 
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>Recents</SidebarGroupLabel>
+    <NavSection userId={userId} section="recents" label="Recents">
       {/* Drag to reorder; the order saves on the synced sidebar row (chat-drag.ts). */}
       <SidebarMenu aria-label="Recents" data-drop-recents>
         {recents.map((chat) => (
@@ -407,7 +414,7 @@ function RecentsGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
           />
         ))}
       </SidebarMenu>
-    </SidebarGroup>
+    </NavSection>
   );
 }
 

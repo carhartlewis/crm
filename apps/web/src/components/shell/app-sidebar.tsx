@@ -7,7 +7,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -25,6 +24,7 @@ import { isSettingsPath } from "../../lib/settings.ts";
 import { shortcuts } from "../../lib/shortcuts.ts";
 import { HotkeyTooltip } from "../hotkey-tooltip.tsx";
 import { SettingsNav } from "../settings/settings-nav.tsx";
+import { NavSection } from "./nav-section.tsx";
 import { PinnedNav } from "./pinned-nav.tsx";
 import { TitleBarControls } from "./title-bar.tsx";
 import { WorkspaceMenu } from "./workspace-menu.tsx";
@@ -97,10 +97,9 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
             </SidebarGroup>
             <Suspense
               fallback={
-                <SidebarGroup>
-                  <SidebarGroupLabel>Pinned</SidebarGroupLabel>
+                <NavSection userId={userId} section="pinned" label="Pinned">
                   <PinnedNav userId={userId} workspaceId={workspaceId} />
-                </SidebarGroup>
+                </NavSection>
               }
             >
               <ChatNav key={workspaceId} userId={userId} workspaceId={workspaceId} />
