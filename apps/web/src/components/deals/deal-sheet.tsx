@@ -27,7 +27,7 @@ import {
   dealContactsCollection,
   dealsCollection,
 } from "../../lib/deals.ts";
-import { calendarDate, momentDate, plural, relativeTime } from "../../lib/record-format.ts";
+import { calendarDate, durationSince, momentDate, plural } from "../../lib/record-format.ts";
 import { RECORD_TABS, useOpenRecord } from "../../lib/records.ts";
 import { deleteRecords, saveRecord } from "../../lib/synced-records.ts";
 import { CustomFieldRows, FieldsSettingsLink } from "../fields/custom-field-rows.tsx";
@@ -242,7 +242,9 @@ export default function DealSheet({
             stats={[
               { label: "Amount", value: formatMoney(current.amount, current.currency) ?? "—" },
               { label: "Expected close", value: calendarDate(current.expected_close_date) ?? "—" },
-              { label: "In stage", value: relativeTime(current.stage_changed_at) ?? "—" },
+              isOpenStage(current.stage)
+                ? { label: "In stage", value: durationSince(current.stage_changed_at) ?? "—" }
+                : { label: "Closed", value: momentDate(current.closed_at) ?? "—" },
               {
                 label: "Owner",
                 value: owner ? (

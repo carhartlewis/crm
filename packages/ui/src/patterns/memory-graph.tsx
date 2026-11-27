@@ -62,7 +62,10 @@ export function MemoryGraph({
   summary?: ReactNode;
   highlightIds?: string[];
   onOpenMemory: (id: string) => void;
-  /** Fill the parent's height (a full-page memory); otherwise a fixed height (a tab). */
+  /**
+   * Fill the parent's height; otherwise a fixed height. The parent must have a definite height
+   * (a flex item of a sized column): the canvas measures its frame, and an auto height reads as 0.
+   */
   fill?: boolean;
 }) {
   return (
@@ -71,7 +74,7 @@ export function MemoryGraph({
       data-slot="memory-graph"
       aria-label={label}
       aria-busy={loading}
-      className="relative h-144 min-h-96 w-full flex-1 overflow-hidden rounded-lg border bg-background select-none data-fill:h-full"
+      className="relative h-144 min-h-96 w-full overflow-hidden rounded-lg border bg-background select-none data-fill:h-full data-fill:flex-1"
     >
       <SupermemoryGraph
         documents={documents}
@@ -109,7 +112,7 @@ export function MemoryGraphSkeleton({ fill = false }: { fill?: boolean }) {
   return (
     <div
       data-fill={fill || undefined}
-      className="h-144 min-h-96 w-full flex-1 overflow-hidden rounded-lg border data-fill:h-full"
+      className="h-144 min-h-96 w-full overflow-hidden rounded-lg border data-fill:h-full data-fill:flex-1"
       aria-busy
     >
       <Skeleton className="size-full" />

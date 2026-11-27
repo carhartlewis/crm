@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { calendarDate, daysSince, relativeTime } from "./record-format.ts";
+import { calendarDate, daysSince, durationSince, relativeTime } from "./record-format.ts";
 
 const now = Date.parse("2026-11-26T12:00:00Z");
 
@@ -29,5 +29,14 @@ describe("daysSince", () => {
   test("counts whole days, never negative", () => {
     expect(daysSince("2026-11-22T13:00:00Z", now)).toBe(3);
     expect(daysSince("2026-11-27T13:00:00Z", now)).toBe(0);
+  });
+});
+
+describe("durationSince", () => {
+  test("reads a span in whole days, never as a moment", () => {
+    expect(durationSince("2026-11-26T11:59:30Z", now)).toBe("Under a day");
+    expect(durationSince("2026-11-25T11:00:00Z", now)).toBe("1 day");
+    expect(durationSince("2026-11-14T12:00:00Z", now)).toBe("12 days");
+    expect(durationSince(null, now)).toBeNull();
   });
 });

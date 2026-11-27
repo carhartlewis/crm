@@ -1,4 +1,3 @@
-import chat from "@carbon/icons/es/chat/20.js";
 import chevronDown from "@carbon/icons/es/chevron--down/16.js";
 import { Button } from "@crm/ui/components/button";
 import {
@@ -15,6 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ChatMark } from "../../../components/brand.tsx";
 import { Composer } from "../../../components/chat/composer.tsx";
 import { PermissionModeMenu } from "../../../components/chat/permission-mode-menu.tsx";
 import { lastPermissionMode, rememberPermissionMode } from "../../../lib/permission-mode.ts";
@@ -28,7 +28,6 @@ import {
   startChatMutation,
 } from "../../../lib/chats.ts";
 
-const ChatIcon = carbonIcon(chat);
 const ChevronIcon = carbonIcon(chevronDown);
 
 export const Route = createLazyFileRoute("/_authed/_workspace/")({
@@ -112,9 +111,7 @@ function NewChatForm({ userId, workspaceId }: { userId: string; workspaceId: str
       </WorkspacePageHeader>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="animate-enter flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center select-none">
-          <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <ChatIcon className="size-5" />
-          </span>
+          <ChatMark />
           <h1 className="text-2xl font-medium tracking-tight text-balance">What's on your mind?</h1>
           <p className="text-sm text-pretty text-muted-foreground">
             Ask a question, find something, or work through an idea.

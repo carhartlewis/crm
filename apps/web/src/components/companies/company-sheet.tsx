@@ -444,7 +444,7 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
           id: "knowledge",
           label: "Knowledge",
           content: current ? (
-            <div className="px-5 py-3">
+            <div className="flex min-h-0 flex-1 flex-col px-5 py-3">
               <CompanyKnowledge
                 company={current}
                 key={current.id}

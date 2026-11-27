@@ -1,5 +1,4 @@
 import add16 from "@carbon/icons/es/add/16.js";
-import bot20 from "@carbon/icons/es/bot/20.js";
 import chevronDown16 from "@carbon/icons/es/chevron--down/16.js";
 import { isPermissionMode, titleFromMessage } from "@crm/core/chat";
 import { Button } from "@crm/ui/components/button";
@@ -39,11 +38,11 @@ import {
   useSelectedRecordChat,
 } from "../../lib/record-agent.ts";
 import type { RecordKind } from "../../lib/records.ts";
+import { ChatMark } from "../brand.tsx";
 import { ChatView } from "../chat/chat-view.tsx";
 import { Composer } from "../chat/composer.tsx";
 
 const AddIcon = carbonIcon(add16);
-const AgentIcon = carbonIcon(bot20);
 const ChevronIcon = carbonIcon(chevronDown16);
 
 interface RecordChatTarget {
@@ -162,9 +161,7 @@ export function RecordAgentTab(target: RecordAgentTabProps) {
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center select-none">
-            <span className="flex size-8 items-center justify-center rounded-md bg-foreground text-background">
-              <AgentIcon className="size-4" />
-            </span>
+            <ChatMark />
             <p className="font-medium text-base text-balance">{copy.title}</p>
             <p className="text-muted-foreground text-pretty">{copy.description}</p>
             <div className="mt-2 flex flex-wrap justify-center gap-2">

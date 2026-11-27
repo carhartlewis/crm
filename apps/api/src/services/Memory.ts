@@ -332,15 +332,17 @@ function subjectOf(target: Target): MemorySubject {
     : { type: "workspace" };
 }
 
+// Supermemory keeps only what the context calls worth remembering. Naming public facts matters:
+// with only relationship facts in the brief, website research about a company yields few or none.
 function workspaceContext(workspace: WorkspaceRow) {
-  return `Memory of ${workspace.name} (${workspace.website}), the company that uses this CRM. Facts describe ${workspace.name}: what it sells, its people, customers, tools and ways of working.`;
+  return `Memory of ${workspace.name} (${workspace.website}), the company that uses this CRM. Remember every concrete fact about ${workspace.name} as its own memory: what it does and sells, its industry, locations, people and their roles, customers, products, pricing, tools and ways of working. Public facts from its website are worth remembering.`;
 }
 
 function companyContext(workspace: WorkspaceRow | null, company: CompanyRow) {
   const owner = workspace?.name ?? "the workspace";
   const site = company.domain ? ` (${company.domain})` : "";
 
-  return `Memory of ${company.name}${site}, a customer, prospect or partner that ${owner} tracks in its CRM. Facts describe ${company.name}: its people and their roles, needs, deals, tools, decisions and history with ${owner}.`;
+  return `Memory of ${company.name}${site}, a customer, prospect or partner that ${owner} tracks in its CRM. Remember every concrete fact about ${company.name} as its own memory: what it does and sells, its industry, locations and offices, people and their roles, customers, portfolio or partners, products, size and contact details, and its needs, deals, tools, decisions and history with ${owner}. Public facts from its website are worth remembering.`;
 }
 
 async function put(memory: MemoryStore, ns: string, source: MemorySource) {

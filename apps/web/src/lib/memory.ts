@@ -31,7 +31,16 @@ const POLL_MS = 4_000;
 const processing = (knowledge: Knowledge | undefined) =>
   knowledge?.sources.some((source) => source.status === "processing") ?? false;
 
-export const knowledgeQuery = (userId: string, workspaceId: string, target: MemoryTarget = {}) =>
+/**
+ * A new company's website research starts when it is created and lands a few seconds later, so
+ * an empty memory polls until `expectUntil` (epoch ms) for its first source.
+ */
+export const knowledgeQuery = (
+  userId: string,
+  workspaceId: string,
+  target: MemoryTarget = {},
+  expectUntil = 0,
+) =>
   queryOptions({
     queryKey: [...memoryKeys.target(userId, workspaceId, target), "knowledge"],
     queryFn: () =>
@@ -40,7 +49,12 @@ export const knowledgeQuery = (userId: string, workspaceId: string, target: Memo
           ? `/api/memory/companies/${encodeURIComponent(target.companyId)}`
           : "/api/memory",
       ),
-    refetchInterval: (query) => (processing(query.state.data) ? POLL_MS : false),
+    refetchInterval: (query) => {
+      const knowledge = query.state.data;
+      const awaited = knowledge?.enabled === true && knowledge.sources.length === 0;
+
+      return processing(knowledge) || (awaited && Date.now() < expectUntil) ? POLL_MS : false;
+    },
   });
 
 /** Sources and their facts, as the memory graph draws them. */

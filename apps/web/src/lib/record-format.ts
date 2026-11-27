@@ -95,6 +95,19 @@ export function daysSince(iso: string, now = Date.now()) {
   return Math.max(0, Math.floor((now - new Date(iso).getTime()) / DAY));
 }
 
+/** How long something has lasted, for "In stage": "Under a day", "1 day", "12 days". */
+export function durationSince(iso: string | null, now = Date.now()) {
+  if (!iso) return null;
+
+  const at = new Date(iso).getTime();
+
+  if (Number.isNaN(at)) return null;
+
+  const days = daysSince(iso, now);
+
+  return days === 0 ? "Under a day" : plural(days, "day");
+}
+
 /** Whether a timestamp is before `now`, such as a task's due time. */
 export function isPast(iso: string, now = Date.now()) {
   return iso < new Date(now).toISOString();

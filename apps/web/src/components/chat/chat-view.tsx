@@ -35,6 +35,7 @@ import { useEveAgent } from "eve/react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ChatMark } from "../brand.tsx";
 import { branchOf, chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
 import {
   type Attachment,
@@ -400,6 +401,7 @@ export function ChatView({
           agent.status !== "resuming" &&
           firstMessage === undefined ? (
             <ConversationEmptyState
+              icon={<ChatMark />}
               title="What's on your mind?"
               description="Ask about a company, draft an email, or work through an idea."
             />

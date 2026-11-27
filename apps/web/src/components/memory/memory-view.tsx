@@ -56,8 +56,10 @@ export interface MemoryViewProps {
   readonly target: MemoryTarget;
   /** Who the memory is about, in copy: the workspace's or the company's name. */
   readonly subject: string;
-  /** Fill the page (Workspace Memory) rather than a fixed height (a company's tab). */
+  /** Fill the parent's height (Workspace Memory, a company's tab) rather than a fixed height. */
   readonly fill?: boolean;
+  /** Until when (epoch ms) an empty memory waits for its first source: a new company's research. */
+  readonly expectUntil?: number;
 }
 
 /**
@@ -89,17 +91,23 @@ export function MemoryView({
   target,
   subject,
   fill = false,
+  expectUntil = 0,
 }: MemoryViewProps) {
   const [state, setState] = useQueryStates(params, { history: "push" });
 
-  const knowledge = useQuery(knowledgeQuery(userId, workspaceId, target));
+  const knowledge = useQuery(knowledgeQuery(userId, workspaceId, target, expectUntil));
 
-  const processing =
-    knowledge.data?.sources.some((source) => source.status === "processing") ?? false;
+  const sources = knowledge.data?.sources ?? [];
+
+  const processing = sources.some((source) => source.status === "processing");
+
+  // When the last source finished; a graph read before then misses its facts, so read it again.
+  const settledAt = Math.max(0, ...sources.map((source) => Date.parse(source.updatedAt) || 0));
 
   const graph = useQuery({
     ...memoryGraphQuery(userId, workspaceId, target),
-    refetchInterval: processing ? POLL_MS : false,
+    refetchInterval: (query) =>
+      processing || query.state.dataUpdatedAt < settledAt ? POLL_MS : false,
   });
 
   const query = state.mq.trim().slice(0, 500);
