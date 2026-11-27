@@ -69,7 +69,7 @@ function Reasoning({
     <ReasoningContext value={context}>
       <Collapsible
         data-slot="reasoning"
-        className={cn("not-prose mb-4", className)}
+        className={cn("not-prose", className)}
         open={isOpen}
         onOpenChange={(next) => {
           setChosen(next);
@@ -88,7 +88,7 @@ export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger> & 
 };
 
 function defaultGetThinkingMessage(isStreaming: boolean, duration?: number) {
-  if (isStreaming || duration === 0) return <span>Thinking</span>;
+  if (isStreaming || duration === 0) return <span className="text-shimmer">Thinking</span>;
 
   if (duration === undefined) return <span>Thought for a few seconds</span>;
 
@@ -137,7 +137,11 @@ function ReasoningContent({ className, children, ...props }: ReasoningContentPro
   return (
     <CollapsibleContent
       data-slot="reasoning-content"
-      className={cn("mt-4 text-sm text-muted-foreground outline-none", className)}
+      // As an opened tool group: indented under a hairline, close below its row.
+      className={cn(
+        "mt-1.5 ml-1.75 border-l pl-4 text-sm text-muted-foreground outline-none",
+        className,
+      )}
       {...props}
     >
       <Markdown isAnimating={isStreaming} className="text-muted-foreground">

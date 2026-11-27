@@ -36,4 +36,30 @@ describe("tidyReply", () => {
   test("text without tables is untouched", () => {
     expect(tidyReply("Just a sentence.", companies)).toBe("Just a sentence.");
   });
+
+  test("a bulleted list of companies with a line each becomes a table that opens them", () => {
+    const list = [
+      "News, one line each:",
+      "",
+      '- :company[Capgo]{record="com_a"} — shipped Cloud Build.',
+      "- **Docspring** – released an MCP server.",
+    ].join("\n");
+
+    expect(tidyReply(list, companies)).toBe(
+      [
+        "News, one line each:",
+        "",
+        "| Company | Summary |",
+        "| --- | --- |",
+        '| :company[Capgo]{record="com_a"} | shipped Cloud Build. |',
+        '| :company[Docspring]{record="com_b"} | released an MCP server. |',
+      ].join("\n"),
+    );
+  });
+
+  test("a list that isn't one line per known company stays a list", () => {
+    const steps = "- Open Capgo — check the domain.\n- Then save.";
+
+    expect(tidyReply(steps, companies)).toBe(steps);
+  });
 });

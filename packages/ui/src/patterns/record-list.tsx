@@ -62,14 +62,14 @@ export function RecordList({
   );
 }
 
-/** A record named in a sentence, as a quiet inline button that opens it. */
+/** A record named in a sentence: its name in medium weight, underlined on hover, opens it. */
 export function RecordChip({ label, onOpen }: { label: string; onOpen: () => void }) {
   return (
     <button
       type="button"
       data-slot="record-chip"
       onClick={onOpen}
-      className="rounded-sm bg-muted px-1 font-medium text-foreground transition-colors outline-none select-text hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+      className="font-medium text-foreground underline decoration-transparent underline-offset-3 transition-colors outline-none select-text hover:decoration-current focus-visible:decoration-current"
     >
       {label}
     </button>

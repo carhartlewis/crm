@@ -70,7 +70,7 @@ export function ThinkingIndicator({ label = "Thinking" }: { label?: string }) {
       className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground select-none"
     >
       <DotMatrix decorative />
-      {label}
+      <span className="text-shimmer">{label}</span>
     </output>
   );
 }

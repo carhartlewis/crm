@@ -93,7 +93,8 @@ function StepLabel({
         state === "done" || state === "failed" ? "text-foreground" : "text-muted-foreground",
       )}
     >
-      {label}
+      {/* A running step's label shimmers, as in T3 Code. */}
+      <span className={state === "pending" ? "text-shimmer" : undefined}>{label}</span>
       {detail && <span className="text-muted-foreground select-text"> · {detail}</span>}
       <span className="sr-only">, {SPOKEN[state]}</span>
     </span>

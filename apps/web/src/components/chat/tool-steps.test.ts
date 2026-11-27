@@ -60,4 +60,18 @@ describe("tool step runs", () => {
     expect(runDetail(["Capgo", "Capgo"])).toBe("Capgo");
     expect(runDetail([undefined, undefined, undefined])).toBe("3 times");
   });
+
+  test("thinking split across steps shows as one row", () => {
+    const blocks = messageBlocks([
+      { type: "reasoning", id: "r1", text: "First", state: "done" },
+      { type: "reasoning", id: "r2", text: "Then", state: "streaming" },
+      text("Answer"),
+    ]);
+
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toMatchObject({
+      kind: "part",
+      part: { type: "reasoning", text: "First\n\nThen", state: "streaming" },
+    });
+  });
 });

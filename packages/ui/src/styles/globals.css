@@ -560,8 +560,6 @@
 
   & [data-markdown="table"] td [data-slot="record-chip"] {
     position: static;
-    background: transparent;
-    padding: 0;
     cursor: pointer;
   }
 
@@ -697,6 +695,39 @@ body[data-sidebar-resizing] [data-slot="tooltip-content"] {
 }
 
 /* Stagger a screen's entrance in at most four groups. Non-uniform steps read as natural. */
+/* Text the agent is working on (a running step, "Thinking"), as in T3 Code: a light band sweeps
+   across the label. Reduced motion keeps the plain muted label. */
+@keyframes crm-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@utility text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 35%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 65%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: crm-shimmer 1.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background: none;
+    color: var(--muted-foreground);
+  }
+}
+
 @utility enter-delay-1 {
   animation-delay: 50ms;
 }

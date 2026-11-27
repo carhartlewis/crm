@@ -83,6 +83,22 @@ export function messageBlocks(parts: readonly EveMessagePart[]): Block[] {
       return;
     }
 
+    // Thinking split across steps reads as one "Thought for…" row, not several in a row.
+    if (part.type === "reasoning" && last?.kind === "part" && last.part.type === "reasoning") {
+      const streaming = part.state === "streaming" || last.part.state === "streaming";
+
+      blocks[blocks.length - 1] = {
+        ...last,
+        part: {
+          ...last.part,
+          text: `${last.part.text}\n\n${part.text}`,
+          state: streaming ? "streaming" : "done",
+        },
+      };
+
+      return;
+    }
+
     blocks.push({ kind: "part", key: partKey(part, index), part });
   });
 
