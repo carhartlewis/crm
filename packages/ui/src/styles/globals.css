@@ -215,6 +215,15 @@
   --container-record: 1600px;
 }
 
+/*
+ * A grid of cards: as many columns as fit cards of at least 30rem, from the grid's own width (the
+ * viewport says nothing while the sidebar is open). Columns are equal at every width, and a card
+ * gets a column only when its one-line text fits, so cards never squeeze.
+ */
+@utility grid-cols-cards {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr));
+}
+
 /* Page header: title on the left, actions on the right. */
 @utility grid-cols-page-header {
   grid-template-columns: minmax(0, 1fr) auto;

@@ -86,9 +86,7 @@ export function ConnectorsPanel({
   );
 
   return (
-    // A container: the card grid follows the space the page leaves, not the viewport, which says
-    // nothing while the sidebar is open.
-    <section className="@container flex flex-col gap-3">
+    <section className="flex flex-col gap-3">
       <SectionHeading count={shown.length}>
         {view === "yours" ? "Connected" : "All connectors"}
       </SectionHeading>
@@ -99,8 +97,7 @@ export function ConnectorsPanel({
             : "Nothing connected yet. Connect an app from Discover."}
         </p>
       ) : (
-        // Two columns only where a card keeps its text on few lines.
-        <div className="grid gap-3 @2xl:grid-cols-2 @6xl:grid-cols-3">
+        <div className="grid grid-cols-cards gap-3">
           {shown.map((integration) => (
             <IntegrationCard
               key={integration.id}
@@ -200,7 +197,7 @@ function IntegrationCard({
               <>
                 <Badge variant="secondary" className="shrink-0">
                   <CheckIcon />
-                  Added
+                  Installed
                 </Badge>
                 <span aria-hidden className="shrink-0">
                   ·
@@ -214,6 +211,7 @@ function IntegrationCard({
               // Same line shape as an added card, so a grid of both reads evenly.
               <>
                 <Badge variant="outline" className="shrink-0">
+                  <AddIcon />
                   Not installed
                 </Badge>
                 <span aria-hidden className="shrink-0">

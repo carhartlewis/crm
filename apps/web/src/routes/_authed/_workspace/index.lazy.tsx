@@ -43,7 +43,7 @@ function Home() {
         </PageShellActions>
       </WorkspacePageHeader>
       <PageShellContent>
-        <div className="animate-enter enter-delay-1 grid gap-3 sm:grid-cols-2">
+        <div className="animate-enter enter-delay-1 grid grid-cols-cards gap-3">
           {order.map((id, index) => {
             const page = pageById(id);
             const PageIcon = page.icon;
