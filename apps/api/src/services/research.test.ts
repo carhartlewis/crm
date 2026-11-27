@@ -39,6 +39,7 @@ describe("background research", () => {
           workspaceId: "ws_a",
           permissionMode: "auto",
           record: { kind: "contact", id: "ctc_1" },
+          origin: "research",
         },
         message: RESEARCH_PROMPTS.contact,
         operationId: "research:ctc_1",
@@ -81,5 +82,25 @@ describe("background research", () => {
     await settle();
 
     expect(logged).toEqual(["research: company com_1"]);
+  });
+
+  test("the sweep researches records whose start was missed, once a day each", async () => {
+    const sessions: string[] = [];
+
+    const research = makeResearch({
+      startSession: async (_caller, _message, operationId) => {
+        sessions.push(operationId);
+      },
+      user: async () => ({ name: "Alice", email: "alice@a.test" }),
+      log: () => {},
+      now: () => Date.parse("2026-11-27T09:00:00Z"),
+      pending: async () => [
+        { kind: "contact", id: "ctc_1", workspaceId: "ws_a", userId: "user_alice" },
+        { kind: "company", id: "com_1", workspaceId: "ws_a", userId: "user_alice" },
+      ],
+    });
+
+    expect(await research.sweep()).toBe(2);
+    expect(sessions).toEqual(["research:ctc_1:2026-11-27", "research:com_1:2026-11-27"]);
   });
 });

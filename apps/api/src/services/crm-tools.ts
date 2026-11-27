@@ -1,10 +1,18 @@
 import { createId, ID_PREFIXES } from "@crm/core/ids";
 import { DEAL_STAGES, LOGGED_ACTIVITY_TYPES } from "@crm/core/records";
 import type { LocalTool } from "@crm/integrations/gateway";
-import { createContextDev, type WebReader } from "@crm/core/brand";
+import type { WebReader } from "@crm/core/brand";
 import type { JevClient } from "@crm/memory/jev";
 import { gatewayJev } from "@crm/memory/jev-gateway";
-import { Context, Effect, Exit, Layer, Option, Redacted, Schema } from "effect";
+import { Context, Effect, Exit, Layer, Option, Schema } from "effect";
+import { Brand } from "./Brand.ts";
+import { Enrichment } from "./Enrichment.ts";
+import {
+  type EnrichmentToolCaller,
+  type EnrichmentToolDeps,
+  enrichmentTools,
+  pgContactMatches,
+} from "./enrichment-tools.ts";
 import { AppConfig } from "../config.ts";
 import { Companies, type CompaniesService } from "./Companies.ts";
 import { postgresDirectory } from "./crm-directory.ts";
@@ -13,7 +21,7 @@ import { Fields, type FieldsService } from "./Fields.ts";
 import { fieldTools } from "./field-tools.ts";
 import { Intel, type IntelService } from "./Intel.ts";
 import { intelTools } from "./intel-tools.ts";
-import { type AgentCaller, type AgentResult, Memory, type MemoryService } from "./Memory.ts";
+import { type AgentResult, Memory, type MemoryService } from "./Memory.ts";
 import { Postgres } from "./Postgres.ts";
 import { Records, type RecordsService } from "./Records.ts";
 
@@ -112,22 +120,24 @@ export interface CrmToolDeps {
   readonly intel?: IntelService;
   /** Custom fields; without it `crm__list_fields` and `crm__set_field_value` aren't listed. */
   readonly fields?: FieldsService;
+  /** People and company enrichment (ADR 0027); without a treg token those tools aren't listed. */
+  readonly enrichment?: Omit<EnrichmentToolDeps, "web"> | null;
 }
 
 /** How long saving a fact waits for Jev to say which company it is about. */
 const SUBJECT_WAIT_MS = 3000;
 
 /** The tool's answer: JSON the model reads. A type alias: MCP results need an index signature. */
-type ToolResult = {
+export type ToolResult = {
   isError?: boolean;
   content: [{ type: "text"; text: string }];
 };
 
-const answer = <T>(value: T): ToolResult => ({
+export const answer = <T>(value: T): ToolResult => ({
   content: [{ type: "text", text: JSON.stringify(value) }],
 });
 
-const refuse = (message: string): ToolResult => ({
+export const refuse = (message: string): ToolResult => ({
   isError: true,
   content: [{ type: "text", text: message }],
 });
@@ -205,8 +215,13 @@ export function tool<S extends Schema.Top & { readonly DecodingServices: never }
 
 const MemoryTarget = {
   companyId: Schema.optional(CompanyId).annotate({
-    description: "The company the memory is about. Leave it out for the workspace's own company.",
+    description:
+      "The company the memory is about. Pass at most one of companyId, contactId and dealId; leave all out for the workspace's own company.",
   }),
+  contactId: Schema.optional(ContactId).annotate({
+    description: "The person the memory is about.",
+  }),
+  dealId: Schema.optional(DealId).annotate({ description: "The deal the memory is about." }),
 };
 
 /** The caller's tools. `caller` comes from a verified token (OAuth MCP or agent token). */
@@ -243,40 +258,6 @@ function webTools(web: WebReader): readonly LocalTool[] {
     ),
     tool(
       {
-        name: "lookup_person",
-        description:
-          "Find a person's public profile: name, photo, title and employer, location, past roles, bio and social links, with `score`, how sure the match is (0–100). Pass a work email (best), their LinkedIn or other profile URLs, or first and last name with their company. Weak matches come back too: check the score and that the employer matches before you use it. Free email addresses (gmail and friends) can't be looked up.",
-        readOnly: true,
-        input: Schema.Struct({
-          email: Text("A work email."),
-          profile_urls: Schema.optional(Schema.Array(Schema.String)).annotate({
-            description: "Their profile pages, such as a LinkedIn /in/ URL.",
-          }),
-          first_name: Text("Their first name."),
-          last_name: Text("Their last name."),
-          company_name: Text("Where they work."),
-          company_domain: Text("Their company's website domain, such as acme.com."),
-        }),
-      },
-      async (input) => {
-        const person = await web.findPerson({
-          email: input.email,
-          profileUrls: input.profile_urls,
-          firstName: input.first_name,
-          lastName: input.last_name,
-          companyName: input.company_name,
-          companyDomain: input.company_domain,
-        });
-
-        return person
-          ? answer(person)
-          : refuse(
-              "No match. Pass a work email, a profile URL, or a first and last name with their company.",
-            );
-      },
-    ),
-    tool(
-      {
         name: "read_web_page",
         description:
           "Read one web page as clean Markdown (it is rendered first, so pages that need JavaScript work too): a company's pricing, about, careers or blog page, a news article, a document. Long pages are cut.",
@@ -296,11 +277,12 @@ function webTools(web: WebReader): readonly LocalTool[] {
   ];
 }
 
-export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly LocalTool[] {
+export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): readonly LocalTool[] {
   const actor = { userId: caller.userId, activeWorkspaceId: caller.workspaceId };
 
   return [
     ...(deps.web ? webTools(deps.web) : []),
+    ...(deps.enrichment ? enrichmentTools({ ...deps.enrichment, web: deps.web }, caller) : []),
     tool(
       {
         name: "list_companies",
@@ -370,6 +352,8 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
           website: Text("Full website URL."),
           description: Text("What the company does, in a few sentences."),
           industry: Text("Industry, such as Software or Healthcare."),
+          employee_count: Text("Headcount as a source states it, such as 15 or 51-200."),
+          founded_year: Text("The year it was founded, such as 2019."),
           city: Text("City of the headquarters."),
           country: Text("Country of the headquarters."),
           phone: Text("Main phone number."),
@@ -424,7 +408,7 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
       {
         name: "create_contact",
         description:
-          "Add a person to the CRM, optionally at a company. The caller becomes the owner.",
+          "Add a person to the CRM, optionally at a company. The caller becomes the owner, and the CRM then researches them in the background (email, phone, photo, background). Check crm__list_contacts first so nobody is added twice. Set `found_by_search` when the person came from crm__find_people.",
         readOnly: false,
         input: Schema.Struct({
           first_name: Schema.String,
@@ -432,15 +416,18 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
           title: Text("Job title, such as Head of Security."),
           email: Text("Work email."),
           phone: Text("Phone number."),
+          linkedin_url: Text("Their LinkedIn profile URL."),
           company_id: Schema.optional(Schema.NullOr(CompanyId)),
+          found_by_search: Schema.optional(Schema.Boolean),
         }),
       },
       (input) => {
         const id = createId(ID_PREFIXES.contact);
+        const { found_by_search: searched, ...fields } = input;
 
         return run(
           deps.records.contacts
-            .create(actor, { ...input, id })
+            .create(actor, { ...fields, id, source: searched ? "search" : "manual" })
             .pipe(Effect.as({ id, created: true })),
         );
       },
@@ -607,7 +594,7 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
       {
         name: "search_memory",
         description:
-          "Search what the CRM remembers: website research, members' notes, past chats and sent emails. Search one company, or the workspace's own company.",
+          "Search what the CRM remembers: website research, members' notes, past chats and sent emails. Search one company, person or deal, or the workspace's own company.",
         readOnly: true,
         input: Schema.Struct({ query: Schema.String, ...MemoryTarget }),
       },
@@ -628,6 +615,19 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
         }),
       },
       async (input) => {
+        // A fact about a person or a deal belongs on that record.
+        if (input.contactId || input.dealId) {
+          const record = input.contactId
+            ? await deps.directory.contact(caller.workspaceId, input.contactId)
+            : await deps.directory.deal(caller.workspaceId, input.dealId ?? "");
+
+          return fromAgent(await deps.memory.remember(caller, { ...input, kind: "agent_fact" }), {
+            saved: true,
+            savedTo: record?.name ?? "the record",
+            note: "Facts appear in memory a few seconds after saving.",
+          });
+        }
+
         // A fact about a company belongs on that company: when the agent gives none, the fact
         // goes to the one it names, or the one Jev judges it is about.
         const companyId =
@@ -672,25 +672,30 @@ export function crmTools(deps: CrmToolDeps, caller: AgentCaller): readonly Local
 /** The CRM tools for a gateway caller; tests provide `CrmTools.of(...)` with fakes. */
 export class CrmTools extends Context.Service<
   CrmTools,
-  { readonly forCaller: (caller: AgentCaller) => readonly LocalTool[] }
+  { readonly forCaller: (caller: EnrichmentToolCaller) => readonly LocalTool[] }
 >()("@crm/api/services/CrmTools") {
   static readonly layer = Layer.effect(
     CrmTools,
     Effect.gen(function* () {
       const config = yield* AppConfig;
+      const pool = yield* Postgres;
+      const enrichment = yield* Enrichment;
 
       const deps: CrmToolDeps = {
-        directory: postgresDirectory(yield* Postgres),
+        directory: postgresDirectory(pool),
         companies: yield* Companies,
         records: yield* Records,
         memory: (yield* Memory).agent,
-        web: Option.match(config.contextDevApiKey, {
-          onNone: () => null,
-          onSome: (apiKey) => createContextDev({ apiKey: Redacted.value(apiKey) }),
-        }),
+        web: yield* Brand,
         jev: Option.isSome(config.aiGatewayApiKey) ? gatewayJev() : null,
         intel: yield* Intel,
         fields: yield* Fields,
+        enrichment: enrichment
+          ? {
+              enrichment,
+              matches: pgContactMatches((sql, params) => pool.query(sql, [...params])),
+            }
+          : null,
       };
 
       return { forCaller: (caller) => crmTools(deps, caller) };
@@ -703,6 +708,8 @@ export class CrmTools extends Context.Service<
       Memory.layer,
       Intel.layer,
       Fields.layer,
+      Enrichment.layer,
+      Brand.layer,
     ]),
   );
 }

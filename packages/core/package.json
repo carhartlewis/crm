@@ -24,7 +24,9 @@
     "./chat": "./src/chat/index.ts",
     "./ids": "./src/ids/index.ts",
     "./auth/desktop-handoff": "./src/auth/desktop-handoff.ts",
-    "./memory": "./src/memory/index.ts"
+    "./memory": "./src/memory/index.ts",
+    "./enrichment": "./src/enrichment/index.ts",
+    "./usage": "./src/usage/index.ts"
   },
   "scripts": {
     "check-types": "bun check --no-script --project tsconfig.json",

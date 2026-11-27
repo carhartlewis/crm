@@ -33,6 +33,7 @@ import { CustomFieldRows, FieldsSettingsLink } from "../fields/custom-field-rows
 import { ConfirmDeleteDialog } from "../records/confirm-delete-dialog.tsx";
 import { ActivityFeed } from "../records/activity-feed.tsx";
 import { RecordAgentTab, useRecordChat } from "../records/agent-tab.tsx";
+import { RecordKnowledge } from "../records/record-knowledge.tsx";
 import { syncActivityPrompt } from "../../lib/record-agent.ts";
 import {
   ChoiceDetail,
@@ -125,7 +126,7 @@ export default function DealSheet({
 
   // The Activity tab's sync starts an agent conversation in the Agent tab (ADR 0024).
   const agent = useRecordChat({ kind: "deal", recordId: record.id ?? "", userId, workspaceId });
-  const open = record.id !== null;
+  const open = record.isOpen;
   const company = current ? byId(companies).get(current.company_id) : undefined;
   const contactsById = byId(contacts);
   const dealLinks = current ? links.filter((link) => link.deal_id === current.id) : [];
@@ -467,6 +468,19 @@ export default function DealSheet({
               key={current.id}
               kind="deal"
               recordId={current.id}
+              userId={userId}
+              workspaceId={workspaceId}
+            />
+          ) : null,
+        },
+        {
+          id: "knowledge",
+          label: "Knowledge",
+          content: current ? (
+            <RecordKnowledge
+              key={current.id}
+              subject={current.name}
+              target={{ dealId: current.id }}
               userId={userId}
               workspaceId={workspaceId}
             />

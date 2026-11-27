@@ -14,6 +14,8 @@ export interface AgentCaller {
   readonly permissionMode?: string;
   /** The record the chat is about (ADR 0024); the agent reads it before each turn. */
   readonly record?: { readonly kind: string; readonly id: string };
+  /** `research` for a background session the API started (ADR 0025); usage is filed under it. */
+  readonly origin?: "research";
 }
 
 /** What the chats service needs from the agent (ADR 0018). Tests inject a fake. */
@@ -41,6 +43,7 @@ export interface CallerHeaders {
   "x-crm-permission-mode"?: string;
   "x-crm-record-kind"?: string;
   "x-crm-record-id"?: string;
+  "x-crm-origin"?: string;
 }
 
 export function callerHeaders(secret: string, caller: AgentCaller | null) {
@@ -60,6 +63,8 @@ export function callerHeaders(secret: string, caller: AgentCaller | null) {
       headers["x-crm-record-kind"] = caller.record.kind;
       headers["x-crm-record-id"] = caller.record.id;
     }
+
+    if (caller.origin) headers["x-crm-origin"] = caller.origin;
   }
 
   return { ...headers };

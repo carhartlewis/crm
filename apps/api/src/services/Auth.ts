@@ -26,6 +26,9 @@ export interface SessionInfo {
 export interface McpPrincipal {
   readonly userId: string;
   readonly workspaceId: string;
+  /** From an agent token: what runs the turn and its record, for usage (ADR 0027). */
+  readonly origin?: "chat" | "research" | "sheet";
+  readonly record?: { readonly kind: string; readonly id: string } | null;
 }
 
 export interface AuthService {

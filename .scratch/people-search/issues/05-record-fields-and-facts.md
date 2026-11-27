@@ -1,6 +1,6 @@
 # Record fields and facts
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 01
 Spec: ../spec.md
@@ -19,3 +19,7 @@ Record fields and fact rules.
   Photos are kept at full size (the 30 MB contact photo limit is already in `ImageCache`). When there is no LinkedIn photo, ask
   context.dev for the photo only. Tests use `createMemoryStorage`.
 - detail-fields: an email status badge (Verified, Catch-all, Unverified), plus phone type.
+
+## Answer
+
+Contact `email_status`, `email_verified_at`, `phone_type`, `phone_status`; company `employee_count`, `founded_year`; `source: search`. Email and phone facts scored by their check (`emailFactScore`, `phoneFactScore`); search-added contacts' values count as the agent's. Photo hosts: media.licdn.com, img.imagecdn.dev, media.brand.dev; 30 MB limit. Sheet badges.

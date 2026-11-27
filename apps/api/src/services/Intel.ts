@@ -1,8 +1,16 @@
 import { Invalid, NoActiveWorkspace, NotFound } from "@crm/core/api";
 import type { Db } from "@crm/core/db";
 import { createId, ID_PREFIXES } from "@crm/core/ids";
-import { PERSON_PHOTO_PATTERN } from "@crm/core/brand";
+import { isPersonPhotoSource } from "@crm/core/storage";
 import {
+  type EmailStatus,
+  emailFactScore,
+  optionalEmail,
+  optionalPhone,
+  type PhoneStatus,
+  phoneFactScore,
+  type PhoneType,
+  PHONE_TYPES,
   bandFor,
   type BriefSections,
   type ContactFactField,
@@ -29,6 +37,7 @@ import { authorizeWorkspace } from "./companies-rules.ts";
 import { AppConfig } from "../config.ts";
 import { Database } from "./Database.ts";
 import { jevFactJudge } from "./fact-judge.ts";
+import { Enrichment } from "./Enrichment.ts";
 import { Images } from "./Images.ts";
 import type { JsonValue } from "./record-store.ts";
 import { type DbTx, transactWithTxid } from "./txid.ts";
@@ -122,17 +131,21 @@ export interface IntelTx {
     field: string,
     status: string,
   ): Promise<string[]>;
+  /** How the contact arrived (`RECORD_SOURCES`); null when it is missing. */
+  contactSource(workspaceId: string, contactId: string): Promise<string | null>;
   /** A contact's value for one fact field; null when empty or the contact is missing. */
   contactValue(
     workspaceId: string,
     contactId: string,
     field: ContactFactField,
   ): Promise<string | null>;
+  /** Sets a fact field, with the columns that describe it (an email's check, a phone's type). */
   setContactValue(
     workspaceId: string,
     contactId: string,
     field: ContactFactField,
     value: string,
+    extra?: ContactExtras,
   ): Promise<void>;
   insertFact(row: FactRow): Promise<void>;
   updateFact(workspaceId: string, id: string, patch: FactPatch): Promise<void>;
@@ -186,6 +199,8 @@ export interface FactInput {
   readonly field: string;
   readonly value: string;
   readonly score: number;
+  /** For a phone fact: `mobile`, `work` or `other`, when research knows. */
+  readonly phoneType?: string | null | undefined;
   readonly band?: string | null | undefined;
   readonly evidence?: readonly string[] | null | undefined;
   readonly sourceUrl?: string | null | undefined;
@@ -237,10 +252,22 @@ export type FactJudge = (input: {
 /** Copies a person photo from context.dev into storage for a contact; null when it can't. */
 export type ContactPhotos = (contactId: string, source: string) => Promise<string | null>;
 
+/**
+ * Mailbox and line checks for email and phone facts (ADR 0027): a found address is a guess until
+ * checked, so its check, not the agent's score, decides whether it fills the contact.
+ */
+export interface FactChecks {
+  /** The email's verdict: one a find already stored, else a check now (filed under the actor). */
+  readonly email: (actor: IntelActor, email: string) => Promise<EmailStatus>;
+  /** The line verdict from the find that returned this number; null when it was never seen. */
+  readonly phone: (phone: string) => Promise<PhoneStatus | null>;
+}
+
 export interface IntelDependencies {
   readonly now?: () => Date;
   readonly judge?: FactJudge | null;
   readonly photos?: ContactPhotos | null;
+  readonly checks?: FactChecks | null;
 }
 
 export interface RecordedFact {
@@ -522,23 +549,42 @@ export function makeIntel(store: IntelStore, deps: IntelDependencies = {}): Inte
 
       if (!value.ok) return reject(value.message);
 
-      const factValue = value.value;
+      const typed = value.value;
 
-      if (!factValue) return reject("Give the value");
+      if (!typed) return reject("Give the value");
+
+      // Addresses and numbers are stored the way members' own are (lower-case email).
+      const normalized =
+        field === "email"
+          ? optionalEmail(typed)
+          : field === "phone"
+            ? optionalPhone(typed)
+            : { ok: true as const, value: typed };
+
+      if (!normalized.ok || !normalized.value) {
+        return reject(field === "email" ? "Give a full email address" : "Give a full phone number");
+      }
+
+      const factValue = normalized.value;
 
       if (field.endsWith("_url") && !optionalUrl(factValue).ok) return reject("Give a full URL");
 
-      if (field === "image_url" && !PERSON_PHOTO_PATTERN.test(factValue)) {
-        return reject("A photo must be the avatar_url crm__lookup_person returned");
+      if (field === "image_url" && !isPersonPhotoSource(factValue)) {
+        return reject(
+          "A photo must be the photoUrl crm__find_photo or crm__linkedin_profile returned",
+        );
       }
+
+      const phoneType =
+        PHONE_TYPES.find((type): type is PhoneType => type === input.phoneType) ?? null;
 
       if (!Number.isFinite(input.score) || input.score < 0 || input.score > 1) {
         return reject("Score is between 0 and 1");
       }
 
-      const band = input.band ?? bandFor(input.score);
-
-      if (!isFactBand(band)) return reject("Band is verified, probable or possible");
+      if (input.band && !isFactBand(input.band)) {
+        return reject("Band is verified, probable or possible");
+      }
 
       const source = optionalUrl(input.sourceUrl ?? null);
 
@@ -552,119 +598,161 @@ export function makeIntel(store: IntelStore, deps: IntelDependencies = {}): Inte
         const current = await tx.contactValue(workspaceId, contactId, field);
         const applied = await tx.factValues(workspaceId, contactId, field, "applied");
 
+        // A person added from a people search came with a directory row's values, not a
+        // member's: research may replace them like its own (ADR 0027).
+        const searched = (await tx.contactSource(workspaceId, contactId)) === "search";
+
         // A stored photo's URL is ours, not the source's: any applied photo means the agent's.
         const agentOwned =
           current !== null &&
-          (field === "image_url"
-            ? applied.length > 0
-            : applied.some((earlier) => sameFactValue(earlier, current)));
+          (searched ||
+            (field === "image_url"
+              ? applied.length > 0
+              : applied.some((earlier) => sameFactValue(earlier, current))));
 
         return { current, agentOwned };
       };
 
-      const read = write(actor, "read fact", async (workspaceId, tx) =>
-        (await tx.record("contact", workspaceId, contactId))
-          ? ok(await situation(workspaceId, tx))
-          : fail(new NotFound({ message: "Contact not found" })),
-      );
+      /** Records the fact once its score is known: for an email or phone, from its check. */
+      const recordScored = (score: number, extra: ContactExtras) => {
+        const band = input.band && isFactBand(input.band) ? input.band : bandFor(score);
 
-      // Jev runs between two transactions, so no transaction waits on the network.
-      const judged = (seen: { current: string | null; agentOwned: boolean }) => {
-        const facts = { score: input.score, value: factValue, ...seen };
+        const read = write(actor, "read fact", async (workspaceId, tx) =>
+          (await tx.record("contact", workspaceId, contactId))
+            ? ok(await situation(workspaceId, tx))
+            : fail(new NotFound({ message: "Contact not found" })),
+        );
 
-        // Two photo URLs say nothing Jev could read.
-        if (!needsJudgement(facts) || !deps.judge || field === "image_url") {
-          return Effect.succeed(facts);
-        }
+        // Jev runs between two transactions, so no transaction waits on the network.
+        const judged = (seen: { current: string | null; agentOwned: boolean }) => {
+          const facts = { score: score, value: factValue, ...seen };
 
-        const judge = deps.judge;
-
-        return Effect.promise(() =>
-          judge({ field, current: seen.current ?? "", proposed: factValue, evidence }).catch(
-            (): FactJudgement => "unsure",
-          ),
-        ).pipe(Effect.map((judgement) => ({ ...facts, judgement })));
-      };
-
-      return read.pipe(
-        Effect.flatMap(judged),
-        Effect.flatMap((facts) => {
-          const decided = factOutcome(facts);
-
-          // A member's own photo stays: accepting a photo would store context.dev's URL, a hotlink.
-          const outcome = field === "image_url" && decided === "proposed" ? "kept" : decided;
-
-          if (outcome === "kept" || outcome === "too_unsure") {
-            return Effect.succeed<RecordedFact>({ id: null, outcome, txid: null });
+          // Two photo URLs say nothing Jev could read.
+          if (!needsJudgement(facts) || !deps.judge || field === "image_url") {
+            return Effect.succeed(facts);
           }
 
-          // A photo is copied before the write; one that won't copy is not recorded.
-          const stored =
-            field === "image_url" && outcome === "applied"
-              ? Effect.promise(() =>
-                  deps.photos
-                    ? deps.photos(contactId, factValue).catch(() => null)
-                    : Promise.resolve(null),
-                )
-              : Effect.succeed(factValue);
+          const judge = deps.judge;
 
-          return stored.pipe(
-            Effect.flatMap((columnValue) => {
-              if (columnValue === null) {
-                return Effect.succeed<RecordedFact>({ id: null, outcome: "kept", txid: null });
-              }
+          return Effect.promise(() =>
+            judge({ field, current: seen.current ?? "", proposed: factValue, evidence }).catch(
+              (): FactJudgement => "unsure",
+            ),
+          ).pipe(Effect.map((judgement) => ({ ...facts, judgement })));
+        };
 
-              const id = createId(ID_PREFIXES.contact_fact);
+        return read.pipe(
+          Effect.flatMap(judged),
+          Effect.flatMap((facts) => {
+            const decided = factOutcome(facts);
 
-              return write(
-                actor,
-                "record fact",
-                async (
-                  workspaceId,
-                  tx,
-                ): Promise<Outcome<{ id: string | null; outcome: FactOutcome }>> => {
-                  const latest = await situation(workspaceId, tx);
+            // A member's own photo stays: accepting a photo would store context.dev's URL, a hotlink.
+            const outcome = field === "image_url" && decided === "proposed" ? "kept" : decided;
 
-                  // A member who typed a value meanwhile gets the question instead.
-                  const changed = latest.current !== facts.current;
+            if (outcome === "kept" || outcome === "too_unsure") {
+              return Effect.succeed<RecordedFact>({ id: null, outcome, txid: null });
+            }
 
-                  const status =
-                    outcome === "applied" && changed && !latest.agentOwned ? "proposed" : outcome;
+            // A photo is copied before the write; one that won't copy is not recorded.
+            const stored =
+              field === "image_url" && outcome === "applied"
+                ? Effect.promise(() =>
+                    deps.photos
+                      ? deps.photos(contactId, factValue).catch(() => null)
+                      : Promise.resolve(null),
+                  )
+                : Effect.succeed(factValue);
 
-                  if (status === "proposed" && field === "image_url")
-                    return ok({ id: null, outcome: "kept" });
+            return stored.pipe(
+              Effect.flatMap((columnValue) => {
+                if (columnValue === null) {
+                  return Effect.succeed<RecordedFact>({ id: null, outcome: "kept", txid: null });
+                }
 
-                  const older = await tx.factIds(workspaceId, contactId, field, "proposed");
+                const id = createId(ID_PREFIXES.contact_fact);
 
-                  for (const olderId of older) {
-                    // oxlint-disable-next-line no-await-in-loop -- a field has one or two open proposals.
-                    await tx.updateFact(workspaceId, olderId, { status: "superseded" });
-                  }
-
-                  await tx.insertFact({
-                    id,
+                return write(
+                  actor,
+                  "record fact",
+                  async (
                     workspaceId,
-                    contactId,
-                    field,
-                    value: factValue,
-                    score: input.score,
-                    band,
-                    evidence,
-                    sourceUrl: source.value,
-                    status,
-                  });
+                    tx,
+                  ): Promise<Outcome<{ id: string | null; outcome: FactOutcome }>> => {
+                    const latest = await situation(workspaceId, tx);
 
-                  if (status === "applied") {
-                    await tx.setContactValue(workspaceId, contactId, field, columnValue);
-                  }
+                    // A member who typed a value meanwhile gets the question instead.
+                    const changed = latest.current !== facts.current;
 
-                  return ok({ id, outcome: status });
-                },
-              );
-            }),
-          );
-        }),
-      );
+                    const status =
+                      outcome === "applied" && changed && !latest.agentOwned ? "proposed" : outcome;
+
+                    if (status === "proposed" && field === "image_url")
+                      return ok({ id: null, outcome: "kept" });
+
+                    const older = await tx.factIds(workspaceId, contactId, field, "proposed");
+
+                    for (const olderId of older) {
+                      // oxlint-disable-next-line no-await-in-loop -- a field has one or two open proposals.
+                      await tx.updateFact(workspaceId, olderId, { status: "superseded" });
+                    }
+
+                    await tx.insertFact({
+                      id,
+                      workspaceId,
+                      contactId,
+                      field,
+                      value: factValue,
+                      score: score,
+                      band,
+                      evidence,
+                      sourceUrl: source.value,
+                      status,
+                    });
+
+                    if (status === "applied") {
+                      await tx.setContactValue(workspaceId, contactId, field, columnValue, extra);
+                    }
+
+                    return ok({ id, outcome: status });
+                  },
+                );
+              }),
+            );
+          }),
+        );
+      };
+
+      const checks = deps.checks;
+
+      // An email or phone fact is scored by its check, not by the agent's confidence.
+      if (field === "email" && checks) {
+        return Effect.promise(() =>
+          checks.email(actor, factValue).catch((): EmailStatus => "unknown"),
+        ).pipe(
+          Effect.flatMap((status) => {
+            const score = emailFactScore(status);
+
+            if (score === null) return reject("That address bounces; it was not saved");
+
+            return recordScored(score, { emailStatus: status, emailVerifiedAt: now() });
+          }),
+        );
+      }
+
+      if (field === "phone" && checks) {
+        return Effect.promise(() => checks.phone(factValue).catch(() => null)).pipe(
+          Effect.flatMap((seen) => {
+            const status: PhoneStatus = seen ?? "unchecked";
+            const score = phoneFactScore(status);
+
+            if (score === null) return reject("That line is dead; it was not saved");
+
+            return recordScored(score, { phoneStatus: status, phoneType });
+          }),
+        );
+      }
+
+      return recordScored(input.score, {});
     },
 
     decideFact: (actor, id, status) => {
@@ -810,7 +898,17 @@ export function makeIntel(store: IntelStore, deps: IntelDependencies = {}): Inte
 }
 
 /** The Prisma field of each fact column. */
+/** What a checked email or phone fact also sets on the contact. */
+export interface ContactExtras {
+  readonly emailStatus?: string | null;
+  readonly emailVerifiedAt?: Date | null;
+  readonly phoneStatus?: string | null;
+  readonly phoneType?: string | null;
+}
+
 const CONTACT_COLUMNS = {
+  email: "email",
+  phone: "phone",
   title: "title",
   image_url: "imageUrl",
   seniority: "seniority",
@@ -873,14 +971,17 @@ function intelTx(tx: DbTx): IntelTx {
       (
         await orm.ContactFact.where({ workspaceId, contactId, field, status }).select("value").all()
       ).map((row) => row.value),
+    contactSource: async (workspaceId, contactId) =>
+      (await orm.Contact.where({ id: contactId, workspaceId }).first())?.source ?? null,
     contactValue: async (workspaceId, contactId, field) => {
       const row = await orm.Contact.where({ id: contactId, workspaceId }).first();
 
       return row ? row[CONTACT_COLUMNS[field]]?.trim() || null : null;
     },
-    setContactValue: async (workspaceId, contactId, field, value) => {
+    setContactValue: async (workspaceId, contactId, field, value, extra = {}) => {
       await orm.Contact.where({ id: contactId, workspaceId }).update({
         [CONTACT_COLUMNS[field]]: value,
+        ...extra,
         updatedAt: new Date(),
       });
     },
@@ -940,11 +1041,29 @@ export class Intel extends Context.Service<Intel, IntelService>()("@crm/api/serv
     Effect.gen(function* () {
       const config = yield* AppConfig;
       const images = yield* Images;
+      const enrichment = yield* Enrichment;
 
       return makeIntel(prismaIntelStore(yield* Database), {
         judge: Option.isSome(config.aiGatewayApiKey) ? jevFactJudge(gatewayJev()) : null,
         photos: (contactId, source) => images.contactPhoto(contactId, source),
+        checks: enrichment
+          ? {
+              // Facts are recorded while researching; a check they need is filed under research.
+              email: (actor, email) =>
+                actor.activeWorkspaceId
+                  ? enrichment.emailStatus(
+                      {
+                        userId: actor.userId,
+                        workspaceId: actor.activeWorkspaceId,
+                        origin: "research",
+                      },
+                      email,
+                    )
+                  : Promise.resolve("unknown"),
+              phone: (phone) => enrichment.phoneStatus(phone),
+            }
+          : null,
       });
     }),
-  ).pipe(Layer.provide([Database.layer, Images.layer]));
+  ).pipe(Layer.provide([Database.layer, Images.layer, Enrichment.layer]));
 }

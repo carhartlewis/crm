@@ -30,3 +30,5 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0024](0024-fields-money-views-intel-tracking.md)  | Custom fields as rows; reporting currency with stored base amounts; saved views; agent-written contact intel; opt-in tracking        |
 | [0025](0025-records-fill-themselves.md)            | New records research themselves in the background; sure facts apply at once, Jev guards members' values; photos from context.dev     |
 | [0026](0026-research-is-the-graph-core.md)         | The record's website research is the memory graph's core, so the record sits at the centre; a drawn core only until it lands         |
+| [0027](0027-enrichment-through-treg.md)            | People search, emails, phones and enrichment through treg; a usage ledger per workspace; costs shown in chats                        |
+| [0028](0028-shared-enrichment-cache.md)            | treg and context.dev answers are cached once for every workspace; a hit is free                                                      |

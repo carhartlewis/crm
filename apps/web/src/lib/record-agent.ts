@@ -50,16 +50,37 @@ export interface AgentPrompt {
   readonly text: string;
 }
 
-/** Research on the company sheet: the agent fills the profile from the web. */
+/** Research on the company sheet: the agent fills the profile and adds its key people. */
 export const researchCompanyPrompt = (name: string): AgentPrompt => ({
   title: `Research ${name}`,
-  text: "Research this company on the web and fill in its profile: description, industry, city, country, phone, email and social links, plus any custom fields that have agent briefs. Mark the research as running while you work, then complete.",
+  text: "Research this company and fill in its profile: description, industry, headcount, founded year, city, country, phone, email and social links, plus any custom fields that have agent briefs. Then add its key people as contacts, following your research-company skill. Mark the research as running while you work, then complete.",
 });
 
-/** Re-enrich on the contact sheet: the agent proposes facts and writes their background. */
+/** Re-enrich on the contact sheet: the agent fills their details and writes their background. */
 export const enrichContactPrompt = (name: string): AgentPrompt => ({
   title: `Re-enrich ${name}`,
-  text: "Re-enrich this contact: find their title, seniority, function, LinkedIn, X and GitHub, where they are based and their career so far. Save each value you are sure of, including their photo, and write their background. Mark the research as running while you work, then complete.",
+  text: "Re-enrich this contact: find their work email, phone number, title, seniority, function, LinkedIn, X and GitHub, photo, where they are based and their career so far. Save each value you are sure of and write their background. Mark the research as running while you work, then complete.",
+});
+
+/** Record actions (ADR 0027): one lookup on this record, saved when it checks out. */
+export const findEmailPrompt = (name: string): AgentPrompt => ({
+  title: `Find email: ${name}`,
+  text: "Find this contact's work email with crm__find_email and record it as an email fact. Tell me the address and whether it is verified.",
+});
+
+export const verifyEmailPrompt = (name: string): AgentPrompt => ({
+  title: `Verify email: ${name}`,
+  text: "Check this contact's email address with crm__verify_email and record it again as an email fact so the CRM keeps its status. Tell me the result in one sentence.",
+});
+
+export const findPhonePrompt = (name: string): AgentPrompt => ({
+  title: `Find phone: ${name}`,
+  text: "Find this contact's phone number with crm__find_phone and record it as a phone fact with its line type. Tell me the number and whether the line is live.",
+});
+
+export const findPeoplePrompt = (name: string): AgentPrompt => ({
+  title: `Find people at ${name}`,
+  text: "Find the key people at this company with crm__find_people by its domain: founders, executives and heads of department who work there now. Show me who you found; don't add them until I pick.",
 });
 
 /** Sync email & calendar from a record's Activity tab. */

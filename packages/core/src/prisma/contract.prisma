@@ -31,6 +31,7 @@ model User {
   ownedDeals         Deal[]     @relation("DealOwner")
   activities         Activity[] @relation("ActivityAuthor")
   savedViews         SavedView[] @relation("SavedViewOwner")
+  usageEvents        UsageEvent[] @relation("UsageEventUser")
 
   @@map("user")
 }
@@ -107,6 +108,7 @@ model Workspace {
   chatSpaces  ChatSpace[]
   sidebars    Sidebar[]
   spaceMembers ChatSpaceMember[]
+  usageEvents UsageEvent[]
   contacts    Contact[]
   deals       Deal[]
   dealContacts DealContact[]
@@ -191,6 +193,9 @@ model Company {
   githubUrl   String?   @map("github_url")
   pricingUrl  String?   @map("pricing_url")
   careersUrl  String?   @map("careers_url")
+  // Headcount as research states it ("15", "51-200"), and the year it was founded.
+  employeeCount String? @map("employee_count")
+  foundedYear   String? @map("founded_year")
   ownerId     String?   @map("owner_id")
   owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   // The person to talk to first; one of the company's contacts.
@@ -225,7 +230,14 @@ model Contact {
   firstName   String    @map("first_name")
   lastName    String?   @map("last_name")
   email       String?
+  // The last mailbox check on `email` (ADR 0027): `valid`, `catch_all`, `risky`, `invalid` or
+  // `unknown`; null when it was never checked, such as an address a member typed.
+  emailStatus     String?   @map("email_status")
+  emailVerifiedAt DateTime? @map("email_verified_at")
   phone       String?
+  // `mobile`, `work` or `other`, when research knows; and whether a line check found it live.
+  phoneType   String?   @map("phone_type")
+  phoneStatus String?   @map("phone_status")
   title       String?
   seniority   String?
   // Their function, such as Engineering or Finance.
@@ -863,9 +875,45 @@ model WorkspaceSetting {
   reportingCurrency  String    @default("USD") @map("reporting_currency")
   // The public key of the website tracking snippet; null until tracking is turned on.
   trackingKey        String?   @unique @map("tracking_key")
+  // What a workspace pays on top of enrichment cost, in basis points (ADR 0027); 0 for now.
+  usageMarkupBps     Int       @default(0) @map("usage_markup_bps")
   updatedAt          DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
 
   @@map("workspace_setting")
+}
+
+// One paid call made for a workspace (ADR 0027): the billing ledger. `cost_micro` is what the
+// provider charged us (micro-USD), `price_micro` what the workspace pays, fixed when the row is
+// written. Found values never go here; they land on the record or a contact fact.
+
+model UsageEvent {
+  // `createId("use")`.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // The member the call ran for; null once they leave the workspace.
+  userId      String?   @map("user_id")
+  user        User?     @relation("UsageEventUser", fields: [userId], references: [id], onDelete: SetNull)
+  // `enrichment` now; `model` later for agent turns.
+  kind        String    @default("enrichment")
+  // What ran it: `chat`, `research` or `sheet`.
+  origin      String    @default("chat")
+  // The job, such as `people.email.find`.
+  contract    String
+  // `hit`, `miss`, `error` or `cached`.
+  outcome     String
+  costMicro   Int       @default(0) @map("cost_micro")
+  priceMicro  Int       @default(0) @map("price_micro")
+  recordKind  String?   @map("record_kind")
+  recordId    String?   @map("record_id")
+  // The provider's call id, for reconciliation; unique so a retried call is counted once.
+  providerCallId String? @unique @map("provider_call_id")
+  servedBy    String?   @map("served_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([recordId])
+  @@map("usage_event")
 }
 
 // What the agent found out about a contact (ADR 0024). A member accepts or dismisses each

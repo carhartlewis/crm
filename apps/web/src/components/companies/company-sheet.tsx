@@ -27,7 +27,11 @@ import { CustomFieldRows, FieldsSettingsLink } from "../fields/custom-field-rows
 import { ConfirmDeleteDialog } from "../records/confirm-delete-dialog.tsx";
 import { ActivityFeed } from "../records/activity-feed.tsx";
 import { RecordAgentTab, useRecordChat } from "../records/agent-tab.tsx";
-import { researchCompanyPrompt, syncActivityPrompt } from "../../lib/record-agent.ts";
+import {
+  findPeoplePrompt,
+  researchCompanyPrompt,
+  syncActivityPrompt,
+} from "../../lib/record-agent.ts";
 import {
   ChoiceDetail,
   DetailList,
@@ -80,7 +84,7 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
 
   const current = companies.find((row) => row.id === record.id);
   const owner = memberOf(current?.owner_id);
-  const open = record.id !== null;
+  const open = record.isOpen;
 
   const save = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: Partial<Company> }) =>
@@ -168,6 +172,12 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
 
   const menu: EntityMenuItem[] = current
     ? [
+        // The agent finds who works here; the member picks whom to add (ADR 0027).
+        {
+          id: "find-people",
+          label: "Find people here",
+          onSelect: () => askAgent(findPeoplePrompt(current.name)),
+        },
         current.archived_at
           ? { id: "restore", label: "Restore", onSelect: () => set({ archived_at: null }) }
           : {
@@ -333,6 +343,8 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
                     {text("phone")}
                     {text("email")}
                     {text("industry")}
+                    {text("employee_count")}
+                    {text("founded_year")}
                     {text("city")}
                     {text("country")}
                     <DetailRow label="Owner">
@@ -443,14 +455,12 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
           id: "knowledge",
           label: "Knowledge",
           content: current ? (
-            <div className="flex min-h-0 flex-1 flex-col px-5 py-3">
-              <CompanyKnowledge
-                company={current}
-                key={current.id}
-                userId={userId}
-                workspaceId={workspaceId}
-              />
-            </div>
+            <CompanyKnowledge
+              company={current}
+              key={current.id}
+              userId={userId}
+              workspaceId={workspaceId}
+            />
           ) : null,
         },
       ]}

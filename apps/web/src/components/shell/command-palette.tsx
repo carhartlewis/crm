@@ -8,6 +8,7 @@ import logout from "@carbon/icons/es/logout/16.js";
 import screen from "@carbon/icons/es/screen/16.js";
 import arrowsHorizontal from "@carbon/icons/es/arrows--horizontal/16.js";
 import sidePanelOpen from "@carbon/icons/es/side-panel--open/16.js";
+import userMultiple from "@carbon/icons/es/user--multiple/16.js";
 import {
   Command,
   CommandDialog,
@@ -23,12 +24,15 @@ import {
 import { carbonIcon } from "@crm/ui/components/icon";
 import { useSidebar } from "@crm/ui/components/sidebar";
 import { useTheme } from "@crm/ui/components/theme-provider";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import { rankSearch, type Searchable } from "@crm/ui/lib/search-rank";
+import { queueFirstMessage, seedNewChat } from "../../lib/chat-api.ts";
 import { useChatSpaces, useVisibleChats } from "../../lib/chat-spaces.ts";
+import { startChatMutation } from "../../lib/chats.ts";
+import { lastPermissionMode } from "../../lib/permission-mode.ts";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { useMemoryFacts } from "../../lib/memory-facts.ts";
 import { parsePinKey } from "@crm/core/chat";
@@ -43,6 +47,7 @@ import { switchWorkspaceMutation } from "../../lib/workspaces.ts";
 import type { FileRoutesByTo } from "../../routeTree.gen.ts";
 
 const AddIcon = carbonIcon(add);
+const FindPeopleIcon = carbonIcon(userMultiple);
 const ChatIcon = carbonIcon(chat);
 const KnowledgeIcon = carbonIcon(book);
 const NewChatIcon = carbonIcon(edit);
@@ -370,6 +375,30 @@ export default function CommandPalette({
     command.run();
   };
 
+  // "Find people: …" starts a chat that searches for them (ADR 0027).
+  const queryClient = useQueryClient();
+
+  const findPeople = useMutation({
+    ...startChatMutation,
+    onSuccess: ({ id, sessionId }, { text }) => {
+      seedNewChat(queryClient, userId, id, sessionId);
+      queueFirstMessage(id, { text, files: [] });
+      void navigate({ to: "/chats/$chatId", params: { chatId: id } });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const askFindPeople = (query: string) => () => {
+    onOpenChange(false);
+    findPeople.mutate({
+      workspaceId,
+      userId,
+      text: `Find people: ${query}`,
+      spaceId: null,
+      permissionMode: lastPermissionMode(userId),
+    });
+  };
+
   return (
     <CommandDialog
       open={open}
@@ -381,6 +410,7 @@ export default function CommandPalette({
         commands={commands}
         records={[...records, ...chats, ...spaces, ...facts]}
         select={select}
+        findPeople={askFindPeople}
         placeholder={
           current ? `Search ${current.label.toLowerCase()} and commands…` : "Search or jump to…"
         }
@@ -398,11 +428,14 @@ function PaletteSearch({
   commands,
   records,
   select,
+  findPeople,
   placeholder,
 }: {
   commands: readonly PaletteCommand[];
   records: readonly PaletteCommand[];
   select: (command: PaletteCommand) => () => void;
+  /** Starts a chat that finds people matching the query. */
+  findPeople: (query: string) => () => void;
   placeholder: string;
 }) {
   const [query, setQuery] = useState("");
@@ -451,7 +484,15 @@ function PaletteSearch({
             </CommandGroup>
           ))
         ) : (
-          <CommandGroup>{results.map(({ item, ranges }) => row(item, ranges, true))}</CommandGroup>
+          <CommandGroup>
+            {results.map(({ item, ranges }) => row(item, ranges, true))}
+            {/* After the matches: the query as a people search, so typing a brief finds people. */}
+            <CommandItem value="find-people" onSelect={findPeople(query.trim())}>
+              <FindPeopleIcon />
+              <span className="min-w-0 truncate">Find people: “{query.trim()}”</span>
+              <CommandItemHint>Chat</CommandItemHint>
+            </CommandItem>
+          </CommandGroup>
         )}
       </CommandList>
     </Command>

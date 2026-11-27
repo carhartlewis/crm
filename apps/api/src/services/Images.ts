@@ -1,4 +1,3 @@
-import { createContextDev } from "@crm/core/brand";
 import {
   type ChatFiles as ChatFilesStore,
   createChatFiles,
@@ -8,6 +7,7 @@ import {
 } from "@crm/core/storage";
 import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { AppConfig } from "../config.ts";
+import { Brand } from "./Brand.ts";
 
 /** Vercel Blob when its token is set, otherwise S3 (the local RustFS in development). */
 const appStorage = Effect.gen(function* () {
@@ -48,21 +48,16 @@ export class Images extends Context.Service<Images, ImageCache>()("@crm/api/serv
   static readonly layer = Layer.effect(
     Images,
     Effect.gen(function* () {
-      const { contextDevApiKey } = yield* AppConfig;
       const storage = yield* appStorage;
+      const brand = yield* Brand;
 
       yield* Effect.logInfo(`image storage: ${storage.driver}`);
 
-      const brand = Option.filter(contextDevApiKey, (value) => Redacted.value(value) !== "").pipe(
-        Option.map((key) => createContextDev({ apiKey: Redacted.value(key) })),
-      );
+      yield* Effect.logInfo(`logos: ${brand ? "context.dev" : "favicons only"}`);
 
-      yield* Effect.logInfo(`logos: ${Option.isSome(brand) ? "context.dev" : "favicons only"}`);
-
-      return Option.match(brand, {
-        onSome: (logos) => createImageCache({ storage, logoSources: logos.iconUrls }),
-        onNone: () => createImageCache({ storage }),
-      });
+      return brand
+        ? createImageCache({ storage, logoSources: brand.iconUrls })
+        : createImageCache({ storage });
     }),
-  );
+  ).pipe(Layer.provide(Brand.layer));
 }

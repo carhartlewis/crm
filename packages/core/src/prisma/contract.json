@@ -132,6 +132,10 @@
       "model": "Skill",
       "namespace": "public"
     },
+    "usage_event": {
+      "model": "UsageEvent",
+      "namespace": "public"
+    },
     "user": {
       "model": "User",
       "namespace": "public"
@@ -1151,6 +1155,13 @@
                   "kind": "scalar"
                 }
               },
+              "employeeCount": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "enrichedAt": {
                 "nullable": true,
                 "type": {
@@ -1170,6 +1181,13 @@
               },
               "enrichmentStatus": {
                 "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "foundedYear": {
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -1478,6 +1496,9 @@
                 "email": {
                   "column": "email"
                 },
+                "employeeCount": {
+                  "column": "employee_count"
+                },
                 "enrichedAt": {
                   "column": "enriched_at"
                 },
@@ -1486,6 +1507,9 @@
                 },
                 "enrichmentStatus": {
                   "column": "enrichment_status"
+                },
+                "foundedYear": {
+                  "column": "founded_year"
                 },
                 "githubUrl": {
                   "column": "github_url"
@@ -1724,6 +1748,23 @@
                   "kind": "scalar"
                 }
               },
+              "emailStatus": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "emailVerifiedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
               "enrichedAt": {
                 "nullable": true,
                 "type": {
@@ -1815,6 +1856,20 @@
                 }
               },
               "phone": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "phoneStatus": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "phoneType": {
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
@@ -2008,6 +2063,12 @@
                 "email": {
                   "column": "email"
                 },
+                "emailStatus": {
+                  "column": "email_status"
+                },
+                "emailVerifiedAt": {
+                  "column": "email_verified_at"
+                },
                 "enrichedAt": {
                   "column": "enriched_at"
                 },
@@ -2046,6 +2107,12 @@
                 },
                 "phone": {
                   "column": "phone"
+                },
+                "phoneStatus": {
+                  "column": "phone_status"
+                },
+                "phoneType": {
+                  "column": "phone_type"
                 },
                 "seniority": {
                   "column": "seniority"
@@ -6062,6 +6129,193 @@
               "table": "skill"
             }
           },
+          "UsageEvent": {
+            "fields": {
+              "contract": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "costMicro": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "origin": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "outcome": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "priceMicro": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "providerCallId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "recordId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "recordKind": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "servedBy": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "workspaceId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "workspace": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "workspaceId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Workspace",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "contract": {
+                  "column": "contract"
+                },
+                "costMicro": {
+                  "column": "cost_micro"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "kind": {
+                  "column": "kind"
+                },
+                "origin": {
+                  "column": "origin"
+                },
+                "outcome": {
+                  "column": "outcome"
+                },
+                "priceMicro": {
+                  "column": "price_micro"
+                },
+                "providerCallId": {
+                  "column": "provider_call_id"
+                },
+                "recordId": {
+                  "column": "record_id"
+                },
+                "recordKind": {
+                  "column": "record_kind"
+                },
+                "servedBy": {
+                  "column": "served_by"
+                },
+                "userId": {
+                  "column": "user_id"
+                },
+                "workspaceId": {
+                  "column": "workspace_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "usage_event"
+            }
+          },
           "User": {
             "fields": {
               "createdAt": {
@@ -6403,6 +6657,21 @@
                 },
                 "to": {
                   "model": "ChatSpaceMember",
+                  "namespace": "public"
+                }
+              },
+              "usageEvents": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "UsageEvent",
                   "namespace": "public"
                 }
               }
@@ -7043,6 +7312,21 @@
                   "namespace": "public"
                 }
               },
+              "usageEvents": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "workspaceId"
+                  ]
+                },
+                "to": {
+                  "model": "UsageEvent",
+                  "namespace": "public"
+                }
+              },
               "websiteVisits": {
                 "cardinality": "1:N",
                 "on": {
@@ -7113,6 +7397,13 @@
                   }
                 }
               },
+              "usageMarkupBps": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "workspaceId": {
                 "nullable": false,
                 "type": {
@@ -7149,6 +7440,9 @@
                 },
                 "updatedAt": {
                   "column": "updated_at"
+                },
+                "usageMarkupBps": {
+                  "column": "usage_markup_bps"
                 },
                 "workspaceId": {
                   "column": "workspace_id"
@@ -8072,6 +8366,11 @@
                   "dataType": "pg/text",
                   "nullable": true
                 },
+                "employee_count": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
                 "enriched_at": {
                   "codecId": "pg/timestamptz-date@1",
                   "dataType": "pg/timestamptz",
@@ -8093,6 +8392,11 @@
                     "value": "pending"
                   },
                   "nullable": false
+                },
+                "founded_year": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
                 },
                 "github_url": {
                   "codecId": "pg/text@1",
@@ -8470,6 +8774,19 @@
                   "dataType": "pg/text",
                   "nullable": true
                 },
+                "email_status": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "email_verified_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "nullable": true,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
                 "enriched_at": {
                   "codecId": "pg/timestamptz-date@1",
                   "dataType": "pg/timestamptz",
@@ -8541,6 +8858,16 @@
                   "nullable": true
                 },
                 "phone": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "phone_status": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "phone_type": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
                   "nullable": true
@@ -11990,6 +12317,192 @@
                 }
               ]
             },
+            "usage_event": {
+              "columns": {
+                "contract": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "cost_micro": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nullable": false,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "kind": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "default": {
+                    "kind": "literal",
+                    "value": "enrichment"
+                  },
+                  "nullable": false
+                },
+                "origin": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "default": {
+                    "kind": "literal",
+                    "value": "chat"
+                  },
+                  "nullable": false
+                },
+                "outcome": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "price_micro": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nullable": false
+                },
+                "provider_call_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "record_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "record_kind": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "served_by": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "user_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "workspace_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "index": {
+                    "name": "usage_event_workspace_id_idx_90a9f461"
+                  },
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "workspace_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "usage_event"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "workspace"
+                  }
+                },
+                {
+                  "index": {
+                    "name": "usage_event_user_id_idx_6c952402"
+                  },
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "user_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "usage_event"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "record_id"
+                  ],
+                  "name": "usage_event_record_id_idx_ab8d411c",
+                  "prefix": "usage_event_record_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "name": "usage_event_user_id_idx_6c952402",
+                  "prefix": "usage_event_user_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "workspace_id",
+                    "created_at"
+                  ],
+                  "name": "usage_event_workspace_id_created_at_idx_3f0db799",
+                  "prefix": "usage_event_workspace_id_created_at_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "workspace_id"
+                  ],
+                  "name": "usage_event_workspace_id_idx_90a9f461",
+                  "prefix": "usage_event_workspace_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "provider_call_id"
+                  ]
+                }
+              ]
+            },
             "user": {
               "columns": {
                 "createdAt": {
@@ -12321,6 +12834,15 @@
                     "precision": 3
                   }
                 },
+                "usage_markup_bps": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nullable": false
+                },
                 "workspace_id": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
@@ -12369,7 +12891,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "951bea6c47ed60d207f3991527996b51a0a3efad21d8b69cfffd5eb45f865d9f"
+    "storageHash": "58615015a98ba2dff7fa67630c2be4dc05d6a23f536852b755e93e8708c7f734"
   },
   "execution": {
     "executionHash": "b63d4c4eb387256698cfe6bcff115f0822109ad1057668d98711db9f02ed97ca",

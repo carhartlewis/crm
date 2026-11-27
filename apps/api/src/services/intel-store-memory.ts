@@ -12,6 +12,8 @@ export interface FakeRecord {
   readonly enrichmentStatus?: string;
   readonly enrichedAt?: Date | null;
   readonly enrichmentError?: string | null;
+  /** How a contact arrived; `manual` when left out. */
+  readonly source?: string;
   /** A contact's fact columns (`title`, `image_url` …), by column name. */
   readonly values?: Readonly<Record<string, string | null>>;
 }
@@ -130,14 +132,20 @@ export function createMemoryIntelStore(members: Iterable<string>) {
               ? [fact.value]
               : [],
           ),
+        contactSource: async (workspaceId, contactId) => {
+          const row = inWorkspace("contact", workspaceId, contactId);
+
+          return row ? (row.source ?? "manual") : null;
+        },
         contactValue: async (workspaceId, contactId, field) =>
           inWorkspace("contact", workspaceId, contactId)?.values?.[field]?.trim() || null,
-        setContactValue: async (workspaceId, contactId, field, value) => {
+        setContactValue: async (workspaceId, contactId, field, value, extra = {}) => {
           const row = inWorkspace("contact", workspaceId, contactId);
 
           if (row) {
             draft.records.contact.set(contactId, {
               ...row,
+              ...extra,
               values: { ...row.values, [field]: value },
             });
           }

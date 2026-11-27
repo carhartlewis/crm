@@ -124,16 +124,32 @@ export function avatarSource(image: string) {
   return url.href;
 }
 
-/** context.dev's person photo host only (`PERSON_PHOTO_PATTERN` in `@crm/core/brand`). */
+/**
+ * The hosts contact photos are copied from, each with the path its photos live under: context.dev
+ * (`PERSON_PHOTO_PATTERN` in `@crm/core/brand`), LinkedIn's media host, and the image host one
+ * profile provider uses (ADR 0027). The URL comes through the agent, so the server fetches no
+ * other host.
+ */
+const PERSON_PHOTO_HOSTS = new Map([
+  ["media.brand.dev", "/pfp/"],
+  ["media.licdn.com", "/dms/image/"],
+  ["img.imagecdn.dev", "/profile/"],
+]);
+
+/** The photo URL when it is an https URL on a person photo host, otherwise null. */
 export function contactPhotoSource(source: string) {
   if (!URL.canParse(source)) return null;
 
   const url = new URL(source);
+  const path = PERSON_PHOTO_HOSTS.get(url.hostname);
 
-  return url.protocol === "https:" && url.hostname === "media.brand.dev" && !url.port
+  return url.protocol === "https:" && !url.port && path && url.pathname.startsWith(path)
     ? url.href
     : null;
 }
+
+/** Whether a contact photo may be copied from `source`. */
+export const isPersonPhotoSource = (source: string) => contactPhotoSource(source) !== null;
 
 function websiteHost(website: string) {
   return URL.canParse(website) ? new URL(website).hostname.toLowerCase() || null : null;

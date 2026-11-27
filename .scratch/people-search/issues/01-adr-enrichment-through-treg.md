@@ -1,6 +1,6 @@
 # Adr enrichment through treg
 
-Status: open
+Status: resolved
 Type: task
 Spec: ../spec.md
 
@@ -10,3 +10,7 @@ enrich, and photos from treg's LinkedIn profile, copied into storage, with conte
 email.
 
 Done when: the ADR and the glossary are merged.
+
+## Answer
+
+ADR 0027 (`docs/adr/0027-enrichment-through-treg.md`), index row, ADR 0025 amended, GLOSSARY: Enrichment, Usage event, Verified email, People search.

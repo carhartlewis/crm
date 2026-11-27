@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { brandDomain, createContextDev, type BrandFetch } from "@crm/core/brand";
+import {
+  BRAND_HIT_TTL_SECONDS,
+  type BrandFetch,
+  brandDomain,
+  createContextDev,
+  PAGE_TTL_SECONDS,
+} from "@crm/core/brand";
+import { createMemoryKv } from "@crm/core/kv";
 
 const logos = [
   { url: "https://media.test/wide.svg", type: "logo", mode: "light", resolution: { width: 900 } },
@@ -232,5 +239,89 @@ describe("context.dev people", () => {
 
     expect(await reader.findPerson({ firstName: "Ada", lastName: "Lovelace" })).toBeNull();
     expect(await reader.findPerson({ firstName: "Ada", companyName: "Engines" })).toBeNull();
+  });
+});
+
+const redisDown = async () => {
+  throw new Error("redis down");
+};
+
+/** A context.dev that answers with `respond` and counts its requests. */
+function counted(respond: (url: string) => Response) {
+  const requests: string[] = [];
+
+  const fetch: BrandFetch = async (url) => {
+    requests.push(url);
+
+    return respond(url);
+  };
+
+  return { requests, fetch };
+}
+
+describe("context.dev cache", () => {
+  const acme = { brand: { domain: "acme.com", title: "Acme", description: "Rockets." } };
+
+  test("asks once for a domain, whichever client or method asks", async () => {
+    const cache = createMemoryKv();
+
+    const api = counted((url) =>
+      url.includes("/scrape/") ? Response.json({ markdown: "# Acme" }) : Response.json(acme),
+    );
+
+    const first = createContextDev({ apiKey: "k", fetch: api.fetch, cache });
+    const second = createContextDev({ apiKey: "k", fetch: api.fetch, cache });
+
+    expect(await first.research("https://acme.com")).toMatchObject({ name: "Acme" });
+    expect(await second.research("acme.com")).toMatchObject({ name: "Acme" });
+    expect(await second.lookup({ domain: "www.acme.com" })).toMatchObject({ name: "Acme" });
+    expect(api.requests).toHaveLength(2);
+  });
+
+  test("remembers 'not found', but asks again after an outage or a rate limit", async () => {
+    const cache = createMemoryKv();
+    let status = 404;
+
+    const api = counted(() => Response.json({ error_code: "NOT_FOUND" }, { status }));
+    const brand = createContextDev({ apiKey: "k", fetch: api.fetch, cache });
+
+    expect(await brand.iconUrls("nobody.test")).toEqual([]);
+    expect(await brand.iconUrls("nobody.test")).toEqual([]);
+    expect(api.requests).toHaveLength(1);
+
+    status = 503;
+    expect(await brand.iconUrls("down.test")).toEqual([]);
+    status = 429;
+    expect(await brand.iconUrls("down.test")).toEqual([]);
+    expect(api.requests).toHaveLength(3);
+  });
+
+  test("keeps pages for a day, brands for a month", async () => {
+    let now = 0;
+    const cache = createMemoryKv(() => now);
+
+    const api = counted((url) =>
+      url.includes("/scrape/") ? Response.json({ markdown: "Hello" }) : Response.json(acme),
+    );
+
+    const brand = createContextDev({ apiKey: "k", fetch: api.fetch, cache });
+
+    await brand.readPage("https://acme.com/about");
+    await brand.lookup({ domain: "acme.com" });
+    now = (PAGE_TTL_SECONDS + 1) * 1000;
+    await brand.readPage("https://acme.com/about");
+    await brand.lookup({ domain: "acme.com" });
+    expect(api.requests).toHaveLength(3);
+    now = (BRAND_HIT_TTL_SECONDS + 1) * 1000;
+    await brand.lookup({ domain: "acme.com" });
+    expect(api.requests).toHaveLength(4);
+  });
+
+  test("works without Redis when Redis fails", async () => {
+    const broken = { ...createMemoryKv(), get: redisDown, set: redisDown };
+    const api = counted(() => Response.json(acme));
+    const brand = createContextDev({ apiKey: "k", fetch: api.fetch, cache: broken });
+
+    expect(await brand.lookup({ domain: "acme.com" })).toMatchObject({ name: "Acme" });
   });
 });

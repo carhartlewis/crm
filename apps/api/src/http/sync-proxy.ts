@@ -288,7 +288,45 @@ export function workspaceSettingsSync(workspaceId: string): SyncSpec {
     table: "workspace_setting",
     where: "workspace_id = $1",
     params: [workspaceId],
-    columns: ["workspace_id", "reporting_currency", "updated_at"],
+    columns: ["workspace_id", "reporting_currency", "usage_markup_bps", "updated_at"],
+  };
+}
+
+/**
+ * One workspace's paid lookups (ADR 0027): what each cost the workspace, without what it cost us
+ * or the provider's call id.
+ */
+export function usageSync(workspaceId: string): SyncSpec {
+  return {
+    table: "usage_event",
+    where: "workspace_id = $1",
+    params: [workspaceId],
+    columns: [
+      "id",
+      "workspace_id",
+      "user_id",
+      "origin",
+      "contract",
+      "outcome",
+      "price_micro",
+      "record_kind",
+      "record_id",
+      "created_at",
+    ],
+  };
+}
+
+/**
+ * What each of one workspace's lookups cost us: rows only when the caller is one of its owners or
+ * admins (the subquery), so members never see our cost.
+ */
+export function usageCostsSync(workspaceId: string, userId: string): SyncSpec {
+  return {
+    table: "usage_event",
+    where:
+      'workspace_id = $1 AND workspace_id IN (SELECT "organizationId" FROM "member" WHERE "userId" = $2 AND role IN (\'owner\', \'admin\'))',
+    params: [workspaceId, userId],
+    columns: ["id", "workspace_id", "cost_micro"],
   };
 }
 

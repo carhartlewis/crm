@@ -23,6 +23,8 @@ import { makeRecords, Records } from "../services/Records.ts";
 import { createMemoryFieldStore } from "../services/field-store-memory.ts";
 import { Fields, makeFields } from "../services/Fields.ts";
 import { Research } from "../services/Research.ts";
+import { makeUsage, Usage } from "../services/Usage.ts";
+import { emptyUsage } from "../services/usage-store-memory.ts";
 import { Electric, makeElectric } from "../services/Electric.ts";
 import { createMemorySkillStore } from "../services/skill-store-memory.ts";
 import { makeSkills, Skills } from "../services/Skills.ts";
@@ -254,7 +256,8 @@ const app = HttpRouter.toWebHandler(
       FakeCompanies,
       FakeRecords,
       Layer.succeed(Fields, makeFields(createMemoryFieldStore({ members: [] }).store)),
-      Layer.succeed(Research, { start: () => {}, fill: async () => true }),
+      Layer.succeed(Research, { start: () => {}, fill: async () => true, sweep: async () => 0 }),
+      Layer.succeed(Usage, makeUsage(emptyUsage)),
       FakeChats,
       Layer.succeed(Intel, makeIntel(createMemoryIntelStore([]).store)),
       Layer.succeed(CrmTools, { forCaller: () => [] }),
@@ -453,10 +456,11 @@ describe("connections", () => {
   test("serves each app's stored logo, and needs a workspace", async () => {
     const response = await get("/api/connections/logos", member);
 
-    expect(await response.json()).toEqual({
-      granola: "https://storage.test/logos/granola.ai",
-      superhuman: "https://storage.test/logos/superhuman.com",
-    });
+    expect(await response.json()).toEqual(
+      Object.fromEntries(
+        integrations.map(({ id, domain }) => [id, `https://storage.test/logos/${domain}`]),
+      ),
+    );
     expect((await get("/api/connections/logos", "session=valid")).status).toBe(403);
   });
 
@@ -470,7 +474,7 @@ describe("connections", () => {
 
     const catalog = decodeCatalog(await (await get("/api/connections/catalog", member)).json());
 
-    expect(catalog.map(({ id }) => id)).toEqual(["granola", "superhuman", "notes"]);
+    expect(catalog.map(({ id }) => id)).toEqual([...integrations.map(({ id }) => id), "notes"]);
 
     const refused = await send("POST", "/api/connections/custom", member, {
       name: "Elsewhere",

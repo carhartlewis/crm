@@ -29,7 +29,9 @@ export { type S3Options } from "./s3.ts";
 
 export {
   avatarSource,
+  contactPhotoSource,
   createImageCache,
+  isPersonPhotoSource,
   faviconSource,
   sniffImageType,
   type ImageCache,

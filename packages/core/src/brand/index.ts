@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Kv } from "../kv/index.ts";
 
 /**
  * Server-only client for context.dev brand data (https://docs.context.dev). It finds a company's
@@ -13,7 +14,42 @@ export interface ContextDevOptions {
   readonly fetch?: BrandFetch;
   /** context.dev crawls on a cold lookup (p90 ≈ 18 s); a logo is never worth a longer wait. */
   readonly timeoutMs?: number;
+  /**
+   * Shared answers (ADR 0028): one company or person is one paid call, whichever workspace asks.
+   * Keys hold no workspace. Without it every call goes to context.dev.
+   */
+  readonly cache?: Kv;
 }
+
+/** How long context.dev answers stay cached: found a month, not found a week, pages a day. */
+export const BRAND_HIT_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+export const BRAND_MISS_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+export const PAGE_TTL_SECONDS = 24 * 60 * 60;
+
+/** Stored for an answer context.dev said it doesn't have; never valid JSON. */
+const MISS = "!miss";
+
+/** A cached body the schema still reads; null for a damaged entry or an older shape. */
+function readStored<T>(schema: z.ZodType<T>, text: string) {
+  try {
+    const parsed = schema.safeParse(JSON.parse(text));
+
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** One key per request: a POST's JSON body, or none for a GET. No workspace, no key. */
+const cacheKey = (url: string, body: string | undefined) =>
+  `brand:${new Bun.CryptoHasher("sha256")
+    .update(`${body === undefined ? "GET" : "POST"} ${url} ${body ?? ""}`)
+    .digest("hex")}`;
+
+/** Statuses that mean "no such brand or person"; others (auth, rate limit, outage) may pass. */
+const NOT_FOUND = new Set([400, 404, 422]);
 
 export interface BrandLogos {
   /**
@@ -351,27 +387,62 @@ export function createContextDev({
   apiKey,
   fetch: fetchImpl = fetch,
   timeoutMs = 20_000,
+  cache,
 }: ContextDevOptions): BrandLogos & CompanyResearcher & WebReader {
   const headers = { authorization: `Bearer ${apiKey}`, accept: "application/json" };
 
-  /** A context.dev JSON body, or null on any failure: research is best effort. */
-  const get = async <T>(schema: z.ZodType<T>, url: string, init: RequestInit = {}) => {
+  // The cache only saves calls: when Redis fails, ask context.dev.
+  const cached = async (key: string) => (cache ? cache.get(key).catch(() => null) : null);
+
+  const keep = async (key: string, value: string, ttlSeconds: number) => {
+    await cache?.set(key, value, ttlSeconds).catch(() => undefined);
+  };
+
+  /**
+   * A context.dev JSON body, or null on any failure: research is best effort. Found answers and
+   * "not found" are cached; errors that may pass (auth, rate limit, outage, timeout) are not.
+   */
+  const get = async <T>(
+    schema: z.ZodType<T>,
+    url: string,
+    options: { body?: string; hitTtl?: number; waitMs?: number } = {},
+  ) => {
+    const key = cacheKey(url, options.body);
+    const stored = await cached(key);
+
+    if (stored === MISS) return null;
+
+    // A body the schema no longer reads (or a damaged entry) is asked for again.
+    const known = stored === null ? null : readStored(schema, stored);
+
+    if (known !== null) return known;
+
     try {
       const requestHeaders = new Headers(headers);
 
-      if (init.body) requestHeaders.set("content-type", "application/json");
+      if (options.body) requestHeaders.set("content-type", "application/json");
 
       const response = await fetchImpl(url, {
-        ...init,
+        method: options.body === undefined ? "GET" : "POST",
+        body: options.body,
         headers: requestHeaders,
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(options.waitMs ?? 60_000),
       });
 
-      if (!response.ok) return null;
+      if (!response.ok) {
+        if (NOT_FOUND.has(response.status)) await keep(key, MISS, BRAND_MISS_TTL_SECONDS);
 
-      const parsed = schema.safeParse(await response.json());
+        return null;
+      }
 
-      return parsed.success ? parsed.data : null;
+      const body: unknown = await response.json();
+      const parsed = schema.safeParse(body);
+
+      if (!parsed.success) return null;
+
+      await keep(key, JSON.stringify(body), options.hitTtl ?? BRAND_HIT_TTL_SECONDS);
+
+      return parsed.data;
     } catch {
       return null;
     }
@@ -397,7 +468,6 @@ export function createContextDev({
       if (!body) return null;
 
       const full = await get(Full, `${BASE}/brand/retrieve`, {
-        method: "POST",
         body: JSON.stringify(body),
       });
 
@@ -418,7 +488,6 @@ export function createContextDev({
       if (!body) return null;
 
       const result = await get(Enriched, `${BASE}/people/enrich`, {
-        method: "POST",
         body: JSON.stringify(body),
       });
 
@@ -470,6 +539,7 @@ export function createContextDev({
       const page = await get(
         Markdown,
         `${BASE}/web/scrape/markdown?${new URLSearchParams({ url, useMainContentOnly: "true" })}`,
+        { hitTtl: PAGE_TTL_SECONDS },
       );
 
       const markdown = page?.markdown?.trim();
@@ -486,7 +556,6 @@ export function createContextDev({
 
       const [full, page] = await Promise.all([
         get(Full, `${BASE}/brand/retrieve`, {
-          method: "POST",
           body: JSON.stringify({ type: "by_domain", domain }),
         }),
         get(
@@ -496,6 +565,7 @@ export function createContextDev({
             useMainContentOnly: "true",
             includeLinks: "false",
           })}`,
+          { hitTtl: PAGE_TTL_SECONDS },
         ),
       ]);
 
@@ -511,25 +581,15 @@ export function createContextDev({
 
       if (!domain) return [];
 
-      try {
-        const response = await fetchImpl(`${API}?domain=${encodeURIComponent(domain)}`, {
-          headers: { authorization: `Bearer ${apiKey}`, accept: "application/json" },
-          signal: AbortSignal.timeout(timeoutMs),
-        });
+      // 400 NOT_FOUND (no brand) is free and normal; anything else is also "no logo".
+      const simplified = await get(Simplified, `${API}?domain=${encodeURIComponent(domain)}`, {
+        waitMs: timeoutMs,
+      });
 
-        // 400 NOT_FOUND (no brand) is free and normal; anything else is also "no logo".
-        if (!response.ok) return [];
-
-        const parsed = Simplified.safeParse(await response.json());
-        const logos = parsed.success ? (parsed.data.brand?.logos ?? []) : [];
-
-        return logos
-          .filter((logo) => logo.type === "icon" && logo.url.startsWith("https://"))
-          .toSorted(compare)
-          .map((logo) => logo.url);
-      } catch {
-        return [];
-      }
+      return (simplified?.brand?.logos ?? [])
+        .filter((logo) => logo.type === "icon" && logo.url.startsWith("https://"))
+        .toSorted(compare)
+        .map((logo) => logo.url);
     },
   };
 }

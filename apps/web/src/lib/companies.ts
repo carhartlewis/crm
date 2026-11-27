@@ -35,6 +35,9 @@ export type Company = {
   readonly careers_url: string | null;
   readonly owner_id: string | null;
   readonly primary_contact_id: string | null;
+  /** Headcount as research states it ("15", "51-200"), and the year it was founded. */
+  readonly employee_count: string | null;
+  readonly founded_year: string | null;
   readonly enrichment_status: string;
   readonly enriched_at: string | null;
   readonly enrichment_error: string | null;
@@ -60,6 +63,8 @@ const EDITABLE = [
   "industry",
   "city",
   "country",
+  "employee_count",
+  "founded_year",
   "owner_id",
   "description",
   "linkedin_url",
@@ -119,6 +124,8 @@ export function newCompany(input: {
     github_url: null,
     pricing_url: null,
     careers_url: null,
+    employee_count: null,
+    founded_year: null,
     owner_id: input.ownerId,
     primary_contact_id: null,
     enrichment_status: "pending",

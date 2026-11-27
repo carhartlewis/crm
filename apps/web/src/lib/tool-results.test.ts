@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { listResult, withoutRepeatedTable } from "./tool-results.ts";
+import { callUsage, listResult, peopleResult, withoutRepeatedTable } from "./tool-results.ts";
 
 const deal = {
   id: "del_1",
@@ -86,5 +86,63 @@ describe("withoutRepeatedTable", () => {
 
   test("a reply without a table is unchanged", () => {
     expect(withoutRepeatedTable("A | B are both fine.")).toBe("A | B are both fine.");
+  });
+});
+
+/** A tool's MCP answer: its JSON in one text part. */
+const answer = (json: string) => ({ content: [{ type: "text", text: json }] });
+
+describe("people results and call costs", () => {
+  const person = {
+    name: "Ada Park",
+    title: "Founder",
+    company: "Example Ventures",
+    companyDomain: "example-ventures.com",
+    location: "Miami, FL, US",
+    linkedinUrl: "https://www.linkedin.com/in/ada-park",
+    email: null,
+    emailStatus: null,
+    contactId: null,
+  };
+
+  test("reads the people a search found, and what it cost", () => {
+    const call = {
+      name: "connections__crm__find_people",
+      state: "completed",
+      output: answer(
+        JSON.stringify({
+          count: 1,
+          people: [person],
+          nextCursor: null,
+          usage: { usageId: "use_1", priceMicro: 2600, outcome: "hit" },
+        }),
+      ),
+    };
+
+    expect(peopleResult(call)).toEqual([person]);
+    expect(callUsage(call)).toEqual({ usageId: "use_1", priceMicro: 2600, outcome: "hit" });
+  });
+
+  test("free calls and other tools carry no cost; an empty search shows no table", () => {
+    const empty = {
+      name: "connections__crm__find_people",
+      state: "completed",
+      output: answer(
+        JSON.stringify({
+          count: 0,
+          people: [],
+          usage: { usageId: "use_2", priceMicro: 0, outcome: "miss" },
+        }),
+      ),
+    };
+
+    expect(peopleResult(empty)).toBeNull();
+    expect(
+      callUsage({
+        name: "connections__crm__list_deals",
+        state: "completed",
+        output: answer(JSON.stringify({ deals: [] })),
+      }),
+    ).toBeNull();
   });
 });

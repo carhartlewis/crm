@@ -10,6 +10,15 @@ const recordFrom = (recordKind: string, recordId: string) =>
     attributes: { workspaceId: "ws_1", recordKind, recordId },
   })?.record;
 
+/** What runs a turn, as the agent reads it from a chat's attributes. */
+const originOf = (attributes: Readonly<Record<string, string>>) =>
+  crmCaller({
+    authenticator: "crm-proxy",
+    principalType: "user",
+    principalId: "user_1",
+    attributes: { workspaceId: "ws_1", ...attributes },
+  })?.origin;
+
 describe("crmCaller", () => {
   test("a chat from the CRM carries its workspace", () => {
     expect(
@@ -29,6 +38,7 @@ describe("crmCaller", () => {
       workspaceId: "ws_1",
       permissionMode: "bypass",
       record: null,
+      origin: "chat",
     });
   });
 
@@ -40,7 +50,13 @@ describe("crmCaller", () => {
         principalId: "user_1",
         attributes: {},
       }),
-    ).toEqual({ userId: "user_1", workspaceId: null, permissionMode: "manual", record: null });
+    ).toEqual({
+      userId: "user_1",
+      workspaceId: null,
+      permissionMode: "manual",
+      record: null,
+      origin: "chat",
+    });
     expect(
       crmCaller({
         authenticator: "crm-proxy",
@@ -59,5 +75,13 @@ describe("crmCaller", () => {
     });
     expect(recordFrom("company", "ctc_0123456789abcdefghijklmn")).toBeNull();
     expect(recordFrom("invoice", "com_0123456789abcdefghijklmn")).toBeNull();
+  });
+
+  test("what runs the turn: research the API started, a record's chat, or a chat", () => {
+    const record = { recordKind: "contact", recordId: "ctc_0123456789abcdefghijklmn" };
+
+    expect(originOf({ ...record, origin: "research" })).toBe("research");
+    expect(originOf(record)).toBe("sheet");
+    expect(originOf({})).toBe("chat");
   });
 });

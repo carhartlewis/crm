@@ -1,4 +1,5 @@
 import book from "@carbon/icons/es/book/16.js";
+import receipt from "@carbon/icons/es/receipt/16.js";
 import building from "@carbon/icons/es/building/16.js";
 import list from "@carbon/icons/es/list/16.js";
 import plug from "@carbon/icons/es/plug/16.js";
@@ -19,6 +20,7 @@ export const settingsGroups = [
       { to: "/settings/fields", label: "Fields", icon: carbonIcon(list) },
       { to: "/settings/memory", label: "Workspace Memory", icon: carbonIcon(book) },
       { to: "/settings/skills", label: "Workspace Skills", icon: carbonIcon(toolKit) },
+      { to: "/settings/usage", label: "Usage", icon: carbonIcon(receipt) },
     ],
   },
   {

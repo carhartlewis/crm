@@ -93,3 +93,11 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 **Agent proxy**: `/api/chats/<chatId>/agent/*`. The only way a browser reaches the agent; it checks that the caller may see the chat (ADR 0018).
 
 **Permission mode**: How much the agent may do in a chat without asking: Manual (asks before every change), Auto (asks only before risky calls) or Bypass permissions (runs everything). Picked beside Send (ADR 0019).
+
+**Enrichment**: Filling a record from outside data: a person's work email, phone, LinkedIn, title and photo, or a company's headcount, founded year and key people. Done by the agent through treg's routed lookups (ADR 0027), never by the API on its own.
+
+**Usage event**: One paid lookup (or a free cache hit) for a workspace (table `usage_event`): what it cost us (`cost_micro`) and what the workspace pays (`price_micro`), in micro-USD. The billing ledger (ADR 0027).
+
+**Verified email**: An address whose mailbox check said it accepts mail (`email_status` `valid`). A **catch-all** address is at a domain that accepts any address, so it can't be confirmed; it fills an empty email field but shows as "Catch-all".
+
+**People search**: Finding people who aren't in the CRM yet by a description, a company's domain, a title or a name (`crm__find_people`). Its rows are directory listings until someone adds them.

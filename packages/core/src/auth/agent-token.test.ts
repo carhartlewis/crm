@@ -12,6 +12,18 @@ describe("agent tokens", () => {
     expect(await verifyAgentToken(secret, token, 1_001 + AGENT_TOKEN_TTL_MS)).toBeNull();
   });
 
+  test("carries what runs the turn and its record, for usage", async () => {
+    const research = {
+      ...claims,
+      origin: "research" as const,
+      record: { kind: "contact", id: "ctc_1" },
+    };
+
+    const token = await mintAgentToken(secret, research, 1_000);
+
+    expect(await verifyAgentToken(secret, token, 2_000)).toEqual(research);
+  });
+
   test("refuses another secret, an edited payload and other tokens", async () => {
     const token = await mintAgentToken(secret, claims, 1_000);
     const [prefix, payload, signature] = token.split(".");

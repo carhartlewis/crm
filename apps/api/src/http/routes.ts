@@ -29,6 +29,9 @@ import {
   CONTACT_BRIEFS_SYNC_PATH,
   CONTACT_FACTS_SYNC_PATH,
   Unauthorized,
+  USAGE_COSTS_SYNC_PATH,
+  USAGE_EXPORT_PATH,
+  USAGE_SYNC_PATH,
 } from "@crm/core/api";
 import { createGateway } from "@crm/integrations/gateway";
 import { clientMetadata } from "@crm/integrations/oauth";
@@ -50,6 +53,7 @@ import { type AgentResult, Memory } from "../services/Memory.ts";
 import { Skills } from "../services/Skills.ts";
 import { Money } from "../services/Money.ts";
 import { SavedViews } from "../services/SavedViews.ts";
+import { Usage } from "../services/Usage.ts";
 import { AuthenticationLive } from "./Authentication.ts";
 import { TrackingHandlers, TrackingRoutes } from "./tracking-routes.ts";
 import { clientIp, withClientIp } from "./client-ip.ts";
@@ -75,6 +79,8 @@ import {
   exchangeRatesSync,
   savedViewsSync,
   contactBriefsSync,
+  usageCostsSync,
+  usageSync,
   contactFactsSync,
   type SyncSpec,
 } from "./sync-proxy.ts";
@@ -371,6 +377,20 @@ const WorkspaceSettingsHandlers = HttpApiBuilder.group(CrmApi, "workspaceSetting
   }),
 );
 
+const UsageHandlers = HttpApiBuilder.group(CrmApi, "usage", (handlers) =>
+  Effect.gen(function* () {
+    const usage = yield* Usage;
+
+    return handlers
+      .handle("summary", ({ query }) =>
+        Effect.flatMap(actor, (who) => usage.summary(who, query.month)),
+      )
+      .handle("record", ({ params }) =>
+        Effect.flatMap(actor, (who) => usage.record(who, params.id)),
+      );
+  }),
+);
+
 const ExchangeRatesHandlers = HttpApiBuilder.group(CrmApi, "exchangeRates", (handlers) =>
   Effect.gen(function* () {
     const money = yield* Money;
@@ -458,9 +478,15 @@ const MemoryHandlers = HttpApiBuilder.group(CrmApi, "memory", (handlers) =>
     const memory = yield* Memory;
 
     return handlers
-      .handle("workspace", () => Effect.flatMap(actor, memory.workspace))
+      .handle("workspace", () => Effect.flatMap(actor, (who) => memory.knowledge(who, {})))
       .handle("company", ({ params }) =>
-        Effect.flatMap(actor, (who) => memory.company(who, params.id)),
+        Effect.flatMap(actor, (who) => memory.knowledge(who, { companyId: params.id })),
+      )
+      .handle("contact", ({ params }) =>
+        Effect.flatMap(actor, (who) => memory.knowledge(who, { contactId: params.id })),
+      )
+      .handle("deal", ({ params }) =>
+        Effect.flatMap(actor, (who) => memory.knowledge(who, { dealId: params.id })),
       )
       .handle("graph", ({ query }) => Effect.flatMap(actor, (who) => memory.graph(who, query)))
       .handle("source", ({ params, query }) =>
@@ -498,6 +524,7 @@ const IntelHandlers = HttpApiBuilder.group(
 
 const ApiRoutes = HttpApiBuilder.layer(CrmApi).pipe(
   Layer.provide([
+    UsageHandlers,
     IntelHandlers,
     SystemHandlers,
     AccountHandlers,
@@ -601,6 +628,8 @@ const synced: ReadonlyArray<
   [SAVED_VIEWS_SYNC_PATH, (workspaceId, userId) => savedViewsSync(workspaceId, userId)],
   [CONTACT_FACTS_SYNC_PATH, (workspaceId) => contactFactsSync(workspaceId)],
   [CONTACT_BRIEFS_SYNC_PATH, (workspaceId) => contactBriefsSync(workspaceId)],
+  [USAGE_SYNC_PATH, (workspaceId) => usageSync(workspaceId)],
+  [USAGE_COSTS_SYNC_PATH, (workspaceId, userId) => usageCostsSync(workspaceId, userId)],
 ];
 
 /**
@@ -752,7 +781,11 @@ const ConnectionRoutes = Layer.effectDiscard(
   }),
 );
 
-const Target = { companyId: Schema.optional(Schema.String) };
+const Target = {
+  companyId: Schema.optional(Schema.String),
+  contactId: Schema.optional(Schema.String),
+  dealId: Schema.optional(Schema.String),
+};
 
 /** Request bodies of the agent's memory endpoints. */
 const AgentBodies = {
@@ -922,8 +955,54 @@ const AgentProxyRoutes = Layer.effectDiscard(
  * Every HTTP route, still requiring `Auth`, `Companies`, `Records`, `Electric` and `Connections`. `main.ts`
  * provides the real services; tests provide fakes.
  */
+/**
+ * The month's usage as CSV (ADR 0027), for billing: a raw route so it downloads as a file. Signed
+ * in, in the active workspace; admins also get what each call cost.
+ */
+const UsageExportRoutes = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const router = yield* HttpRouter.HttpRouter;
+    const auth = yield* Auth;
+    const usage = yield* Usage;
+
+    yield* router.add("GET", USAGE_EXPORT_PATH, (request) =>
+      Effect.gen(function* () {
+        const session = yield* auth
+          .session(new Headers(request.headers))
+          .pipe(Effect.option, Effect.map(Option.flatten));
+
+        if (Option.isNone(session)) {
+          return HttpServerResponse.text("Not signed in", { status: 401 });
+        }
+
+        const month = new URL(request.url, "http://api").searchParams.get("month") ?? undefined;
+
+        const csv = yield* usage
+          .exportCsv(
+            { userId: session.value.user.id, activeWorkspaceId: session.value.activeWorkspaceId },
+            month,
+          )
+          .pipe(Effect.result);
+
+        if (Result.isFailure(csv)) {
+          return HttpServerResponse.text(csv.failure.message, { status: 400 });
+        }
+
+        return HttpServerResponse.text(csv.success, {
+          headers: {
+            "content-type": "text/csv; charset=utf-8",
+            "content-disposition": `attachment; filename="usage-${month ?? "this-month"}.csv"`,
+            "cache-control": "no-store",
+          },
+        });
+      }),
+    );
+  }),
+);
+
 export const Routes = Layer.mergeAll(
   ApiRoutes,
+  UsageExportRoutes,
   TrackingRoutes,
   AuthRoutes,
   SyncRoutes,

@@ -34,6 +34,7 @@ export const ID_PREFIXES = {
   sidebar: "sbr",
   // Not a table: personal folders live in the `sidebar` row (ADR 0018), with ids of this scheme.
   folder: "fld",
+  usage_event: "use",
 } as const;
 
 /** Tables whose ids are not ours to make, and why. */

@@ -1,6 +1,6 @@
 # Api enrichment service ledger cache
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 02
 Spec: ../spec.md
@@ -16,3 +16,7 @@ Spec: ../spec.md
 - Redis cache `crm:enrich:<workspace>:<contract>:<sha256(normalised identity)>`, 30-day TTL.
   A cache hit logs `outcome: cached` at 0 cost.
 - Tests: createMemoryKv with a clock, a fake treg.
+
+## Answer
+
+`Enrichment` service (membership, Redis cache, ledger), `usage_event` table + `usage_markup_bps` (migration `20261127T0532_enrichment_usage`), origin and record carried in the agent token. Tests in `enrichment.test.ts`. (A later session made the cache shared across workspaces, ADR 0028.)

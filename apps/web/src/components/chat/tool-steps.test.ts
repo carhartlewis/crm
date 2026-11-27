@@ -27,6 +27,29 @@ const call = (
 
 const text = (value: string): EveMessagePart => ({ type: "text", id: value, text: value });
 
+/** A finished lookup whose answer says what it cost. */
+const paid = (callId: string, priceMicro: number): ToolPart => ({
+  type: "tool",
+  callId,
+  stepIndex: 0,
+  kind: "tool",
+  name: "find_email",
+  label: "Connections: Find email",
+  state: "completed",
+  input: {},
+  output: {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          found: true,
+          usage: { usageId: callId, priceMicro, outcome: "hit" },
+        }),
+      },
+    ],
+  },
+});
+
 const event = (type: string, turnId: string, at: string, outcome?: string) => ({
   type,
   data: { turnId, outcome },
@@ -114,6 +137,18 @@ describe("tool step runs", () => {
     // Still running: no line yet.
     expect(summaries.has("m2")).toBe(false);
     expect(formatWorked(125_000)).toBe("2m 5s");
+  });
+
+  test("a turn's summary adds what its paid lookups cost", () => {
+    const summaries = turnSummaries(
+      [
+        event("turn.started", "t1", "2026-11-27T03:00:00.000Z"),
+        event("turn.settled", "t1", "2026-11-27T03:00:14.400Z", "completed"),
+      ],
+      [reply("m1", "t1", [paid("a", 240_000), paid("b", 70_000), text("Done")])],
+    );
+
+    expect(summaries.get("m1")).toBe("Worked for 14s · 2 steps · $0.31");
   });
 
   test("a branch carries the conversation up to the chosen message, words only", () => {

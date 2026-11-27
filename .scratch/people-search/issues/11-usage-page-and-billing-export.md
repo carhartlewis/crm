@@ -1,6 +1,6 @@
 # Usage page and billing export
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 03
 Spec: ../spec.md
@@ -18,3 +18,7 @@ Per-customer (workspace) usage, so we can bill later.
   Export CSV button.
 - Later, not in this ticket: Stripe metered billing pushes monthly `priceMicro` per workspace
   as meter events.
+
+## Answer
+
+`Usage` service + `GET /api/usage`, `GET /api/usage/records/:id`, CSV at `/api/usage/export`; Workspace settings → Usage page.

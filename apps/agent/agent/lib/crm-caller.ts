@@ -11,6 +11,11 @@ export interface CrmCaller {
   readonly permissionMode: PermissionMode;
   /** The record the chat is about, from a record sheet's Agent tab (ADR 0024). */
   readonly record: { readonly kind: ChatRecordKind; readonly id: string } | null;
+  /**
+   * What runs the turn, for usage (ADR 0027): `research` for a background session the API
+   * started, `sheet` for a chat about one record, otherwise `chat`.
+   */
+  readonly origin: "chat" | "research" | "sheet";
 }
 
 const RecordAttributes = Schema.Struct({
@@ -35,12 +40,14 @@ export function crmCaller(auth: SessionAuthContext | null | undefined): CrmCalle
 
   const workspace = auth.attributes["workspaceId"];
   const mode = auth.attributes["permissionMode"];
+  const record = recordOf(auth.attributes);
 
   return {
     userId: auth.principalId,
     workspaceId: String(workspace) === workspace && workspace !== "" ? workspace : null,
     permissionMode:
       String(mode) === mode && isPermissionMode(mode) ? mode : DEFAULT_PERMISSION_MODE,
-    record: recordOf(auth.attributes),
+    record,
+    origin: auth.attributes["origin"] === "research" ? "research" : record ? "sheet" : "chat",
   };
 }

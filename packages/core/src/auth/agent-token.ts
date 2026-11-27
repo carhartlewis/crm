@@ -5,17 +5,25 @@
  * for a few minutes, so connections, skills and memory need no separate sign-in. The API checks
  * the signature, the expiry and the membership again on every call.
  *
- * Format: `crm1.<base64url JSON { u, w, exp }>.<base64url HMAC-SHA256>`.
+ * Format: `crm1.<base64url JSON { u, w, exp, o?, r? }>.<base64url HMAC-SHA256>`. `o` is what runs
+ * the turn and `r` the record it is about (`kind:id`), so paid calls are filed under them
+ * (ADR 0027); they grant nothing.
  */
+
+import { Option, Schema } from "effect";
 
 export const AGENT_TOKEN_PREFIX = "crm1.";
 
 /** How long a minted token is valid. */
 export const AGENT_TOKEN_TTL_MS = 5 * 60 * 1000;
 
+export type AgentTokenOrigin = "chat" | "research" | "sheet";
+
 export interface AgentTokenClaims {
   readonly userId: string;
   readonly workspaceId: string;
+  readonly origin?: AgentTokenOrigin;
+  readonly record?: { readonly kind: string; readonly id: string } | null;
 }
 
 const encoder = new TextEncoder();
@@ -47,7 +55,14 @@ export async function mintAgentToken(
 ) {
   const payload = base64url(
     encoder.encode(
-      JSON.stringify({ u: claims.userId, w: claims.workspaceId, exp: now + AGENT_TOKEN_TTL_MS }),
+      JSON.stringify({
+        u: claims.userId,
+        w: claims.workspaceId,
+        exp: now + AGENT_TOKEN_TTL_MS,
+        // Undefined fields drop out of the JSON.
+        o: claims.origin,
+        r: claims.record ? `${claims.record.kind}:${claims.record.id}` : undefined,
+      }),
     ),
   );
 
@@ -60,11 +75,17 @@ export function isAgentToken(token: string) {
   return token.startsWith(AGENT_TOKEN_PREFIX);
 }
 
-interface Payload {
-  readonly u?: string;
-  readonly w?: string;
-  readonly exp?: number;
-}
+const Payload = Schema.fromJsonString(
+  Schema.Struct({
+    u: Schema.String,
+    w: Schema.String,
+    exp: Schema.Number,
+    o: Schema.optional(Schema.Literals(["chat", "research", "sheet"])),
+    r: Schema.optional(Schema.String),
+  }),
+);
+
+const decodePayload = Schema.decodeUnknownOption(Payload);
 
 /** The claims of a valid, unexpired token signed with `secret`; null for anything else. */
 export async function verifyAgentToken(
@@ -91,14 +112,20 @@ export async function verifyAgentToken(
 
     if (!valid) return null;
 
-    const json = new TextDecoder().decode(fromBase64url(payload));
+    const claims = Option.getOrNull(
+      decodePayload(new TextDecoder().decode(fromBase64url(payload))),
+    );
 
-    // SAFETY: the signature proves the API's own agent wrote this JSON; each field is checked below.
-    const claims = JSON.parse(json) as Payload;
+    if (!claims?.u || !claims.w || claims.exp < now) return null;
 
-    if (!claims.u || !claims.w || !claims.exp || claims.exp < now) return null;
+    const [kind, id] = claims.r?.split(":") ?? [];
 
-    return { userId: claims.u, workspaceId: claims.w };
+    return {
+      userId: claims.u,
+      workspaceId: claims.w,
+      origin: claims.o,
+      record: kind && id ? { kind, id } : undefined,
+    };
   } catch {
     return null;
   }

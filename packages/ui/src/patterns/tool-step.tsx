@@ -35,12 +35,15 @@ const SPOKEN: Record<ToolStepState, string> = {
 export function ToolStep({
   label,
   detail,
+  cost,
   state,
 }: {
   /** What the tool does, such as "Create company". */
   label: ReactNode;
   /** What it acts on, such as the company's name; dimmed after the label. */
   detail?: ReactNode;
+  /** What the call cost, such as "$0.24" or "No charge"; at the end of the line. */
+  cost?: ReactNode;
   state: ToolStepState;
 }) {
   return (
@@ -51,7 +54,22 @@ export function ToolStep({
     >
       <StepIcon state={state} />
       <StepLabel label={label} detail={detail} state={state} />
+      <StepCost cost={cost} />
     </div>
+  );
+}
+
+/** A call's price after its label, in tabular figures so a run of prices lines up. */
+function StepCost({ cost }: { cost: ReactNode }) {
+  if (cost === undefined || cost === null || cost === "") return null;
+
+  return (
+    <span
+      className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground tabular-nums"
+      data-slot="tool-step-cost"
+    >
+      {cost}
+    </span>
   );
 }
 
@@ -99,6 +117,7 @@ function StepLabel({
 export function ToolStepGroup({
   label,
   detail,
+  cost,
   state,
   defaultOpen = false,
   children,
@@ -106,6 +125,8 @@ export function ToolStepGroup({
   label: ReactNode;
   /** What the calls act on, together. */
   detail?: ReactNode;
+  /** What the calls cost together. */
+  cost?: ReactNode;
   state: ToolStepState;
   defaultOpen?: boolean;
   /** The calls, as `ToolStep`s. */
@@ -113,7 +134,7 @@ export function ToolStepGroup({
 }) {
   return (
     <Collapsible defaultOpen={defaultOpen} data-slot="tool-step-group" data-state={state}>
-      <StepTrigger label={label} detail={detail} state={state} />
+      <StepTrigger label={label} detail={detail} cost={cost} state={state} />
       <CollapsibleContent>
         <div className="mt-1.5 ml-1.75 flex min-w-0 flex-col gap-1.5 border-l pl-4">{children}</div>
       </CollapsibleContent>
@@ -128,6 +149,7 @@ export function ToolStepGroup({
 export function ToolStepResult({
   label,
   detail,
+  cost,
   state,
   defaultOpen = true,
   children,
@@ -135,6 +157,8 @@ export function ToolStepResult({
   label: ReactNode;
   /** Text only: the step is a button, so it can't hold a link or another button. */
   detail?: ReactNode;
+  /** What the call cost. */
+  cost?: ReactNode;
   state: ToolStepState;
   defaultOpen?: boolean;
   /** The result, such as a table. */
@@ -142,7 +166,7 @@ export function ToolStepResult({
 }) {
   return (
     <Collapsible defaultOpen={defaultOpen} data-slot="tool-step-result" data-state={state}>
-      <StepTrigger label={label} detail={detail} state={state} />
+      <StepTrigger label={label} detail={detail} cost={cost} state={state} />
       <CollapsibleContent>
         <div className="mt-2 min-w-0">{children}</div>
       </CollapsibleContent>
@@ -154,16 +178,19 @@ export function ToolStepResult({
 function StepTrigger({
   label,
   detail,
+  cost,
   state,
 }: {
   label: ReactNode;
   detail?: ReactNode;
+  cost?: ReactNode;
   state: ToolStepState;
 }) {
   return (
     <CollapsibleTrigger className="group/steps flex w-full min-w-0 items-center gap-2 text-left text-sm">
       <StepIcon state={state} />
       <StepLabel label={label} detail={detail} state={state} />
+      <StepCost cost={cost} />
       <ChevronIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover/steps:opacity-100 group-focus-visible/steps:opacity-100 group-data-panel-open/steps:rotate-90 group-data-panel-open/steps:opacity-100" />
     </CollapsibleTrigger>
   );

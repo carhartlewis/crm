@@ -1,6 +1,6 @@
 # Research skills
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 04, 05
 Spec: ../spec.md
@@ -13,3 +13,7 @@ enrich_person, plus linkedin_profile for the photo. Every new company gets enric
 Eval: create 10 known contacts (name + company only). Expect ≥ 7 verified emails, no
 wrong-domain emails applied, and phones only as facts until checked. Record the cost per record
 from `usage_event`.
+
+## Answer
+
+Skills `research-contact.md` (email, phone, photo, LinkedIn, title), `research-company.md` (enrich + add up to five key people), `find-people.md`; instructions updated. Research sweep every 10 minutes for records still pending.

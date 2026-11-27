@@ -12,7 +12,9 @@ import {
 import { carbonIcon } from "@crm/ui/components/icon";
 import { Skeleton } from "@crm/ui/components/skeleton";
 import { useLiveQuery } from "@tanstack/react-db";
+import { formatUsage } from "@crm/core/usage";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useRecordSpend } from "../../lib/usage.ts";
 import { Suspense } from "react";
 import { toast } from "sonner";
 import type { Attachment } from "../../lib/attachments.ts";
@@ -120,7 +122,7 @@ export function RecordAgentTab(target: RecordAgentTabProps) {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button className="w-full justify-between" size="sm" variant="ghost">
+              <Button className="min-w-0 flex-1 justify-between" size="sm" variant="ghost">
                 <span className="truncate">
                   {current?.title ?? (openId ? "Chat" : "New conversation")}
                 </span>
@@ -147,6 +149,7 @@ export function RecordAgentTab(target: RecordAgentTabProps) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        <RecordSpend recordId={recordId} workspaceId={workspaceId} />
       </div>
       {openId ? (
         <Suspense fallback={<ConversationSkeleton />}>
@@ -238,5 +241,24 @@ function ConversationSkeleton() {
       <Skeleton className="h-4 w-2/3" />
       <Skeleton className="h-4 w-1/2" />
     </div>
+  );
+}
+
+/**
+ * What research and lookups on this record have cost (ADR 0027), after the conversation picker,
+ * live from the synced ledger. Nothing until it has a figure.
+ */
+function RecordSpend({ recordId, workspaceId }: { recordId: string; workspaceId: string }) {
+  const data = useRecordSpend(workspaceId, recordId);
+
+  if (data.priceMicro <= 0) return null;
+
+  return (
+    <span
+      className="shrink-0 px-2 text-xs text-muted-foreground tabular-nums"
+      title={`${data.calls} paid ${data.calls === 1 ? "lookup" : "lookups"} on this record`}
+    >
+      {formatUsage(data.priceMicro)}
+    </span>
   );
 }

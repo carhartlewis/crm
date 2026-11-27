@@ -140,6 +140,8 @@ export const UpdateCompany = Schema.Struct({
     "industry",
     "city",
     "country",
+    "employee_count",
+    "founded_year",
     "owner_id",
     "description",
     "linkedin_url",
@@ -194,8 +196,11 @@ export const CreateContact = Schema.Struct({
   email: Schema.optional(Text),
   phone: Schema.optional(Text),
   title: Schema.optional(Text),
+  linkedin_url: Schema.optional(Text),
   company_id: Schema.optional(Text),
   owner_id: Schema.optional(Text),
+  /** How the row arrived (`RECORD_SOURCES`); `manual` when left out, `search` from a people search. */
+  source: Schema.optional(Schema.String),
 });
 
 export const UpdateContact = Schema.Struct({
@@ -517,7 +522,7 @@ export const MemorySourceDetail = Schema.Struct({
 
 export type MemorySourceDetail = typeof MemorySourceDetail.Type;
 
-/** A workspace's or a company's memory, as the Workspace knowledge page and record sheet show it. */
+/** A workspace's or a record's memory, as the Workspace knowledge page and record sheets show it. */
 export const Knowledge = Schema.Struct({
   /** False when the API has no memory store configured. */
   enabled: Schema.Boolean,
@@ -591,11 +596,18 @@ export type MemoryHit = typeof MemoryHit.Type;
 
 const MemoryErrors = [NotFound, NoActiveWorkspace, Invalid, UpstreamUnavailable];
 
-/** The optional company a memory call is about; without it, the workspace's own memory. */
-const MemoryTarget = { companyId: Schema.optional(Schema.String) };
+/**
+ * The optional record a memory call is about (at most one); without one, the workspace's own
+ * memory.
+ */
+const MemoryTarget = {
+  companyId: Schema.optional(Schema.String),
+  contactId: Schema.optional(Schema.String),
+  dealId: Schema.optional(Schema.String),
+};
 
 /**
- * Workspace and company memory. Any member reads and writes it; the memory store's key stays
+ * Workspace and record memory. Any member reads and writes it; the memory store's key stays
  * in the API.
  */
 export class MemoryApi extends HttpApiGroup.make("memory")
@@ -629,13 +641,23 @@ export class MemoryApi extends HttpApiGroup.make("memory")
       success: Knowledge,
       error: MemoryErrors,
     }),
+    HttpApiEndpoint.get("contact", "/contacts/:id", {
+      params: { id: Schema.String },
+      success: Knowledge,
+      error: MemoryErrors,
+    }),
+    HttpApiEndpoint.get("deal", "/deals/:id", {
+      params: { id: Schema.String },
+      success: Knowledge,
+      error: MemoryErrors,
+    }),
     /** A note in a member's own words. Facts appear once the store has read it. */
     HttpApiEndpoint.post("addNote", "/notes", {
       payload: Schema.Struct({ ...MemoryTarget, text: Schema.String }),
       success: HttpApiSchema.NoContent,
       error: MemoryErrors,
     }),
-    /** Reads the website again (context.dev) and replaces the earlier research. */
+    /** Reads the website again (context.dev) and replaces the earlier research. Not for contacts or deals. */
     HttpApiEndpoint.post("research", "/research", {
       payload: Schema.Struct(MemoryTarget),
       success: HttpApiSchema.NoContent,
@@ -1082,7 +1104,60 @@ export class IntelApi extends HttpApiGroup.make("intel")
   )
   .middleware(Authentication) {}
 
+const UsageLine = Schema.Struct({
+  key: Schema.String,
+  label: Schema.String,
+  calls: Schema.Number,
+  priceMicro: Schema.Number,
+  /** What the calls cost us; admins only, otherwise null. */
+  costMicro: Schema.NullOr(Schema.Number),
+});
+
+/**
+ * A workspace's paid calls in one month (ADR 0027): totals, then by day, by member, by what ran
+ * them (chats, research on new records, record actions) and by job. Prices in micro-USD.
+ */
+export const UsageSummary = Schema.Struct({
+  month: Schema.String,
+  /** The month it is now (UTC), for the month picker. */
+  currentMonth: Schema.String,
+  calls: Schema.Number,
+  priceMicro: Schema.Number,
+  costMicro: Schema.NullOr(Schema.Number),
+  markupBps: Schema.Number,
+  days: Schema.Array(Schema.Struct({ day: Schema.String, priceMicro: Schema.Number })),
+  members: Schema.Array(UsageLine),
+  origins: Schema.Array(UsageLine),
+  jobs: Schema.Array(UsageLine),
+});
+
+/** What research and actions on one record have cost, for its Agent tab. */
+export const RecordUsage = Schema.Struct({ calls: Schema.Number, priceMicro: Schema.Number });
+
+export class UsageApi extends HttpApiGroup.make("usage")
+  .add(
+    HttpApiEndpoint.get("summary", "/", {
+      query: { month: Schema.optional(Schema.String) },
+      success: UsageSummary,
+      error: RecordErrors,
+    }),
+    HttpApiEndpoint.get("record", "/records/:id", {
+      params: { id: Schema.String },
+      success: RecordUsage,
+      error: RecordErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/usage") {}
+
+/**
+ * The month's paid calls as CSV, one row per call: the billing hand-off (a raw route in
+ * apps/api). `?month=YYYY-MM`; admins also get the cost column.
+ */
+export const USAGE_EXPORT_PATH = "/api/usage/export";
+
 export class CrmApi extends HttpApi.make("crm")
+  .add(UsageApi)
   .add(IntelApi)
   .add(FieldsApi)
   .add(SystemApi)
@@ -1184,6 +1259,15 @@ export const chatAgentBase = (chatId: string) => `/api/chats/${encodeURIComponen
 
 /** The agent's proposed facts on the active workspace's contacts (same `?workspace=` rule). */
 export const CONTACT_FACTS_SYNC_PATH = "/api/shapes/contact-facts";
+
+/**
+ * The active workspace's paid lookups (ADR 0027): what each cost the workspace, for the Usage
+ * page and a record's spend. Same `?workspace=` rule; what they cost us is a separate shape.
+ */
+export const USAGE_SYNC_PATH = "/api/shapes/usage";
+
+/** What each of the workspace's lookups cost us; rows only for the workspace's owners and admins. */
+export const USAGE_COSTS_SYNC_PATH = "/api/shapes/usage-costs";
 
 /** The agent's briefs on the active workspace's contacts (same `?workspace=` rule). */
 export const CONTACT_BRIEFS_SYNC_PATH = "/api/shapes/contact-briefs";

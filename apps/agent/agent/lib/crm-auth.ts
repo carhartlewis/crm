@@ -17,6 +17,8 @@ type CallerAttributes = {
   /** The record a chat from a record sheet is about (ADR 0024). */
   recordKind?: string;
   recordId?: string;
+  /** `research` for a background session the API started (ADR 0025). */
+  origin?: string;
 };
 
 export function crmProxy(secret: string | undefined): AuthFn<Request> {
@@ -64,6 +66,8 @@ export function crmProxy(secret: string | undefined): AuthFn<Request> {
       attributes.recordKind = recordKind;
       attributes.recordId = recordId;
     }
+
+    if (request.headers.get("x-crm-origin") === "research") attributes.origin = "research";
 
     return {
       authenticator: "crm-proxy",

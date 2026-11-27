@@ -10,6 +10,8 @@ import {
   proxyResponseHeaders,
   skillsSync,
   memoryFactsSync,
+  usageCostsSync,
+  usageSync,
 } from "./sync-proxy.ts";
 
 const electric = new URL("http://127.0.0.1:53000");
@@ -203,5 +205,24 @@ describe("synced tables", () => {
       "is_static",
       "created_at",
     ]);
+  });
+});
+
+describe("usage shapes", () => {
+  test("members see what lookups cost the workspace, never what they cost us", () => {
+    const params = upstream(usageSync("ws_a"));
+
+    expect(params).toMatchObject({ table: "usage_event", "params[1]": "ws_a" });
+    expect(params["columns"]?.split(",")).toContain("price_micro");
+    expect(params["columns"]?.split(",")).not.toContain("cost_micro");
+    expect(params["columns"]?.split(",")).not.toContain("provider_call_id");
+  });
+
+  test("our cost syncs only to the workspace's owners and admins", () => {
+    const params = upstream(usageCostsSync("ws_a", "user_1"));
+
+    expect(params["where"]).toContain("role IN ('owner', 'admin')");
+    expect(params).toMatchObject({ "params[1]": "ws_a", "params[2]": "user_1" });
+    expect(params["columns"]).toBe("id,workspace_id,cost_micro");
   });
 });

@@ -13,6 +13,7 @@ import {
   isLoggedActivityType,
   isLosingStage,
   isOpenStage,
+  isRecordSource,
   normalizePatch,
   optionalProse,
   optionalText,
@@ -206,11 +207,16 @@ export function makeRecords(
         "email",
         "phone",
         "title",
+        "linkedin_url",
         "company_id",
         "owner_id",
       ]);
 
       if (!fields.ok) return invalid(fields.message);
+
+      const source = input["source"] ?? "manual";
+
+      if (!isRecordSource(source)) return invalid("Unknown source");
 
       const ownerId =
         input.owner_id === undefined ? actor.userId : (fields.value["owner_id"] ?? null);
@@ -233,6 +239,7 @@ export function makeRecords(
           workspaceId,
           firstName: first.value,
           ownerId,
+          source,
         });
 
         await keepPrimaryContact(tx, workspaceId, {

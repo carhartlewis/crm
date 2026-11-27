@@ -1,6 +1,13 @@
 import email16 from "@carbon/icons/es/email/16.js";
 import renew16 from "@carbon/icons/es/renew/16.js";
-import { CONTACT_FIELDS, contactName, type FieldSpec, relationship } from "@crm/core/records";
+import {
+  CONTACT_FIELDS,
+  contactName,
+  EMAIL_STATUS_LABELS,
+  type FieldSpec,
+  isEmailStatus,
+  relationship,
+} from "@crm/core/records";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { StatusDot } from "@crm/ui/components/status-dot";
 import { RailLink } from "@crm/ui/patterns/record-sheet/record-rail";
@@ -16,6 +23,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { type Company, companiesCollection } from "../../lib/companies.ts";
+import { Badge } from "@crm/ui/components/badge";
 import { type Contact, contactsCollection } from "../../lib/contacts.ts";
 import { useOpenCreate } from "../../lib/create-sheet.ts";
 import { type Deal, dealsCollection } from "../../lib/deals.ts";
@@ -26,7 +34,14 @@ import { CustomFieldRows, FieldsSettingsLink } from "../fields/custom-field-rows
 import { ConfirmDeleteDialog } from "../records/confirm-delete-dialog.tsx";
 import { ActivityFeed } from "../records/activity-feed.tsx";
 import { RecordAgentTab, useRecordChat } from "../records/agent-tab.tsx";
-import { enrichContactPrompt, syncActivityPrompt } from "../../lib/record-agent.ts";
+import { RecordKnowledge } from "../records/record-knowledge.tsx";
+import {
+  enrichContactPrompt,
+  findEmailPrompt,
+  findPhonePrompt,
+  syncActivityPrompt,
+  verifyEmailPrompt,
+} from "../../lib/record-agent.ts";
 import {
   ContactBackground,
   FactSuggestion,
@@ -88,7 +103,7 @@ export default function ContactSheet({
 
   const current = contacts.find((row) => row.id === record.id);
   const owner = memberOf(current?.owner_id);
-  const open = record.id !== null;
+  const open = record.isOpen;
   const companiesById = byId(companies);
   const company = current?.company_id ? companiesById.get(current.company_id) : undefined;
   const isPrimary = company !== undefined && company.primary_contact_id === current?.id;
@@ -175,11 +190,25 @@ export default function ContactSheet({
     // The agent's open suggestion for this field, under its value (ADR 0024).
     const suggestion = intel.suggestions.get(column);
 
+    // An email's mailbox check and a phone's line type, after the value (ADR 0027).
+    const check = column === "email" || column === "phone" ? contactCheck(current, column) : null;
+
+    const field = check ? (
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="min-w-0 flex-1">{editor}</div>
+        <span className="flex shrink-0">
+          <Badge variant="outline">{check}</Badge>
+        </span>
+      </div>
+    ) : (
+      editor
+    );
+
     return (
       <DetailRow label={spec(column).label}>
         {suggestion && suggestion.value !== current[column] ? (
           <div className="flex min-w-0 flex-1 flex-col">
-            {editor}
+            {field}
             <FactSuggestion
               fact={suggestion}
               onDecide={(status) => decide.mutate({ fact: suggestion, status })}
@@ -187,7 +216,7 @@ export default function ContactSheet({
             />
           </div>
         ) : (
-          editor
+          field
         )}
       </DetailRow>
     );
@@ -207,6 +236,26 @@ export default function ContactSheet({
               },
             ]
           : []),
+        // One lookup each, run by the agent on this contact (ADR 0027).
+        {
+          id: "find-email",
+          label: "Find email",
+          onSelect: () => askAgent(findEmailPrompt(contactName(current))),
+        },
+        ...(current.email
+          ? [
+              {
+                id: "verify-email",
+                label: "Verify email",
+                onSelect: () => askAgent(verifyEmailPrompt(contactName(current))),
+              },
+            ]
+          : []),
+        {
+          id: "find-phone",
+          label: "Find phone",
+          onSelect: () => askAgent(findPhonePrompt(contactName(current))),
+        },
         current.archived_at
           ? { id: "restore", label: "Restore", onSelect: () => set({ archived_at: null }) }
           : {
@@ -517,7 +566,45 @@ export default function ContactSheet({
             />
           ) : null,
         },
+        {
+          id: "knowledge",
+          label: "Knowledge",
+          content: current ? (
+            <RecordKnowledge
+              key={current.id}
+              subject={contactName(current)}
+              target={{ contactId: current.id }}
+              userId={userId}
+              workspaceId={workspaceId}
+            />
+          ) : null,
+        },
       ]}
     />
   );
 }
+
+/**
+ * The badge after a contact's email or phone (ADR 0027): the email's mailbox check ("Verified",
+ * "Catch-all") and the phone's line type. Nothing for a value nobody checked, such as one a
+ * member typed.
+ */
+function contactCheck(contact: Contact, column: "email" | "phone") {
+  if (column === "email") {
+    const status = contact.email && contact.email_status;
+
+    return status && isEmailStatus(status) ? EMAIL_STATUS_LABELS[status] : null;
+  }
+
+  if (!contact.phone) return null;
+
+  const type = PHONE_TYPE_LABELS.get(contact.phone_type ?? "") ?? null;
+
+  return contact.phone_status === "live" ? (type ?? "Live line") : type;
+}
+
+const PHONE_TYPE_LABELS = new Map([
+  ["mobile", "Mobile"],
+  ["work", "Work"],
+  ["other", "Phone"],
+]);

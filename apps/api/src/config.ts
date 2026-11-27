@@ -30,6 +30,10 @@ export const AppConfig = Config.all({
   // context.dev brand data: square logos for workspaces and connected apps. Optional; without
   // it, logos fall back to favicons.
   contextDevApiKey: Config.option(Config.Redacted("CONTEXT_DEV_API_KEY")),
+  // treg: people search, email and phone finding, and person and company enrichment through one
+  // token in front of many data providers (ADR 0027). Optional; without it the tools are hidden.
+  tregToken: Config.option(Config.Redacted("TREG_TOKEN")),
+  tregUrl: Config.String("TREG_URL").pipe(Config.withDefault("https://treg.to")),
   // Supermemory: workspace and company memory (ADR 0014). Optional; without it, memory is off.
   supermemoryApiKey: Config.option(Config.Redacted("SUPERMEMORY_API_KEY")),
   /** The Vercel AI Gateway, for Jev's judgements (the AI SDK reads it from the environment). */

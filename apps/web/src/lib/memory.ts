@@ -3,28 +3,53 @@ import { mutationOptions, queryOptions, type QueryClient } from "@tanstack/react
 import { request, send } from "./api-fetch.ts";
 
 /**
- * Workspace and company memory (ADR 0014). Not synced: Supermemory extracts facts in the
+ * Workspace and record memory (ADR 0014). Not synced: Supermemory extracts facts in the
  * background, so a memory with a source still processing polls until it is done.
  */
 export const memoryKeys = {
   all: ["memory"] as const,
   workspace: (userId: string, workspaceId: string) =>
     [...memoryKeys.all, userId, workspaceId] as const,
-  company: (userId: string, workspaceId: string, companyId: string) =>
-    [...memoryKeys.workspace(userId, workspaceId), "company", companyId] as const,
-  target: (userId: string, workspaceId: string, target: MemoryTarget) =>
-    target.companyId
-      ? memoryKeys.company(userId, workspaceId, target.companyId)
-      : memoryKeys.workspace(userId, workspaceId),
+  target: (userId: string, workspaceId: string, target: MemoryTarget) => {
+    const record = recordOf(target);
+
+    return record
+      ? ([...memoryKeys.workspace(userId, workspaceId), record.kind, record.id] as const)
+      : memoryKeys.workspace(userId, workspaceId);
+  },
 };
 
-const targetQuery = (target: MemoryTarget) =>
-  target.companyId ? `companyId=${encodeURIComponent(target.companyId)}` : "";
+/** The memory a call is about: the workspace's own, or one company's, contact's or deal's. */
+export type MemoryTarget =
+  | { readonly companyId?: undefined; readonly contactId?: undefined; readonly dealId?: undefined }
+  | { readonly companyId: string }
+  | { readonly contactId: string }
+  | { readonly dealId: string };
 
-/** The memory a call is about: the workspace's own, or one company's. */
-export interface MemoryTarget {
-  readonly companyId?: string;
+/** Each record kind's knowledge path under `/api/memory`. */
+const RECORD_PATHS = { company: "companies", contact: "contacts", deal: "deals" } as const;
+
+function recordOf(target: MemoryTarget) {
+  if ("companyId" in target && target.companyId) {
+    return { kind: "company", param: "companyId", id: target.companyId } as const;
+  }
+
+  if ("contactId" in target && target.contactId) {
+    return { kind: "contact", param: "contactId", id: target.contactId } as const;
+  }
+
+  if ("dealId" in target && target.dealId) {
+    return { kind: "deal", param: "dealId", id: target.dealId } as const;
+  }
+
+  return null;
 }
+
+const targetQuery = (target: MemoryTarget) => {
+  const record = recordOf(target);
+
+  return record ? `${record.param}=${encodeURIComponent(record.id)}` : "";
+};
 
 const POLL_MS = 4_000;
 
@@ -43,12 +68,15 @@ export const knowledgeQuery = (
 ) =>
   queryOptions({
     queryKey: [...memoryKeys.target(userId, workspaceId, target), "knowledge"],
-    queryFn: () =>
-      request<Knowledge>(
-        target.companyId
-          ? `/api/memory/companies/${encodeURIComponent(target.companyId)}`
+    queryFn: () => {
+      const record = recordOf(target);
+
+      return request<Knowledge>(
+        record
+          ? `/api/memory/${RECORD_PATHS[record.kind]}/${encodeURIComponent(record.id)}`
           : "/api/memory",
-      ),
+      );
+    },
     refetchInterval: (query) => {
       const knowledge = query.state.data;
       const awaited = knowledge?.enabled === true && knowledge.sources.length === 0;

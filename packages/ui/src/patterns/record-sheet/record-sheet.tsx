@@ -20,13 +20,23 @@ import {
 import { CloseGlyph } from "@crm/ui/patterns/close-glyph";
 import { SkeletonLine } from "@crm/ui/patterns/skeleton-lines";
 import { UI_COPY } from "@crm/ui/patterns/ui-copy";
-import { createContext, type ReactNode, type RefObject, useContext, useRef } from "react";
+import {
+  createContext,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useContext,
+  useRef,
+} from "react";
 import { RecordRail } from "./record-rail";
 import { type RecordTabSpec, RecordTabs } from "./record-tabs";
 
 const EllipsisIcon = carbonIcon(overflowMenuHorizontal16);
 
 const RecordTitleContext = createContext<RefObject<HTMLHeadingElement | null> | null>(null);
+
+/** Set inside `RecordSheetHost`: a `RecordSheet` there renders its content into the host's sheet. */
+const RecordSheetHostContext = createContext(false);
 
 type RecordSheetProps<Tab extends string> = {
   open: boolean;
@@ -44,11 +54,21 @@ type RecordSheetProps<Tab extends string> = {
   placeholder?: ReactNode;
 };
 
-export function RecordSheet<Tab extends string>({
+/**
+ * One sheet frame shared by records that open from one another (a company, then one of its
+ * contacts). The frame stays open while the record inside changes, so moving between records
+ * swaps the content in place instead of sliding one sheet out and another in. Each `RecordSheet`
+ * inside renders only its content; render one at a time.
+ */
+export function RecordSheetHost({
   open,
   onClose,
-  ...content
-}: RecordSheetProps<Tab>) {
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
   const title = useRef<HTMLHeadingElement>(null);
 
   return (
@@ -60,13 +80,50 @@ export function RecordSheet<Tab extends string>({
         open={open}
         size="wide"
       >
-        <RecordSheetContent {...content} onClose={onClose} title={title} />
+        <AdaptiveSheetContent
+          className="gap-0 p-0"
+          initialFocus={() => title.current}
+          showCloseButton={false}
+        >
+          <RecordSheetHostContext value={true}>{children}</RecordSheetHostContext>
+        </AdaptiveSheetContent>
       </AdaptiveSheet>
     </RecordTitleContext>
   );
 }
 
-function RecordSheetContent<Tab extends string>({
+export function RecordSheet<Tab extends string>({
+  open,
+  onClose,
+  ...content
+}: RecordSheetProps<Tab>) {
+  const hosted = useContext(RecordSheetHostContext);
+  const title = useRef<HTMLHeadingElement>(null);
+
+  if (hosted) return <RecordSheetBody {...content} onClose={onClose} />;
+
+  return (
+    <RecordTitleContext value={title}>
+      <AdaptiveSheet
+        onOpenChange={(next) => {
+          if (!next) onClose();
+        }}
+        open={open}
+        size="wide"
+      >
+        <AdaptiveSheetContent
+          className="gap-0 p-0"
+          initialFocus={() => title.current}
+          showCloseButton={false}
+        >
+          <RecordSheetBody {...content} onClose={onClose} />
+        </AdaptiveSheetContent>
+      </AdaptiveSheet>
+    </RecordTitleContext>
+  );
+}
+
+function RecordSheetBody<Tab extends string>({
   onClose,
   label,
   header,
@@ -77,20 +134,13 @@ function RecordSheetContent<Tab extends string>({
   rail,
   loading = false,
   placeholder,
-  title,
-}: Omit<RecordSheetProps<Tab>, "open"> & {
-  title: RefObject<HTMLHeadingElement | null>;
-}) {
+}: Omit<RecordSheetProps<Tab>, "open">) {
   const mode = useAdaptiveSheetMode();
   const active = tabs.find((entry) => entry.id === tab) ?? tabs[0];
   const fills = active?.fills === true && !loading && mode === "sheet";
 
   return (
-    <AdaptiveSheetContent
-      className="gap-0 p-0"
-      initialFocus={() => title.current}
-      showCloseButton={false}
-    >
+    <>
       <div className="sr-only">
         <AdaptiveSheetTitle>{label}</AdaptiveSheetTitle>
       </div>
@@ -132,7 +182,29 @@ function RecordSheetContent<Tab extends string>({
           {rail === undefined ? null : <RecordRail>{loading ? <RailSkeleton /> : rail}</RecordRail>}
         </div>
       )}
-    </AdaptiveSheetContent>
+    </>
+  );
+}
+
+/**
+ * The record title's ref. A title that mounts while focus has left the sheet takes it: in a
+ * `RecordSheetHost` the link that opened this record was in the record before it and is gone.
+ */
+function useTitleRef() {
+  const titleRef = useContext(RecordTitleContext);
+
+  return useCallback(
+    (node: HTMLHeadingElement | null) => {
+      if (titleRef) titleRef.current = node;
+
+      const popup = node?.closest("[data-slot='sheet-content'], [data-slot='drawer-content']");
+      const focused = node?.ownerDocument.activeElement;
+
+      if (node && popup && (focused === popup || !popup.contains(focused ?? null))) {
+        node.focus({ preventScroll: true });
+      }
+    },
+    [titleRef],
   );
 }
 
@@ -258,7 +330,7 @@ export function RecordHeader({
   actions?: readonly RecordMenuItem[];
   menu?: readonly RecordMenuItem[];
 }) {
-  const titleRef = useContext(RecordTitleContext);
+  const titleRef = useTitleRef();
   const mode = useAdaptiveSheetMode();
   const showCode = code !== undefined && code !== title;
 
@@ -334,7 +406,7 @@ export function RecordStats({ stats }: { stats: readonly RecordStat[] }) {
 }
 
 function RecordHeaderSkeleton({ label }: { label: string }) {
-  const titleRef = useContext(RecordTitleContext);
+  const titleRef = useTitleRef();
 
   return (
     <header className="shrink-0 border-b px-4 py-3 group-data-[mode=sheet]/adaptive-sheet:px-8">

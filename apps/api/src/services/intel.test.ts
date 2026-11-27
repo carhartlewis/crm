@@ -11,6 +11,20 @@ const now = new Date("2026-11-26T12:00:00Z");
 
 const PHOTO = "https://media.brand.dev/pfp/0f8fad5b-d9cb-469f-a165-70867728950e.png";
 
+/** Mailbox and line checks as the Enrichment service would answer them. */
+const checks = {
+  email: async (_actor: IntelActor, email: string) =>
+    email.startsWith("valid")
+      ? ("valid" as const)
+      : email.startsWith("catchall")
+        ? ("catch_all" as const)
+        : email.startsWith("bounce")
+          ? ("invalid" as const)
+          : ("unknown" as const),
+  phone: async (phone: string) =>
+    phone.endsWith("0000") ? ("dead" as const) : phone.startsWith("+1") ? ("live" as const) : null,
+};
+
 function setup(judge: FactJudge | null = null) {
   const memory = createMemoryIntelStore(["ws_a:user_alice", "ws_b:user_bob"]);
   const companyId = createId("com");
@@ -26,6 +40,7 @@ function setup(judge: FactJudge | null = null) {
     judge,
     photos: async (id, source) =>
       source === PHOTO ? `https://store.test/contacts/${id}/photo` : null,
+    checks,
   });
 
   return { ...memory, intel, companyId, contactId, dealId };
@@ -334,5 +349,117 @@ describe("agent tools", () => {
     const refused = await logEmail?.call({ thread_id: "t-10", subject: "x", occurred_at: "soon" });
 
     expect(refused?.isError).toBe(true);
+  });
+});
+
+describe("email and phone facts", () => {
+  const fact = { field: "email", sourceUrl: "https://example.com", score: 0.3 };
+
+  test("a verified email fills the contact whatever score the agent gave", async () => {
+    const env = setup();
+
+    const saved = await run(
+      env.intel.recordFact(alice, { contactId: env.contactId, ...fact, value: "Valid@Acme.com" }),
+    );
+
+    expect(saved.outcome).toBe("applied");
+    expect(env.record("contact", env.contactId)?.values?.["email"]).toBe("valid@acme.com");
+    expect(env.record("contact", env.contactId)).toMatchObject({ emailStatus: "valid" });
+  });
+
+  test("a catch-all address fills an empty field; an unconfirmed one is not saved", async () => {
+    const env = setup();
+
+    expect(
+      (
+        await run(
+          env.intel.recordFact(alice, {
+            contactId: env.contactId,
+            ...fact,
+            value: "unsure@acme.com",
+          }),
+        )
+      ).outcome,
+    ).toBe("too_unsure");
+
+    expect(
+      (
+        await run(
+          env.intel.recordFact(alice, {
+            contactId: env.contactId,
+            ...fact,
+            value: "catchall@acme.com",
+          }),
+        )
+      ).outcome,
+    ).toBe("applied");
+    expect(env.record("contact", env.contactId)).toMatchObject({ emailStatus: "catch_all" });
+  });
+
+  test("an address that bounces is refused", async () => {
+    const env = setup();
+
+    expect(
+      await outcome(
+        env.intel.recordFact(alice, {
+          contactId: env.contactId,
+          ...fact,
+          value: "bounce@acme.com",
+        }),
+      ),
+    ).toBe("Invalid");
+  });
+
+  test("a live phone line fills the contact with its type; a dead one is refused", async () => {
+    const env = setup();
+    const phone = { field: "phone", sourceUrl: null, score: 0.2, phoneType: "mobile" };
+
+    const saved = await run(
+      env.intel.recordFact(alice, { contactId: env.contactId, ...phone, value: "+1 843 607 8601" }),
+    );
+
+    expect(saved.outcome).toBe("applied");
+    expect(env.record("contact", env.contactId)).toMatchObject({
+      phoneStatus: "live",
+      phoneType: "mobile",
+    });
+    expect(
+      await outcome(
+        env.intel.recordFact(alice, {
+          contactId: env.contactId,
+          ...phone,
+          value: "+1 843 607 0000",
+        }),
+      ),
+    ).toBe("Invalid");
+  });
+});
+
+describe("people added from a search", () => {
+  test("research replaces a directory row's values without asking", async () => {
+    const env = setup();
+    const contactId = createId("ctc");
+
+    env.seed("contact", {
+      id: contactId,
+      workspaceId: "ws_a",
+      source: "search",
+      values: { title: "Co-founder" },
+    });
+
+    const saved = await run(
+      env.intel.recordFact(alice, {
+        contactId,
+        field: "title",
+        value: "Co-Founder & AI Technical Adviser",
+        score: 0.9,
+        sourceUrl: "https://example.com",
+      }),
+    );
+
+    expect(saved.outcome).toBe("applied");
+    expect(env.record("contact", contactId)?.values?.["title"]).toBe(
+      "Co-Founder & AI Technical Adviser",
+    );
   });
 });

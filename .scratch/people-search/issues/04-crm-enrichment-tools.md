@@ -1,6 +1,6 @@
 # Crm enrichment tools
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 03
 Spec: ../spec.md
@@ -24,3 +24,7 @@ Bright Data response from the smoke test.
 `find_people` caps `limit` at 50. It returns compact rows (drop raw), a `resultId`, and marks
 rows already in the CRM (email or LinkedIn match in the workspace). Results never include
 vendor names.
+
+## Answer
+
+`enrichment-tools.ts`: find_people, find_email, verify_email, find_phone, enrich_person, linkedin_profile, find_photo, enrich_company, find_companies, similar_companies. `crm__lookup_person` removed; context.dev stays as the photo fallback.

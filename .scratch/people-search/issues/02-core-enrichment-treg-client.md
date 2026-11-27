@@ -1,6 +1,6 @@
 # Core enrichment treg client
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 01
 Spec: ../spec.md
@@ -16,3 +16,7 @@ New server-only subpath `@crm/core/enrichment`, with `createTreg({url, token, fe
   InsufficientBalance (402), RateLimited (429), InvalidIdentity (422), Upstream.
 - bun:test with injected fetch and recorded fixtures (including the 2026-11-27 smoke-test
   response). Add a `check-types` script and register the export.
+
+## Answer
+
+`@crm/core/enrichment`: `createTreg`, per-contract `Schema` outputs (`CONTRACT_OUTPUTS`), `readTregAnswer` (also reads cached bodies), photo from the body, normalisers. Tests in `enrichment.test.ts`.

@@ -1,6 +1,8 @@
 import type { ToolStepState } from "@crm/ui/patterns/tool-step";
 import { Option, Schema } from "effect";
+import { formatUsage, totalUsage } from "@crm/core/usage";
 import type { EveMessage, EveMessagePart } from "eve/client";
+import { callUsage } from "../../lib/tool-results.ts";
 
 export type ToolPart = Extract<EveMessagePart, { type: "tool" }>;
 
@@ -172,6 +174,7 @@ export function turnSummaries(events: readonly unknown[], messages: readonly Eve
 
   const lastMessage = new Map<string, string>();
   const steps = new Map<string, number>();
+  const spent = new Map<string, number>();
 
   for (const message of messages) {
     const turnId = message.metadata?.turnId;
@@ -184,6 +187,15 @@ export function turnSummaries(events: readonly unknown[], messages: readonly Eve
       (steps.get(turnId) ?? 0) +
         message.parts.filter((part) => part.type === "tool" && shownCall(part)).length,
     );
+
+    // What the turn's paid calls cost (ADR 0027).
+    const usages = message.parts.flatMap((part) => {
+      const usage = part.type === "tool" ? callUsage(part) : null;
+
+      return usage ? [usage] : [];
+    });
+
+    spent.set(turnId, (spent.get(turnId) ?? 0) + totalUsage(usages));
   }
 
   const summaries = new Map<string, string>();
@@ -195,9 +207,13 @@ export function turnSummaries(events: readonly unknown[], messages: readonly Eve
 
     if (start === undefined || end === undefined || count === 0) continue;
 
+    const cost = spent.get(turnId) ?? 0;
+
     summaries.set(
       messageId,
-      `Worked for ${formatWorked(end - start)} · ${count} ${count === 1 ? "step" : "steps"}`,
+      `Worked for ${formatWorked(end - start)} · ${count} ${count === 1 ? "step" : "steps"}${
+        cost > 0 ? ` · ${formatUsage(cost)}` : ""
+      }`,
     );
   }
 

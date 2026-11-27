@@ -16,7 +16,12 @@ export async function crmToken(
   secret: string | undefined = process.env["AGENT_PROXY_SECRET"],
 ): Promise<string | null> {
   if (caller.workspaceId && secret) {
-    return mintAgentToken(secret, { userId: caller.userId, workspaceId: caller.workspaceId });
+    return mintAgentToken(secret, {
+      userId: caller.userId,
+      workspaceId: caller.workspaceId,
+      origin: caller.origin,
+      record: caller.record,
+    });
   }
 
   try {

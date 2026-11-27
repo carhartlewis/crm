@@ -1,16 +1,18 @@
 /**
- * What a memory is about. A workspace remembers its own company; each CRM company has its own
- * memory. People join when contacts are stored records.
+ * What a memory is about. A workspace remembers its own company; each CRM company, contact and
+ * deal has its own memory.
  */
 export type MemorySubject =
   | { readonly type: "workspace" }
-  | { readonly type: "company"; readonly companyId: string };
+  | { readonly type: "company"; readonly companyId: string }
+  | { readonly type: "contact"; readonly contactId: string }
+  | { readonly type: "deal"; readonly dealId: string };
 
 /** Where a source's text came from. */
 export const MEMORY_SOURCE_KINDS = [
   /** context.dev brand data and the website's home page. */
   "website_research",
-  /** A note a member wrote on the Workspace knowledge page or a company. */
+  /** A note a member wrote on the Workspace knowledge page or a record. */
   "member_note",
   /** A fact the agent saved with its `remember` tool, or that Jev kept from a chat. */
   "agent_fact",

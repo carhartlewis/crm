@@ -31,7 +31,8 @@ const OUTCOME_NOTES: Record<FactOutcome, string> = {
   applied: "Saved on the contact.",
   proposed: "A member typed a different value; it waits on the contact's sheet for them.",
   kept: "A member's own value stays; nothing was changed.",
-  too_unsure: "Not saved: below 0.6 is too unsure.",
+  too_unsure:
+    "Not saved: too unsure (below 0.6, or an email or phone number that could not be checked).",
 };
 
 const FIELD_HELP = CONTACT_FACT_FIELDS.map((field) => field.column).join(", ");
@@ -65,7 +66,7 @@ export function intelTools(intel: IntelService, caller: AgentCaller): readonly L
     tool(
       {
         name: "record_contact_fact",
-        description: `Record a value you found for one of a contact's fields (${FIELD_HELP}), with how sure you are. It fills the contact at once when you are sure (score 0.6 or more), the field is empty, or it replaces a value you wrote before. A value a member typed stays unless the evidence shows a real change; only then may a member be asked. Only record what a source says: give the page as \`source_url\` and quote it in \`evidence\`. For \`image_url\`, pass the \`avatar_url\` that crm__lookup_person returned; it is copied into the CRM.`,
+        description: `Record a value you found for one of a contact's fields (${FIELD_HELP}), with how sure you are. It fills the contact at once when you are sure (score 0.6 or more), the field is empty, or it replaces a value you wrote before. A value a member typed stays unless the evidence shows a real change; only then may a member be asked. Only record what a source says: give the page as \`source_url\` and quote it in \`evidence\`. For \`email\` and \`phone\`, pass what crm__find_email or crm__find_phone returned: the CRM checks the mailbox or line and that check, not your score, decides (a verified address or live line fills the contact; a bouncing address or dead line is refused). For \`image_url\`, pass the \`photoUrl\` crm__find_photo or crm__linkedin_profile returned; it is copied into the CRM.`,
         readOnly: false,
         input: Schema.Struct({
           contact_id: Schema.String.annotate({ description: "A contact id (ctc_…)." }),
@@ -85,6 +86,9 @@ export function intelTools(intel: IntelService, caller: AgentCaller): readonly L
             description: "Short quotes from the sources that support it.",
           }),
           source_url: Text("The page it came from."),
+          phone_type: Schema.optional(Schema.Literals(["mobile", "work", "other"])).annotate({
+            description: "For a phone: the line type crm__find_phone gave.",
+          }),
         }),
       },
       (input) =>
@@ -98,6 +102,7 @@ export function intelTools(intel: IntelService, caller: AgentCaller): readonly L
               band: input.band,
               evidence: input.evidence,
               sourceUrl: input.source_url,
+              phoneType: input.phone_type,
             })
             .pipe(Effect.map(({ id, outcome }) => ({ id, outcome, note: OUTCOME_NOTES[outcome] }))),
         ),

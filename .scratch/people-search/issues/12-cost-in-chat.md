@@ -1,6 +1,6 @@
 # Cost in the chat
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 03, 11
 Spec: ../spec.md
@@ -15,3 +15,7 @@ Show what each call cost, as the chat shows turn time and steps now.
 - The chat menu shows "Usage in this chat" from synced `usage_event` rows by `chatId`.
 - The record Agent tab shows the cost per research run.
 - Tabular numbers. No animation on cost labels.
+
+## Answer
+
+Price per step (`ToolStep` cost), turn summary sum, chat total line, record spend in the Agent tab.

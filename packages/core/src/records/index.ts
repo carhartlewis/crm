@@ -90,7 +90,21 @@ export function enrichmentLabel(id: string) {
   return ENRICHMENT_STATUSES.find((status) => status.id === id)?.label ?? id;
 }
 
-export const RECORD_SOURCES = ["manual", "import", "email", "calendar", "tracking"] as const;
+/** How a row arrived; `search` is a person a member added from a people search. */
+export const RECORD_SOURCES = [
+  "manual",
+  "import",
+  "email",
+  "calendar",
+  "tracking",
+  "search",
+] as const;
+
+const RECORD_SOURCE_SET = new Set<string>(RECORD_SOURCES);
+
+export function isRecordSource(value: string): value is (typeof RECORD_SOURCES)[number] {
+  return RECORD_SOURCE_SET.has(value);
+}
 
 export const ACTIVITY_TYPES = [
   "note",
@@ -279,6 +293,8 @@ export const COMPANY_FIELDS = [
   { column: "industry", label: "Industry", kind: "text" },
   { column: "city", label: "City", kind: "text" },
   { column: "country", label: "Country", kind: "text" },
+  { column: "employee_count", label: "Employees", kind: "text", placeholder: "51-200", max: 40 },
+  { column: "founded_year", label: "Founded", kind: "text", placeholder: "2019", max: 12 },
   { column: "owner_id", label: "Owner", kind: "user" },
   { column: "description", label: "About", kind: "prose" },
   { column: "linkedin_url", label: "LinkedIn", kind: "url" },

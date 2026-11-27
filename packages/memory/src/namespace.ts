@@ -7,10 +7,22 @@ const PREFIX = /^[a-z0-9]{1,16}$/;
 /** A workspace or record id: letters, digits, `-` (UUIDs) and `_` (prefixed ids, `com_…`). */
 const ID = /^[a-zA-Z0-9_-]{1,40}$/;
 
+/** A record's namespace tag and id. Company namespaces predate the others. */
+function recordPart(subject: Exclude<MemorySubject, { type: "workspace" }>): [string, string] {
+  switch (subject.type) {
+    case "company":
+      return ["co", subject.companyId];
+    case "contact":
+      return ["ct", subject.contactId];
+    case "deal":
+      return ["dl", subject.dealId];
+  }
+}
+
 /**
  * The store namespace for a subject. The prefix keeps environments that share one Supermemory
- * account apart (see `memoryPrefix`); the workspace id keeps tenants apart, and every company
- * namespace sits under its workspace's.
+ * account apart (see `memoryPrefix`); the workspace id keeps tenants apart, and every company,
+ * contact and deal namespace sits under its workspace's.
  */
 export function memoryNamespace(prefix: string, workspaceId: string, subject: MemorySubject) {
   if (!PREFIX.test(prefix)) {
@@ -23,9 +35,11 @@ export function memoryNamespace(prefix: string, workspaceId: string, subject: Me
 
   if (subject.type === "workspace") return base;
 
-  if (!ID.test(subject.companyId)) throw new Error("The company id can't name a memory.");
+  const [tag, id] = recordPart(subject);
 
-  const namespace = `${base}_co_${subject.companyId}`;
+  if (!ID.test(id)) throw new Error(`The ${subject.type} id can't name a memory.`);
+
+  const namespace = `${base}_${tag}_${id}`;
 
   if (!NAMESPACE.test(namespace)) throw new Error("The memory namespace is too long.");
 

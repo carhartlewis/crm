@@ -50,7 +50,14 @@ import { useNavigate } from "@tanstack/react-router";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { MentionChip, ReplyResponse } from "./reply-islands.tsx";
 import { ToolResultTable } from "./tool-results.tsx";
-import { listResult, withoutRepeatedTable } from "../../lib/tool-results.ts";
+import {
+  callUsage,
+  listResult,
+  peopleResult,
+  withoutRepeatedTable,
+} from "../../lib/tool-results.ts";
+import { callUsageLabel, formatUsage, totalUsage } from "@crm/core/usage";
+import { PeopleResults } from "./people-results.tsx";
 import { callRecord, type TurnRecord, turnRecords } from "../../lib/turn-records.ts";
 import { Composer } from "./composer.tsx";
 
@@ -295,8 +302,19 @@ export function ChatView({
     };
   };
 
-  // "Worked for 14s · 5 steps" under each finished turn.
+  // "Worked for 14s · 5 steps · $0.31" under each finished turn.
   const summaries = turnSummaries(agent.events, agent.messages);
+
+  // What the chat's paid lookups cost so far (ADR 0027).
+  const chatCost = totalUsage(
+    agent.messages.flatMap((message) =>
+      message.parts.flatMap((part) => {
+        const usage = part.type === "tool" ? callUsage(part) : null;
+
+        return usage ? [usage] : [];
+      }),
+    ),
+  );
 
   const answer = (interactionId: string, optionId: string) =>
     respond.mutate([{ interactionId, optionId }]);
@@ -412,11 +430,17 @@ export function ChatView({
                 message={message}
                 summary={summaries.get(message.id)}
                 onAnswer={answer}
+                onAsk={(text) => send.mutate({ text })}
                 actions={messageActions(message)}
               />
             ))
           )}
           {working && !visiblyWorking && waiting.length === 0 && !question && <ThinkingIndicator />}
+          {chatCost > 0 && !working ? (
+            <p className="text-xs text-muted-foreground tabular-nums select-none">
+              Lookups in this chat · {formatUsage(chatCost)}
+            </p>
+          ) : null}
           {agent.error && (
             <p role="alert" className="text-sm text-pretty text-destructive">
               {agent.error.message}
@@ -506,12 +530,15 @@ function ChatMessage({
   message,
   summary,
   onAnswer,
+  onAsk,
   actions,
 }: {
   message: EveMessage;
-  /** How long the finished turn took and how many steps it ran. */
+  /** How long the finished turn took, how many steps it ran and what they cost. */
   summary: string | undefined;
   onAnswer: (interactionId: string, optionId: string) => void;
+  /** Sends a follow-up message, as a result table's actions do. */
+  onAsk: (text: string) => void;
   actions: MessageActionsSpec;
 }) {
   const branchedFrom = message.role === "user" ? branchOf(messageText(message)) : null;
@@ -532,7 +559,11 @@ function ChatMessage({
   const tableAt = blocks.findIndex(
     (block) =>
       block.kind === "calls" &&
-      block.calls.some((call) => call.callId === latestCallId && listResult(call) !== null),
+      block.calls.some(
+        (call) =>
+          call.callId === latestCallId &&
+          (listResult(call) !== null || peopleResult(call) !== null),
+      ),
   );
 
   // A branch's first message holds the earlier conversation: it shows as one line.
@@ -557,6 +588,7 @@ function ChatMessage({
                 calls={block.calls}
                 latestCallId={latestCallId}
                 onAnswer={onAnswer}
+                onAsk={onAsk}
               />
             );
           }
@@ -566,7 +598,15 @@ function ChatMessage({
               ? { ...block.part, text: withoutRepeatedTable(block.part.text) }
               : block.part;
 
-          return <ChatPart key={block.key} part={part} touched={touched} onAnswer={onAnswer} />;
+          return (
+            <ChatPart
+              key={block.key}
+              part={part}
+              touched={touched}
+              onAnswer={onAnswer}
+              onAsk={onAsk}
+            />
+          );
         })}
       </MessageContent>
       {summary && <p className="text-xs text-muted-foreground select-none">{summary}</p>}
@@ -602,10 +642,12 @@ function ChatPart({
   part,
   touched,
   onAnswer,
+  onAsk,
 }: {
   part: EveMessagePart;
   touched: readonly TurnRecord[];
   onAnswer: (interactionId: string, optionId: string) => void;
+  onAsk: (text: string) => void;
 }) {
   switch (part.type) {
     case "text":
@@ -622,7 +664,7 @@ function ChatPart({
         </Reasoning>
       );
     case "tool":
-      return shownCall(part) ? <ToolCall part={part} onAnswer={onAnswer} /> : null;
+      return shownCall(part) ? <ToolCall part={part} onAnswer={onAnswer} onAsk={onAsk} /> : null;
     case "interaction":
       return <InteractionPrompt interaction={part} onAnswer={onAnswer} />;
     case "file":
@@ -684,19 +726,35 @@ function ToolCalls({
   calls,
   latestCallId,
   onAnswer,
+  onAsk,
 }: {
   calls: readonly ToolPart[];
   /** The message's last call: only its result shows open. */
   latestCallId: string | undefined;
   onAnswer: (interactionId: string, optionId: string) => void;
+  onAsk: (text: string) => void;
 }) {
   const [first] = calls;
 
   if (!first) return null;
 
   if (calls.length === 1) {
-    return <ToolCall part={first} latest={first.callId === latestCallId} onAnswer={onAnswer} />;
+    return (
+      <ToolCall
+        part={first}
+        latest={first.callId === latestCallId}
+        onAnswer={onAnswer}
+        onAsk={onAsk}
+      />
+    );
   }
+
+  // What the run cost together, when any call in it was paid (ADR 0027).
+  const usages = calls.flatMap((call) => {
+    const usage = callUsage(call);
+
+    return usage ? [usage] : [];
+  });
 
   // A sign-in or open question asked inside a call must be seen, so its group opens.
   const asking = calls.some(
@@ -710,6 +768,7 @@ function ToolCalls({
     <ToolStepGroup
       label={stepLabel(first)}
       detail={runDetail(calls.map(stepDetail))}
+      cost={usages.length > 0 ? formatUsage(totalUsage(usages)) : undefined}
       state={runState(calls.map(stepState))}
       defaultOpen={asking}
     >
@@ -719,6 +778,7 @@ function ToolCalls({
           part={call}
           latest={call.callId === latestCallId}
           onAnswer={onAnswer}
+          onAsk={onAsk}
         />
       ))}
     </ToolStepGroup>
@@ -729,14 +789,20 @@ function ToolCall({
   part,
   latest = true,
   onAnswer,
+  onAsk,
 }: {
   part: ToolPart;
   /** The turn's latest call: its result starts open. */
   latest?: boolean;
   onAnswer: (interactionId: string, optionId: string) => void;
+  onAsk: (text: string) => void;
 }) {
-  // CRM list calls show their rows as a table (ADR 0024).
+  // CRM list calls show their rows as a table (ADR 0024); a people search shows its people.
   const result = listResult(part);
+  const people = peopleResult(part);
+  // A paid call's price at the end of its line (ADR 0027).
+  const usage = callUsage(part);
+  const cost = usage ? callUsageLabel(usage) : undefined;
   // A record the call wrote or read shows as its name, from the call's answer, not the reply.
   // The name opens the record, but its logo shows only in the reply, the turn's latest view, so
   // one record doesn't show the same chip on every step and again in the answer.
@@ -756,19 +822,24 @@ function ToolCall({
 
   return (
     <div className="flex flex-col gap-2">
-      {result ? (
+      {result || people ? (
         // Keyed on `latest`, so the table folds away when a later call runs.
         <ToolStepResult
           key={String(latest)}
           label={stepLabel(part)}
           detail={detail}
+          cost={cost}
           state={stepState(part)}
           defaultOpen={latest}
         >
-          <ToolResultTable result={result} />
+          {people ? (
+            <PeopleResults rows={people} onAsk={onAsk} />
+          ) : result ? (
+            <ToolResultTable result={result} />
+          ) : null}
         </ToolStepResult>
       ) : (
-        <ToolStep label={stepLabel(part)} detail={detail} state={stepState(part)} />
+        <ToolStep label={stepLabel(part)} detail={detail} cost={cost} state={stepState(part)} />
       )}
       {/* Approvals and questions with choices wait above the composer; sign-ins and open
           questions stay with their call. */}

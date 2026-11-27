@@ -1,6 +1,6 @@
 # People search and enrichment through treg
 
-Status: open (plan agreed 2026-11-27, not started)
+Status: built 2026-11-27 (ADR 0027); ticket 09 (PostHog, reconciliation) skipped
 Source: https://treg.to/people-search, https://treg.to/llms.txt, https://github.com/superdesigndev/treg
 
 ## Goal

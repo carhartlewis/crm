@@ -208,3 +208,52 @@ export function withoutRepeatedTable(markdown: string) {
 
   return markdown;
 }
+
+/** One person from `crm__find_people` (ADR 0027), as the API answers it. */
+const PersonRow = Schema.Struct({
+  name: Schema.String,
+  title: Schema.NullOr(Schema.String),
+  company: Schema.NullOr(Schema.String),
+  companyDomain: Schema.NullOr(Schema.String),
+  location: Schema.NullOr(Schema.String),
+  linkedinUrl: Schema.NullOr(Schema.String),
+  email: Schema.NullOr(Schema.String),
+  emailStatus: Schema.NullOr(Schema.String),
+  titleMatch: Schema.optional(Schema.NullOr(Schema.String)),
+  summary: Schema.optional(Schema.NullOr(Schema.String)),
+  /** Set when the person is already in the CRM. */
+  contactId: Schema.NullOr(Schema.String),
+});
+
+export type PersonResultRow = typeof PersonRow.Type;
+
+const readPeople = outputReader(Schema.Struct({ people: Schema.Array(PersonRow) }));
+
+/** The people a finished `crm__find_people` call found, or null for any other call. */
+export function peopleResult(call: ToolCallResult): readonly PersonResultRow[] | null {
+  if (call.state !== "completed" || !/(?:^|__)crm__find_people$/.test(call.name)) return null;
+
+  const rows = readPeople(call.output)?.people;
+
+  return rows?.length ? rows : null;
+}
+
+const CallUsageSchema = Schema.Struct({
+  usage: Schema.Struct({
+    usageId: Schema.NullOr(Schema.String),
+    priceMicro: Schema.Number,
+    outcome: Schema.Literals(["hit", "miss", "error", "cached"]),
+  }),
+});
+
+const decodeCallUsage = Schema.decodeUnknownOption(CallUsageSchema);
+
+/** What a paid call cost (ADR 0027), from the `usage` its answer carries; null for free calls. */
+export function callUsage(call: ToolCallResult) {
+  if (call.state !== "completed") return null;
+
+  return Option.match(decodeCallUsage(toolPayload(call.output)), {
+    onNone: () => null,
+    onSome: (value) => value.usage,
+  });
+}

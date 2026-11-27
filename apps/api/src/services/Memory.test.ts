@@ -17,6 +17,10 @@ import { createMemoryFactMirror } from "./memory-mirror-memory.ts";
 
 const now = () => new Date("2026-11-26T12:00:00Z");
 
+const CONTACT = "ctc_wile00000000000000000000";
+
+const DEAL = "del_rockets00000000000000000";
+
 const acme: BrandResearch = {
   domain: "acme.test",
   name: "Acme",
@@ -78,6 +82,16 @@ function setup(options: { store?: boolean } = {}) {
           domain: "acme.test",
         },
       ],
+      contacts: [
+        {
+          id: CONTACT,
+          workspaceId: "ws1",
+          name: "Wile Coyote",
+          title: "Head of Procurement",
+          companyName: "Acme",
+        },
+      ],
+      deals: [{ id: DEAL, workspaceId: "ws1", name: "Acme rockets", companyName: "Acme" }],
       users: { alice: "Alice" },
     }),
     prefix: "test",
@@ -149,7 +163,7 @@ describe("members", () => {
     await memory.researchWorkspace("ws1");
     await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
 
-    const knowledge = await Effect.runPromise(memory.workspace(alice));
+    const knowledge = await Effect.runPromise(memory.knowledge(alice, {}));
 
     expect(knowledge.enabled).toBe(true);
     expect(knowledge.facts.map((fact) => fact.text)).toContain("We close deals in Q4.");
@@ -162,7 +176,7 @@ describe("members", () => {
 
     await Effect.runPromise(memory.forget(alice, { factId: fact?.id ?? "" }));
 
-    const after = await Effect.runPromise(memory.workspace(alice));
+    const after = await Effect.runPromise(memory.knowledge(alice, {}));
 
     expect(after.facts.map((entry) => entry.text)).not.toContain("We close deals in Q4.");
   });
@@ -171,13 +185,13 @@ describe("members", () => {
     const { memory } = setup();
 
     const outsider = await Effect.runPromise(
-      Effect.flip(memory.workspace({ userId: "mallory", activeWorkspaceId: "ws1" })),
+      Effect.flip(memory.knowledge({ userId: "mallory", activeWorkspaceId: "ws1" }, {})),
     );
 
     expect(outsider).toBeInstanceOf(NoActiveWorkspace);
 
     const foreign = await Effect.runPromise(
-      Effect.flip(memory.company(alice, "com_other0000000000000000000")),
+      Effect.flip(memory.knowledge(alice, { companyId: "com_other0000000000000000000" })),
     );
 
     expect(foreign).toBeInstanceOf(NotFound);
@@ -202,7 +216,7 @@ describe("members", () => {
   test("with memory off, reads are empty and writes say why", async () => {
     const { memory } = setup({ store: false });
 
-    expect(await Effect.runPromise(memory.workspace(alice))).toEqual({
+    expect(await Effect.runPromise(memory.knowledge(alice, {}))).toEqual({
       enabled: false,
       profile: [],
       facts: [],
@@ -273,7 +287,7 @@ describe("the agent", () => {
     });
 
     const knowledge = await Effect.runPromise(
-      memory.company(alice, "com_acme00000000000000000000"),
+      memory.knowledge(alice, { companyId: "com_acme00000000000000000000" }),
     );
 
     expect(knowledge.facts.map((fact) => fact.text)).toEqual(["Acme's champion is now Road."]);
@@ -457,6 +471,99 @@ describe("a source", () => {
   });
 });
 
+describe("contact and deal memory", () => {
+  test("a note on a contact or a deal stays in that record's own memory", async () => {
+    const { memory, store } = setup();
+
+    await Effect.runPromise(
+      memory.addNote(alice, { contactId: CONTACT, text: "Wile prefers email." }),
+    );
+    await Effect.runPromise(memory.addNote(alice, { dealId: DEAL, text: "Budget is 40k." }));
+
+    const contact = await Effect.runPromise(memory.knowledge(alice, { contactId: CONTACT }));
+    const deal = await Effect.runPromise(memory.knowledge(alice, { dealId: DEAL }));
+    const workspace = await Effect.runPromise(memory.knowledge(alice, {}));
+
+    expect(contact.facts.map((fact) => fact.text)).toEqual(["Wile prefers email."]);
+    expect(deal.facts.map((fact) => fact.text)).toEqual(["Budget is 40k."]);
+    expect(workspace.facts).toEqual([]);
+    expect(store.namespaces()).toContain(
+      memoryNamespace("test", "ws1", { type: "contact", contactId: CONTACT }),
+    );
+  });
+
+  test("the graph's core is the record", async () => {
+    const { memory } = setup();
+
+    await Effect.runPromise(memory.addNote(alice, { dealId: DEAL, text: "Budget is 40k." }));
+
+    const graph = await Effect.runPromise(memory.graph(alice, { dealId: DEAL }));
+
+    expect(graph.documents[0]).toMatchObject({
+      id: MEMORY_CORE_ID,
+      title: "Acme rockets",
+      documentType: "deal",
+    });
+  });
+
+  test("an unknown record, or more than one record, is refused", async () => {
+    const { memory } = setup();
+
+    const missing = await Effect.runPromise(
+      Effect.flip(memory.knowledge(alice, { contactId: "ctc_none00000000000000000000" })),
+    );
+
+    expect(missing).toBeInstanceOf(NotFound);
+
+    const both = await Effect.runPromise(
+      Effect.flip(memory.knowledge(alice, { contactId: CONTACT, dealId: DEAL })),
+    );
+
+    expect(both).toBeInstanceOf(Invalid);
+
+    const research = await Effect.runPromise(
+      Effect.flip(memory.research(alice, { contactId: CONTACT })),
+    );
+
+    expect(research).toBeInstanceOf(Invalid);
+  });
+
+  test("the agent remembers about a contact; another workspace can't reach it", async () => {
+    const { memory } = setup();
+
+    await memory.agent.remember(
+      { userId: "alice", workspaceId: "ws1" },
+      { kind: "agent_fact", contactId: CONTACT, text: "Wile reports to the CFO." },
+    );
+
+    const hits = await memory.agent.search(
+      { userId: "alice", workspaceId: "ws1" },
+      { contactId: CONTACT, query: "Wile reports" },
+    );
+
+    expect(hits.ok && hits.value.map((hit) => hit.text)).toEqual(["Wile reports to the CFO."]);
+
+    expect(
+      await memory.agent.search(
+        { userId: "mallory", workspaceId: "ws2" },
+        { contactId: CONTACT, query: "Wile" },
+      ),
+    ).toMatchObject({ ok: false, status: 404 });
+  });
+
+  test("contact and deal facts are not copied for ⌘K", async () => {
+    const { memory, copy } = setup();
+
+    await Effect.runPromise(
+      memory.addNote(alice, { contactId: CONTACT, text: "Wile prefers email." }),
+    );
+    await Effect.runPromise(memory.knowledge(alice, { contactId: CONTACT }));
+    await Bun.sleep(5);
+
+    expect(copy.rows()).toEqual([]);
+  });
+});
+
 describe("the fact copy ⌘K searches", () => {
   test("reading a company's memory copies its facts, and a forgotten fact leaves at once", async () => {
     const { memory, copy } = setup();
@@ -464,7 +571,7 @@ describe("the fact copy ⌘K searches", () => {
     await Effect.runPromise(
       memory.addNote(alice, { companyId: ACME, text: "Uses Postgres.\nBudget is 10k." }),
     );
-    await Effect.runPromise(memory.company(alice, ACME));
+    await Effect.runPromise(memory.knowledge(alice, { companyId: ACME }));
     await eventually(() => copy.rows().length === 2);
 
     expect(
@@ -488,11 +595,11 @@ describe("the fact copy ⌘K searches", () => {
     const { memory, copy } = setup();
 
     await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
-    await Effect.runPromise(memory.workspace(alice));
+    await Effect.runPromise(memory.knowledge(alice, {}));
     await eventually(() => copy.rows().length === 1);
 
     await Effect.runPromise(memory.addNote(alice, { text: "Our CFO is Dana." }));
-    await Effect.runPromise(memory.workspace(alice));
+    await Effect.runPromise(memory.knowledge(alice, {}));
     await eventually(() => copy.rows().length === 2);
 
     expect(copy.rows().every((row) => row.companyId === null)).toBe(true);
@@ -502,7 +609,7 @@ describe("the fact copy ⌘K searches", () => {
     const { memory, copy, store } = setup();
 
     await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
-    await Effect.runPromise(memory.workspace(alice));
+    await Effect.runPromise(memory.knowledge(alice, {}));
     await eventually(() => copy.rows().length === 1);
 
     // Written behind the service's back: nothing marks the copy stale.
@@ -514,7 +621,7 @@ describe("the fact copy ⌘K searches", () => {
       content: "Not copied yet.",
       supportingContext: "",
     });
-    await Effect.runPromise(memory.workspace(alice));
+    await Effect.runPromise(memory.knowledge(alice, {}));
     await Bun.sleep(5);
 
     expect(copy.rows()).toHaveLength(1);

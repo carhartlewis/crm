@@ -28,6 +28,8 @@ export const isContactFactId = (value: string) => isRecordId(ID_PREFIXES.contact
 
 /** The contact columns the agent may record a value for, and how the sheet labels them. */
 export const CONTACT_FACT_FIELDS = [
+  { column: "email", label: "Email" },
+  { column: "phone", label: "Phone" },
   { column: "title", label: "Title" },
   { column: "image_url", label: "Photo" },
   { column: "seniority", label: "Seniority" },
@@ -77,6 +79,62 @@ export const FACT_BAND_LABELS: Record<FactBand, string> = {
 export const FACT_STATUSES = ["proposed", "applied", "dismissed", "superseded"] as const;
 
 export type FactStatus = (typeof FACT_STATUSES)[number];
+
+/**
+ * A mailbox check's verdict on an email (ADR 0027). Found addresses are guesses until checked:
+ * `valid` accepts mail, `catch_all` is a domain that accepts any address, `risky` and `unknown`
+ * could not be confirmed, `invalid` bounces.
+ */
+export const EMAIL_STATUSES = ["valid", "catch_all", "risky", "invalid", "unknown"] as const;
+
+export type EmailStatus = (typeof EMAIL_STATUSES)[number];
+
+const EMAIL_STATUS_SET = new Set<string>(EMAIL_STATUSES);
+
+export function isEmailStatus(value: string): value is EmailStatus {
+  return EMAIL_STATUS_SET.has(value);
+}
+
+export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
+  valid: "Verified",
+  catch_all: "Catch-all",
+  risky: "Unverified",
+  invalid: "Bounces",
+  unknown: "Unverified",
+};
+
+/**
+ * How sure an email fact is, from its check, whatever score the agent gave: a verified address
+ * fills the contact, a catch-all domain's address fills an empty field (most company domains
+ * accept any address), and an unconfirmed one is not saved. `null`: the address bounces.
+ */
+export function emailFactScore(status: EmailStatus): number | null {
+  if (status === "invalid") return null;
+
+  if (status === "valid") return 0.95;
+
+  return status === "catch_all" ? 0.7 : 0.5;
+}
+
+/** A line check's verdict on a phone number: `live`, `dead`, or `unchecked` (no country code). */
+export const PHONE_STATUSES = ["live", "dead", "unchecked"] as const;
+
+export type PhoneStatus = (typeof PHONE_STATUSES)[number];
+
+/**
+ * How sure a phone fact is, from its line check: a live line fills the contact, an unchecked
+ * number fills only an empty field, and a dead line is not saved (`null`).
+ */
+export function phoneFactScore(status: PhoneStatus): number | null {
+  if (status === "dead") return null;
+
+  return status === "live" ? 0.8 : 0.6;
+}
+
+/** The phone line types research reports. */
+export const PHONE_TYPES = ["mobile", "work", "other"] as const;
+
+export type PhoneType = (typeof PHONE_TYPES)[number];
 
 /** How sure the agent must be before a fact changes a contact without asking. */
 export const AUTO_APPLY_SCORE = 0.6;

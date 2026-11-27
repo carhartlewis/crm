@@ -10,8 +10,9 @@ import {
   UpstreamUnavailable,
 } from "@crm/core/api";
 import { isCompanyId } from "@crm/core/company";
+import { isContactId, isDealId } from "@crm/core/records";
 import { MAX_NOTE_CHARACTERS, memoryNoteError } from "@crm/core/memory";
-import { createContextDev, type CompanyResearcher } from "@crm/core/brand";
+import type { CompanyResearcher } from "@crm/core/brand";
 import type { Db } from "@crm/core/db";
 import type { Kv as KvStore } from "@crm/core/kv";
 import {
@@ -31,14 +32,16 @@ import { createSupermemoryStore } from "@crm/memory/supermemory";
 import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { AppConfig } from "../config.ts";
 import type { Actor } from "./Companies.ts";
+import { Brand } from "./Brand.ts";
 import { Database } from "./Database.ts";
 import { Kv } from "./Kv.ts";
 import { type FactMirror, prismaFactMirror } from "./memory-mirror.ts";
 
 /**
- * Workspace and company memory (ADR 0014). Supermemory stores the sources and extracts the
- * facts; this service checks membership, picks the namespace, and writes the sources: website
- * research when a workspace or company is created, members' notes, and what the agent sends.
+ * Workspace and record memory (ADR 0014): the workspace's own, and each company's, contact's
+ * and deal's. Supermemory stores the sources and extracts the facts; this service checks
+ * membership, picks the namespace, and writes the sources: website research when a workspace or
+ * company is created, members' notes, and what the agent sends.
  * Deciding what a chat adds (Jev) is the agent's job, not the API's.
  */
 
@@ -46,6 +49,19 @@ export interface CompanyRow {
   readonly id: string;
   readonly name: string;
   readonly domain: string | null;
+}
+
+export interface ContactRow {
+  readonly id: string;
+  readonly name: string;
+  readonly title: string | null;
+  readonly companyName: string | null;
+}
+
+export interface DealRow {
+  readonly id: string;
+  readonly name: string;
+  readonly companyName: string | null;
 }
 
 export interface WorkspaceRow {
@@ -60,6 +76,8 @@ export interface MemoryDirectory {
   workspace(id: string): Promise<WorkspaceRow | null>;
   company(workspaceId: string, id: string): Promise<CompanyRow | null>;
   companies(workspaceId: string): Promise<readonly CompanyRow[]>;
+  contact(workspaceId: string, id: string): Promise<ContactRow | null>;
+  deal(workspaceId: string, id: string): Promise<DealRow | null>;
   userName(id: string): Promise<string | null>;
 }
 
@@ -93,13 +111,18 @@ export interface Hit {
   readonly companyId: string | null;
 }
 
-type Target = { readonly companyId?: string | undefined };
+/** The record a memory call is about; with none, the workspace's own memory. At most one. */
+type Target = {
+  readonly companyId?: string | undefined;
+  readonly contactId?: string | undefined;
+  readonly dealId?: string | undefined;
+};
 
 type MemoryError = NoActiveWorkspace | NotFound | Invalid | UpstreamUnavailable;
 
 export interface MemoryService {
-  readonly workspace: (actor: Actor) => Effect.Effect<Knowledge, MemoryError>;
-  readonly company: (actor: Actor, id: string) => Effect.Effect<Knowledge, MemoryError>;
+  /** The workspace's own memory, or the record's the target names. */
+  readonly knowledge: (actor: Actor, input: Target) => Effect.Effect<Knowledge, MemoryError>;
   readonly graph: (actor: Actor, input: Target) => Effect.Effect<MemoryGraph, MemoryError>;
   readonly source: (
     actor: Actor,
@@ -200,7 +223,7 @@ type GraphRelation = NonNullable<GraphMemory["relation"]>;
 
 /** Who a memory is about: the core of its graph. */
 export interface GraphCore {
-  readonly kind: "workspace" | "company";
+  readonly kind: MemorySubject["type"];
   readonly title: string;
 }
 
@@ -338,7 +361,16 @@ export function toMemoryGraph(
 const noWorkspace = () =>
   new NoActiveWorkspace({ message: "Choose a workspace you belong to first" });
 
-const companyNotFound = () => new NotFound({ message: "Company not found" });
+const NOT_FOUND = {
+  company: "Company not found",
+  contact: "Contact not found",
+  deal: "Deal not found",
+} as const;
+
+const recordNotFound = (subject: MemorySubject) =>
+  new NotFound({ message: subject.type === "workspace" ? "Not found" : NOT_FOUND[subject.type] });
+
+const oneRecord = () => new Invalid({ message: "A memory is about one record at a time." });
 
 const unavailable = () =>
   new UpstreamUnavailable({ message: "Memory is unavailable right now. Try again." });
@@ -346,10 +378,43 @@ const unavailable = () =>
 const memoryOff = () =>
   new UpstreamUnavailable({ message: "Memory isn't set up on this server (SUPERMEMORY_API_KEY)." });
 
-function subjectOf(target: Target): MemorySubject {
-  return target.companyId
-    ? { type: "company", companyId: target.companyId }
-    : { type: "workspace" };
+/** The subject a target names, or null when it names more than one record. */
+export function subjectOf(target: Target): MemorySubject | null {
+  const named = [target.companyId, target.contactId, target.dealId].filter(Boolean).length;
+
+  if (named > 1) return null;
+
+  if (target.companyId) return { type: "company", companyId: target.companyId };
+
+  if (target.contactId) return { type: "contact", contactId: target.contactId };
+
+  if (target.dealId) return { type: "deal", dealId: target.dealId };
+
+  return { type: "workspace" };
+}
+
+/** Whether an id has the right shape for its subject, before any database read. */
+function wellFormed(subject: MemorySubject) {
+  switch (subject.type) {
+    case "workspace":
+      return true;
+    case "company":
+      return isCompanyId(subject.companyId);
+    case "contact":
+      return isContactId(subject.contactId);
+    case "deal":
+      return isDealId(subject.dealId);
+  }
+}
+
+/**
+ * The company whose copy (`memory_fact`, ADR 0017) holds a subject's facts: null for the
+ * workspace's own. Contact and deal memories are not copied, so ⌘K doesn't list their facts.
+ */
+function mirrorOf(subject: MemorySubject): { readonly companyId: string | null } | null {
+  if (subject.type === "workspace") return { companyId: null };
+
+  return subject.type === "company" ? { companyId: subject.companyId } : null;
 }
 
 // Supermemory keeps only what the context calls worth remembering. Naming public facts matters:
@@ -363,6 +428,21 @@ function companyContext(workspace: WorkspaceRow | null, company: CompanyRow) {
   const site = company.domain ? ` (${company.domain})` : "";
 
   return `Memory of ${company.name}${site}, a customer, prospect or partner that ${owner} tracks in its CRM. Remember every concrete fact about ${company.name} as its own memory: what it does and sells, its industry, locations and offices, people and their roles, customers, portfolio or partners, products, size and contact details, and its needs, deals, tools, decisions and history with ${owner}. Public facts from its website are worth remembering.`;
+}
+
+function contactContext(workspace: WorkspaceRow | null, contact: ContactRow) {
+  const owner = workspace?.name ?? "the workspace";
+  const role = [contact.title, contact.companyName].filter(Boolean).join(" at ");
+  const about = role ? ` (${role})` : "";
+
+  return `Memory of ${contact.name}${about}, a person that ${owner} tracks in its CRM. Remember every concrete fact about ${contact.name} as its own memory: their role, team and responsibilities, background, location, how they like to be contacted, what they care about, their needs, objections and decisions, and their history with ${owner}.`;
+}
+
+function dealContext(workspace: WorkspaceRow | null, deal: DealRow) {
+  const owner = workspace?.name ?? "the workspace";
+  const company = deal.companyName ? ` with ${deal.companyName}` : "";
+
+  return `Memory of the deal "${deal.name}"${company}, which ${owner} tracks in its CRM. Remember every concrete fact about this deal as its own memory: what is being bought and why, scope, pricing and budget, timeline, decision makers and process, competitors, risks, objections, next steps and agreements.`;
 }
 
 async function put(memory: MemoryStore, ns: string, source: MemorySource) {
@@ -492,33 +572,65 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
         )
       : Effect.fail(memoryOff());
 
-  /** The core of a graph, named after its workspace or company. Runs after `target` checks it. */
-  const graphCore = async (workspaceId: string, input: Target): Promise<GraphCore> => {
-    if (input.companyId) {
-      const company = await directory.company(workspaceId, input.companyId);
-
-      return { kind: "company", title: company?.name ?? "Company" };
-    }
-
+  /**
+   * Who a subject is: its name for the graph's core, and the brief the store reads its sources
+   * with. Null when the record isn't in the workspace.
+   */
+  const describe = async (
+    workspaceId: string,
+    subject: MemorySubject,
+  ): Promise<{ readonly title: string; readonly context: string } | null> => {
     const workspace = await directory.workspace(workspaceId);
 
-    return { kind: "workspace", title: workspace?.name ?? "Workspace" };
+    switch (subject.type) {
+      case "workspace":
+        return workspace
+          ? { title: workspace.name, context: workspaceContext(workspace) }
+          : { title: "Workspace", context: "" };
+      case "company": {
+        const company = await directory.company(workspaceId, subject.companyId);
+
+        return company && { title: company.name, context: companyContext(workspace, company) };
+      }
+
+      case "contact": {
+        const contact = await directory.contact(workspaceId, subject.contactId);
+
+        return contact && { title: contact.name, context: contactContext(workspace, contact) };
+      }
+
+      case "deal": {
+        const deal = await directory.deal(workspaceId, subject.dealId);
+
+        return deal && { title: deal.name, context: dealContext(workspace, deal) };
+      }
+    }
   };
 
+  /** Checks the record a target names is in the workspace; its namespace and subject. */
   const target = (workspaceId: string, input: Target) =>
     Effect.gen(function* () {
-      if (!input.companyId) return namespace(workspaceId, { type: "workspace" });
+      const subject = subjectOf(input);
 
-      const { companyId } = input;
+      if (!subject) return yield* Effect.fail(oneRecord());
 
-      if (!isCompanyId(companyId)) return yield* Effect.fail(companyNotFound());
+      const ns = { ns: namespace(workspaceId, subject), subject };
 
-      const company = yield* Effect.promise(() => directory.company(workspaceId, companyId));
+      if (subject.type === "workspace") return ns;
 
-      return company
-        ? namespace(workspaceId, subjectOf(input))
-        : yield* Effect.fail(companyNotFound());
+      if (!wellFormed(subject)) return yield* Effect.fail(recordNotFound(subject));
+
+      const found = yield* Effect.promise(() => describe(workspaceId, subject));
+
+      return found ? ns : yield* Effect.fail(recordNotFound(subject));
     });
+
+  /** Refreshes a subject's copy when it has one and it is stale. */
+  const followCopy = (workspaceId: string, subject: MemorySubject) => {
+    const mirror = mirrorOf(subject);
+
+    if (mirror) void refreshIfStale(workspaceId, mirror.companyId);
+  };
 
   const knowledge = (ns: string) =>
     store
@@ -636,22 +748,13 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
     }
   };
 
-  const contextFor = async (workspaceId: string, input: Target) => {
-    const workspace = await directory.workspace(workspaceId);
-
-    if (!input.companyId) return workspace ? workspaceContext(workspace) : "";
-
-    const company = await directory.company(workspaceId, input.companyId);
-
-    return company ? companyContext(workspace, company) : "";
-  };
-
   const writeNote = async (
     memory: MemoryStore,
     workspaceId: string,
-    input: Target & { text: string; kind: MemorySource["kind"]; title: string },
+    subject: MemorySubject,
+    input: { text: string; kind: MemorySource["kind"]; title: string },
   ) => {
-    const ns = namespace(workspaceId, subjectOf(input));
+    const ns = namespace(workspaceId, subject);
 
     await write(memory, ns, {
       sourceId: `${input.kind === "member_note" ? "note" : input.kind}-${crypto.randomUUID()}`,
@@ -659,7 +762,7 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
       kind: input.kind,
       title: input.title,
       content: input.text,
-      supportingContext: await contextFor(workspaceId, input),
+      supportingContext: (await describe(workspaceId, subject))?.context ?? "",
     });
   };
 
@@ -683,14 +786,22 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
     }
   };
 
+  /** The subject an agent call names, when it is one record (or none) in the workspace. */
   const agentTarget = async (caller: AgentCaller, input: Target) => {
-    if (!input.companyId) return true;
+    const subject = subjectOf(input);
 
-    return (
-      isCompanyId(input.companyId) &&
-      (await directory.company(caller.workspaceId, input.companyId)) !== null
-    );
+    if (!subject || !wellFormed(subject)) return null;
+
+    if (subject.type === "workspace") return subject;
+
+    return (await describe(caller.workspaceId, subject)) ? subject : null;
   };
+
+  const noRecord = {
+    ok: false,
+    status: 404,
+    message: "No such record in this workspace.",
+  } as const;
 
   /** Recall never fails a turn: a store failure leaves that part empty. */
   const quietly = async <A>(fallback: A, work: () => Promise<A>) => {
@@ -704,38 +815,41 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
   };
 
   return {
-    workspace: (actor) =>
-      Effect.flatMap(member(actor), (workspaceId) => {
-        void refreshIfStale(workspaceId, null);
+    knowledge: (actor, input) =>
+      Effect.gen(function* () {
+        const workspaceId = yield* member(actor);
+        const { ns, subject } = yield* target(workspaceId, input);
 
-        return knowledge(namespace(workspaceId, { type: "workspace" }));
+        followCopy(workspaceId, subject);
+
+        return yield* knowledge(ns);
       }),
 
     graph: (actor, input) =>
       Effect.gen(function* () {
         const workspaceId = yield* member(actor);
-        const ns = yield* target(workspaceId, input);
+        const { ns, subject } = yield* target(workspaceId, input);
 
         if (!store) return { documents: [], totals: { sources: 0, facts: 0 } };
 
         // The page polls this while a source is read, so the copy follows along.
-        void refreshIfStale(workspaceId, input.companyId ?? null);
+        followCopy(workspaceId, subject);
 
-        const [sources, core] = yield* Effect.all(
+        const [sources, about] = yield* Effect.all(
           [
             stored("graph", (memory) => memory.graph(ns, GRAPH_SOURCES)),
-            Effect.promise(() => graphCore(workspaceId, input)),
+            Effect.promise(() => describe(workspaceId, subject)),
           ],
           { concurrency: 2 },
         );
 
-        return toMemoryGraph(ns, sources, core);
+        return toMemoryGraph(ns, sources, { kind: subject.type, title: about?.title ?? "" });
       }),
 
     source: (actor, input) =>
       Effect.gen(function* () {
         const workspaceId = yield* member(actor);
-        const ns = yield* target(workspaceId, input);
+        const { ns } = yield* target(workspaceId, input);
         const found = yield* stored("source", (memory) => memory.getSource(ns, input.id));
 
         if (!found) return yield* Effect.fail(new NotFound({ message: "Source not found" }));
@@ -754,17 +868,20 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
     deleteSource: (actor, input) =>
       Effect.gen(function* () {
         const workspaceId = yield* member(actor);
-        const ns = yield* target(workspaceId, input);
+        const { ns, subject } = yield* target(workspaceId, input);
 
         yield* stored("delete source", (memory) => memory.deleteSource(ns, input.id));
         yield* Effect.promise(() => markStale(ns));
-        void refreshCopy(workspaceId, input.companyId ?? null);
+
+        const mirror = mirrorOf(subject);
+
+        if (mirror) void refreshCopy(workspaceId, mirror.companyId);
       }),
 
     search: (actor, input) =>
       Effect.gen(function* () {
         const workspaceId = yield* member(actor);
-        const ns = yield* target(workspaceId, input);
+        const { ns } = yield* target(workspaceId, input);
         const query = input.q.trim().slice(0, 500);
 
         if (!query || !store) return [];
@@ -776,16 +893,6 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
         return hits.map((hit) => ({ id: hit.factId, text: hit.text, sourceId: hit.sourceId }));
       }),
 
-    company: (actor, id) =>
-      Effect.gen(function* () {
-        const workspaceId = yield* member(actor);
-        const ns = yield* target(workspaceId, { companyId: id });
-
-        void refreshIfStale(workspaceId, id);
-
-        return yield* knowledge(ns);
-      }),
-
     addNote: (actor, input) =>
       Effect.gen(function* () {
         const workspaceId = yield* member(actor);
@@ -795,13 +902,12 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
         if (problem) return yield* Effect.fail(new Invalid({ message: problem }));
 
-        yield* target(workspaceId, input);
+        const { subject } = yield* target(workspaceId, input);
 
         const author = yield* Effect.promise(() => directory.userName(actor.userId));
 
         yield* stored("note", (memory) =>
-          writeNote(memory, workspaceId, {
-            ...input,
+          writeNote(memory, workspaceId, subject, {
             text,
             kind: "member_note",
             title: `Note from ${author ?? "a member"}`,
@@ -813,7 +919,14 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
       Effect.gen(function* () {
         const workspaceId = yield* member(actor);
 
-        yield* target(workspaceId, input);
+        const { subject } = yield* target(workspaceId, input);
+
+        // Only a workspace or a company has a website to read.
+        if (subject.type === "contact" || subject.type === "deal") {
+          return yield* Effect.fail(
+            new Invalid({ message: "Only companies have a website to read." }),
+          );
+        }
 
         if (!store) return yield* Effect.fail(memoryOff());
 
@@ -827,15 +940,15 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
         // context.dev can take half a minute on a cold domain; the page shows the source when
         // it lands.
-        void (input.companyId
-          ? researchCompany(workspaceId, input.companyId)
+        void (subject.type === "company"
+          ? researchCompany(workspaceId, subject.companyId)
           : researchWorkspace(workspaceId));
       }),
 
     forget: (actor, input) =>
       Effect.gen(function* () {
         const workspaceId = yield* member(actor);
-        const ns = yield* target(workspaceId, input);
+        const { ns } = yield* target(workspaceId, input);
 
         yield* stored("forget", (memory) => memory.forgetFacts(ns, [input.factId]));
         yield* Effect.promise(() => deps.mirror.remove(workspaceId, [input.factId]));
@@ -928,11 +1041,11 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
       search: (caller, input) =>
         agentCall(caller, async (memory) => {
-          if (!(await agentTarget(caller, input))) {
-            return { ok: false, status: 404, message: "No such company in this workspace." };
-          }
+          const subject = await agentTarget(caller, input);
 
-          const hits = await memory.search(namespace(caller.workspaceId, subjectOf(input)), {
+          if (!subject) return noRecord;
+
+          const hits = await memory.search(namespace(caller.workspaceId, subject), {
             query: input.query.slice(0, 1_000),
             limit: 10,
           });
@@ -955,19 +1068,19 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
             return { ok: false, status: 400, message: "A fact must be 1 to 4,000 characters." };
           }
 
-          if (!(await agentTarget(caller, input))) {
-            return { ok: false, status: 404, message: "No such company in this workspace." };
-          }
+          const subject = await agentTarget(caller, input);
 
-          const ns = namespace(caller.workspaceId, subjectOf(input));
+          if (!subject) return noRecord;
+
+          const ns = namespace(caller.workspaceId, subject);
 
           if (input.replaces) {
             await memory.forgetFacts(ns, [input.replaces]);
             await deps.mirror.remove(caller.workspaceId, [input.replaces]);
           }
 
-          await writeNote(memory, caller.workspaceId, {
-            ...input,
+          await writeNote(memory, caller.workspaceId, subject, {
+            kind: input.kind,
             text,
             title: input.kind === "email" ? "Sent email" : "Remembered by the agent",
           });
@@ -977,11 +1090,11 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
       forget: (caller, input) =>
         agentCall(caller, async (memory) => {
-          if (!(await agentTarget(caller, input))) {
-            return { ok: false, status: 404, message: "No such company in this workspace." };
-          }
+          const subject = await agentTarget(caller, input);
 
-          await memory.forgetFacts(namespace(caller.workspaceId, subjectOf(input)), [input.factId]);
+          if (!subject) return noRecord;
+
+          await memory.forgetFacts(namespace(caller.workspaceId, subject), [input.factId]);
           await deps.mirror.remove(caller.workspaceId, [input.factId]);
 
           return { ok: true, value: null };
@@ -1009,6 +1122,31 @@ export function prismaMemoryDirectory(db: Db): MemoryDirectory {
     },
     companies: async (workspaceId) =>
       (await orm.Company.where({ workspaceId }).all()).map(toCompany),
+    contact: async (workspaceId, id) => {
+      const row = await orm.Contact.where({ workspaceId, id }).first();
+
+      if (!row) return null;
+
+      const company = row.companyId
+        ? await orm.Company.where({ workspaceId, id: row.companyId }).first()
+        : null;
+
+      return {
+        id: row.id,
+        name: [row.firstName, row.lastName].filter(Boolean).join(" "),
+        title: row.title,
+        companyName: company?.name ?? null,
+      };
+    },
+    deal: async (workspaceId, id) => {
+      const row = await orm.Deal.where({ workspaceId, id }).first();
+
+      if (!row) return null;
+
+      const company = await orm.Company.where({ workspaceId, id: row.companyId }).first();
+
+      return { id: row.id, name: row.name, companyName: company?.name ?? null };
+    },
     userName: async (id) => (await orm.User.where({ id }).first())?.name ?? null,
   };
 }
@@ -1023,10 +1161,7 @@ export class Memory extends Context.Service<Memory, MemoryService>()("@crm/api/s
 
       const key = Option.filter(config.supermemoryApiKey, (value) => Redacted.value(value) !== "");
 
-      const brandKey = Option.filter(
-        config.contextDevApiKey,
-        (value) => Redacted.value(value) !== "",
-      );
+      const researcher = yield* Brand;
 
       const prefix = yield* Option.match(config.memoryPrefix, {
         onSome: Effect.succeed,
@@ -1034,7 +1169,7 @@ export class Memory extends Context.Service<Memory, MemoryService>()("@crm/api/s
       });
 
       yield* Effect.logInfo(
-        `memory: ${Option.isSome(key) ? `supermemory (${prefix})` : "off"}, research: ${Option.isSome(brandKey) ? "context.dev" : "off"}`,
+        `memory: ${Option.isSome(key) ? `supermemory (${prefix})` : "off"}, research: ${researcher ? "context.dev" : "off"}`,
       );
 
       return makeMemory({
@@ -1042,10 +1177,7 @@ export class Memory extends Context.Service<Memory, MemoryService>()("@crm/api/s
           onSome: (apiKey) => createSupermemoryStore({ apiKey: Redacted.value(apiKey) }),
           onNone: () => null,
         }),
-        researcher: Option.match(brandKey, {
-          onSome: (apiKey) => createContextDev({ apiKey: Redacted.value(apiKey) }),
-          onNone: () => null,
-        }),
+        researcher,
         directory: prismaMemoryDirectory(db),
         mirror: prismaFactMirror(db),
         kv,
@@ -1058,5 +1190,5 @@ export class Memory extends Context.Service<Memory, MemoryService>()("@crm/api/s
         },
       });
     }),
-  ).pipe(Layer.provide([Database.layer, Kv.layer]));
+  ).pipe(Layer.provide([Database.layer, Kv.layer, Brand.layer]));
 }

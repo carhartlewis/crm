@@ -1,6 +1,6 @@
 # Chat people results
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 04
 Spec: ../spec.md
@@ -15,3 +15,7 @@ Chat people finder.
   created by domain. Research then starts by itself.
 - Find emails: sends the selection to the agent as a follow-up turn.
 - Initials only; no hotlinked photos.
+
+## Answer
+
+`components/chat/people-results.tsx` + `lib/people.ts`: table with selection, In CRM rows, Add to CRM (company made by domain), Find emails.

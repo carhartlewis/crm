@@ -19,6 +19,7 @@ import { SavedViews } from "./services/SavedViews.ts";
 import { Skills } from "./services/Skills.ts";
 import { Research } from "./services/Research.ts";
 import { Tracking } from "./services/Tracking.ts";
+import { Usage } from "./services/Usage.ts";
 
 const Server = Layer.unwrap(
   Effect.gen(function* () {
@@ -45,6 +46,7 @@ const Server = Layer.unwrap(
         Images.layer,
         ChatFiles.layer,
         Tracking.layer,
+        Usage.layer,
       ]),
       Layer.provide(BunHttpServer.layer({ port: config.port })),
     );

@@ -15,6 +15,8 @@ import { isoTimestamp, perWorkspace, syncedWrite } from "./sync-collections.ts";
 export type WorkspaceSetting = {
   readonly workspace_id: string;
   readonly reporting_currency: string;
+  /** What the workspace pays on top of lookup costs, in basis points (ADR 0027). */
+  readonly usage_markup_bps?: number;
   readonly updated_at: string;
 };
 

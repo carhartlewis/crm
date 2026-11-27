@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { avatarSource, createImageCache, createMemoryStorage, createStorage } from "./index.ts";
+import {
+  avatarSource,
+  contactPhotoSource,
+  createImageCache,
+  createMemoryStorage,
+  createStorage,
+} from "./index.ts";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
@@ -151,6 +157,19 @@ describe("image cache", () => {
       "memory://storage/contacts/c1/photo?v=",
     );
     expect(await images.contactPhoto("c2", "https://media.brand.dev/pfp/huge.png")).toBeNull();
+  });
+
+  test("copies contact photos only from the person photo hosts", () => {
+    expect(
+      contactPhotoSource("https://media.licdn.com/dms/image/v2/abc/photo?e=1&t=x"),
+    ).toStartWith("https://media.licdn.com/dms/image/");
+    expect(contactPhotoSource("https://img.imagecdn.dev/profile/abc.jpeg")).not.toBeNull();
+    expect(contactPhotoSource("https://media.brand.dev/pfp/abc.png")).not.toBeNull();
+    // LinkedIn's blank default avatar lives on another host and is not a photo of them.
+    expect(contactPhotoSource("https://static.licdn.com/aero-v1/sc/h/abc")).toBeNull();
+    expect(contactPhotoSource("https://media.licdn.com/elsewhere/abc")).toBeNull();
+    expect(contactPhotoSource("http://media.licdn.com/dms/image/abc")).toBeNull();
+    expect(contactPhotoSource("https://evil.example/dms/image/abc")).toBeNull();
   });
 
   test("never fetches a non-https avatar", () => {

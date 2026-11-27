@@ -9,7 +9,7 @@ import {
 import { formatRecall } from "./recall.ts";
 
 describe("namespaces", () => {
-  test("keep environments, workspaces and companies apart", async () => {
+  test("keep environments, workspaces and records apart", async () => {
     expect(memoryNamespace("crm1", "ws1", { type: "workspace" })).toBe("crm1_ws_ws1");
     expect(memoryNamespace("crm1", "ws1", { type: "company", companyId: "c-1" })).toBe(
       "crm1_ws_ws1_co_c-1",
@@ -21,6 +21,16 @@ describe("namespaces", () => {
         companyId: "com_0123456789ABCDEFGHIJKLMN",
       }),
     ).toBe("crm1_ws_ws1_co_com_0123456789ABCDEFGHIJKLMN");
+    expect(
+      memoryNamespace("crm1", "ws1", {
+        type: "contact",
+        contactId: "ctc_0123456789ABCDEFGHIJKLMN",
+      }),
+    ).toBe("crm1_ws_ws1_ct_ctc_0123456789ABCDEFGHIJKLMN");
+    expect(
+      memoryNamespace("crm1", "ws1", { type: "deal", dealId: "del_0123456789ABCDEFGHIJKLMN" }),
+    ).toBe("crm1_ws_ws1_dl_del_0123456789ABCDEFGHIJKLMN");
+    expect(() => memoryNamespace("crm1", "ws1", { type: "deal", dealId: "a/b" })).toThrow();
     expect(() => memoryNamespace("crm1", "ws_1/../x", { type: "workspace" })).toThrow();
     expect(() => memoryNamespace("CRM", "ws1", { type: "workspace" })).toThrow();
     expect(await memoryPrefix("https://a.test")).toMatch(/^crm[0-9a-f]{12}$/);
