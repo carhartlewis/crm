@@ -10,6 +10,7 @@ import {
   parseNewCompany,
 } from "./companies-rules.ts";
 import { Database } from "./Database.ts";
+import { type DbTx, transactWithTxid } from "./txid.ts";
 
 /** Who is acting: the session user and the session's (unverified) active workspace. */
 export interface Actor {
@@ -169,9 +170,7 @@ export function makeCompanies(store: CompanyStore): CompaniesService {
   };
 }
 
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-
-function companyTx(tx: Tx): CompanyTx {
+function companyTx(tx: DbTx): CompanyTx {
   const companies = tx.orm.public.Company;
 
   return {
@@ -202,22 +201,7 @@ export function prismaCompanyStore(db: Db): CompanyStore {
   return {
     isMember: async (workspaceId, userId) =>
       (await db.orm.public.Member.where({ organizationId: workspaceId, userId }).first()) !== null,
-    transact: (fn) =>
-      db.transaction(async (tx) => {
-        const result = await fn(companyTx(tx));
-
-        const [row] = await tx.query(
-          tx.raw.sql`SELECT pg_current_xact_id()::xid::text AS txid`
-            .returnsRow({ txid: "pg/text@1" })
-            .build(),
-        );
-
-        const txid = Number(row?.txid);
-
-        if (!Number.isSafeInteger(txid)) throw new Error(`Unexpected transaction id: ${row?.txid}`);
-
-        return { result, txid };
-      }),
+    transact: (fn) => transactWithTxid(db, (tx) => fn(companyTx(tx))),
   };
 }
 

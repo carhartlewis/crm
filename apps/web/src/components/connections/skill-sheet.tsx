@@ -1,4 +1,3 @@
-import type { SkillDetail } from "@crm/core/api";
 import { Markdown } from "@crm/ui/components/markdown";
 import { DayCell, StatusCell } from "@crm/ui/patterns/data-table/table-cells";
 import { RailFacts } from "@crm/ui/patterns/record-sheet/record-rail";
@@ -6,32 +5,44 @@ import { RecordSection } from "@crm/ui/patterns/record-sheet/record-section";
 import { RecordHeader, RecordSheet } from "@crm/ui/patterns/record-sheet/record-sheet";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { removeSkillMutation, setSkillEnabledMutation, skillQuery } from "../../lib/skills.ts";
+import {
+  removeSkillMutation,
+  setSkillEnabledMutation,
+  type SkillItem,
+  skillQuery,
+  skillsCollection,
+} from "../../lib/skills.ts";
 
 const onError = (error: Error) => toast.error(error.message);
 
 /** `owner/repo/skill` → `owner/repo`; the skill's own name is already the title. */
-function sourceOf(skill: SkillDetail) {
+function sourceOf(skill: SkillItem) {
   return skill.sourceId ? skill.sourceId.split("/").slice(0, -1).join("/") : "This workspace";
 }
 
 /**
  * A skill as a record, like a company: name and actions in the header, what it's for and its
- * instructions in the body, facts in the rail. Loaded on demand (the Markdown renderer is
- * WebAssembly); stays mounted after the first open so it can animate out.
+ * instructions in the body, facts in the rail. Everything but the file count comes from the
+ * synced skill, so it opens at once; the file list loads on demand. The sheet itself loads on
+ * demand (the Markdown renderer is WebAssembly) and stays mounted so it can animate out.
  */
 export default function SkillSheet({
   userId,
   workspaceId,
   id,
+  skill: detail,
   onClose,
 }: {
   userId: string;
   workspaceId: string;
   id: string | null;
+  /** The synced skill; null while it hasn't arrived, or after someone removed it. */
+  skill: SkillItem | null;
   onClose: () => void;
 }) {
-  const skill = useQuery({ ...skillQuery(userId, workspaceId, id ?? ""), enabled: id !== null });
+  const collection = skillsCollection(workspaceId);
+  const files = useQuery({ ...skillQuery(userId, workspaceId, id ?? ""), enabled: id !== null });
+  const fileCount = files.data?.id === id ? files.data?.files.length : undefined;
   const setEnabled = useMutation({ ...setSkillEnabledMutation, onError });
 
   const remove = useMutation({
@@ -42,8 +53,6 @@ export default function SkillSheet({
       onClose();
     },
   });
-
-  const detail = skill.data?.id === id ? skill.data : undefined;
 
   return (
     <RecordSheet
@@ -63,7 +72,8 @@ export default function SkillSheet({
                 id: "enable",
                 label: detail.enabled ? "Disable" : "Enable for the workspace",
                 disabled: setEnabled.isPending,
-                onSelect: () => setEnabled.mutate({ id: detail.id, enabled: !detail.enabled }),
+                onSelect: () =>
+                  setEnabled.mutate({ collection, id: detail.id, enabled: !detail.enabled }),
               },
             ]}
             menu={[
@@ -72,7 +82,7 @@ export default function SkillSheet({
                 label: "Remove",
                 destructive: true,
                 disabled: remove.isPending,
-                onSelect: () => remove.mutate(detail.id),
+                onSelect: () => remove.mutate({ collection, id: detail.id }),
               },
             ]}
           />
@@ -112,7 +122,11 @@ export default function SkillSheet({
               },
               { kind: "property", label: "Source", value: sourceOf(detail) },
               { kind: "person", label: "Added by", value: detail.addedBy?.name ?? "—" },
-              { kind: "count", label: "Extra files", value: String(detail.files.length) },
+              {
+                kind: "count",
+                label: "Extra files",
+                value: fileCount === undefined ? "…" : String(fileCount),
+              },
               { kind: "date", label: "Added", value: <DayCell value={detail.createdAt} /> },
             ]}
           />

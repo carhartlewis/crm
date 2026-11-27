@@ -58,6 +58,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - Postgres is the source of truth. Use TanStack DB collections synced through ElectricSQL for CRM records so reads, filters, and sorts are local (`useLiveQuery`).
 - Writes are optimistic. Collection mutation handlers call the Effect API, which writes in a transaction and returns the Postgres `txid`; the client awaits that txid before dropping optimistic state. Server rejection rolls back.
 - Electric shapes are requested through the Effect API so auth and row filtering stay server-side. Never expose the Electric service directly.
+- Each shape fixes its table, row filter and, where a table holds secrets or bulk data, its columns (`connection.credentials` and `skill.files` never sync). Per-workspace collections go through `perWorkspace` in `apps/web/src/lib/sync-collections.ts` so workspace switches and sign-out release them. See ADR 0012.
 - Use TanStack Query (one shared `QueryClient`, one `queryOptions` definition per resource) only for data that is not synced: search, AI, third-party APIs.
 
 ### Workspaces

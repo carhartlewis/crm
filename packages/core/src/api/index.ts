@@ -177,16 +177,19 @@ export class ConnectionsApi extends HttpApiGroup.make("connections")
       success: Schema.Array(CatalogEntry),
       error: ConnectionErrors,
     }),
-    /** Adds a remote MCP server by URL for the whole workspace. It must offer MCP OAuth. */
+    /**
+     * Adds a remote MCP server by URL for the whole workspace. It must offer MCP OAuth. The
+     * connector reaches clients through sync (`/api/shapes/custom-connectors`).
+     */
     HttpApiEndpoint.post("addCustom", "/custom", {
       payload: Schema.Struct({ name: Schema.String, url: Schema.String }),
-      success: CatalogEntry,
+      success: TxId,
       error: [...ConnectionErrors, Invalid, UpstreamUnavailable],
     }),
     /** Removes a custom connector, and everyone's connection to it, from the workspace. */
     HttpApiEndpoint.delete("removeCustom", "/custom/:id", {
       params: { id: Schema.String },
-      success: HttpApiSchema.NoContent,
+      success: TxId,
       error: ConnectionErrors,
     }),
     /** Each catalog app's logo in our storage (context.dev, else its favicon), by app id. */
@@ -204,12 +207,12 @@ export class ConnectionsApi extends HttpApiGroup.make("connections")
     HttpApiEndpoint.patch("update", "/:integration", {
       params: { integration: Schema.String },
       payload: Schema.Struct({ access: ConnectionAccess }),
-      success: Connection,
+      success: TxId,
       error: ConnectionErrors,
     }),
     HttpApiEndpoint.delete("remove", "/:integration", {
       params: { integration: Schema.String },
-      success: HttpApiSchema.NoContent,
+      success: TxId,
       error: ConnectionErrors,
     }),
   )
@@ -258,6 +261,9 @@ export type SkillsShResult = typeof SkillsShResult.Type;
 
 const SkillErrors = [NotFound, NoActiveWorkspace];
 
+/** A skill just added: its id, and the transaction to await in the synced skills. */
+export const AddedSkill = Schema.Struct({ id: Schema.String, txid: Schema.Number });
+
 /** Skills shared by everyone in the active workspace. Any member can add, enable or remove one. */
 export class SkillsApi extends HttpApiGroup.make("skills")
   .add(
@@ -274,13 +280,13 @@ export class SkillsApi extends HttpApiGroup.make("skills")
         description: Schema.String,
         content: Schema.String,
       }),
-      success: SkillSummary,
+      success: AddedSkill,
       error: [...SkillErrors, Invalid],
     }),
     /** Copies a skill from skills.sh into the workspace, disabled until someone enables it. */
     HttpApiEndpoint.post("install", "/install", {
       payload: Schema.Struct({ sourceId: Schema.String }),
-      success: SkillSummary,
+      success: AddedSkill,
       error: [...SkillErrors, Invalid, UpstreamUnavailable],
     }),
     HttpApiEndpoint.get("get", "/:id", {
@@ -291,12 +297,12 @@ export class SkillsApi extends HttpApiGroup.make("skills")
     HttpApiEndpoint.patch("update", "/:id", {
       params: { id: Schema.String },
       payload: Schema.Struct({ enabled: Schema.Boolean }),
-      success: SkillSummary,
+      success: TxId,
       error: SkillErrors,
     }),
     HttpApiEndpoint.delete("remove", "/:id", {
       params: { id: Schema.String },
-      success: HttpApiSchema.NoContent,
+      success: TxId,
       error: SkillErrors,
     }),
   )
@@ -317,3 +323,18 @@ export class CrmApi extends HttpApi.make("crm")
  * the URL, and so the browser cache entry, distinct per workspace.
  */
 export const COMPANIES_SYNC_PATH = "/api/shapes/companies";
+
+/**
+ * The caller's own connections in the active workspace (same `?workspace=` rule). The proxy
+ * leaves out the encrypted `credentials` column: tokens never leave the API.
+ */
+export const CONNECTIONS_SYNC_PATH = "/api/shapes/connections";
+
+/** The active workspace's custom connectors (same `?workspace=` rule). */
+export const CUSTOM_CONNECTORS_SYNC_PATH = "/api/shapes/custom-connectors";
+
+/**
+ * The active workspace's skills (same `?workspace=` rule), without each skill's extra files:
+ * they can reach 1 MB per skill, so the skill sheet loads them on demand (`GET /api/skills/:id`).
+ */
+export const SKILLS_SYNC_PATH = "/api/shapes/skills";

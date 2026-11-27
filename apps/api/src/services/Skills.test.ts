@@ -70,7 +70,9 @@ describe("workspace skills", () => {
 
     const installed = await run(skills.install(alice, "acme/skills/deep-research"));
 
-    expect(installed).toMatchObject({
+    // The client awaits this txid in its synced skills before the new row counts as saved.
+    expect(installed.txid).toBeGreaterThan(0);
+    expect(await run(skills.get(bob, installed.id))).toMatchObject({
       name: "deep-research",
       description: "Research with sources.",
       source: "skills.sh",
@@ -163,7 +165,11 @@ describe("workspace skills", () => {
       }),
     );
 
-    expect(written).toMatchObject({ name: "deal-review", source: "custom", enabled: true });
+    expect(await run(skills.get(alice, written.id))).toMatchObject({
+      name: "deal-review",
+      source: "custom",
+      enabled: true,
+    });
     expect(await skills.forAgent({ workspaceId: "ws_a", userId: "user_2" })).toHaveLength(1);
 
     const invalid = await Effect.runPromiseExit(

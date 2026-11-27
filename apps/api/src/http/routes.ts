@@ -1,9 +1,12 @@
 import {
   COMPANIES_SYNC_PATH,
+  CONNECTIONS_SYNC_PATH,
   CrmApi,
+  CUSTOM_CONNECTORS_SYNC_PATH,
   CurrentSession,
   CurrentUser,
   NoActiveWorkspace,
+  SKILLS_SYNC_PATH,
   Unauthorized,
 } from "@crm/core/api";
 import { createGateway } from "@crm/integrations/gateway";
@@ -19,7 +22,13 @@ import { Skills } from "../services/Skills.ts";
 import { AuthenticationLive } from "./Authentication.ts";
 import { clientIp, withClientIp } from "./client-ip.ts";
 import { callbackFromUrl, startFromUrl } from "./desktop.ts";
-import { companiesSync } from "./sync-proxy.ts";
+import {
+  companiesSync,
+  connectionsSync,
+  customConnectorsSync,
+  skillsSync,
+  type SyncSpec,
+} from "./sync-proxy.ts";
 
 const SystemHandlers = HttpApiBuilder.group(CrmApi, "system", (handlers) =>
   handlers.handle("health", () => Effect.void),
@@ -178,9 +187,22 @@ const syncError = (error: Unauthorized | NoActiveWorkspace) =>
   });
 
 /**
- * Electric shape proxy (raw route: it streams Electric's body through). The session must be
+ * Synced tables: each proxy path and the shape it serves for a verified workspace and user.
+ * A table needs a migration-free setup only: Electric sets REPLICA IDENTITY FULL itself.
+ */
+const synced: ReadonlyArray<
+  readonly [HttpRouter.PathInput, (workspaceId: string, userId: string) => SyncSpec]
+> = [
+  [COMPANIES_SYNC_PATH, (workspaceId) => companiesSync(workspaceId)],
+  [CONNECTIONS_SYNC_PATH, (workspaceId, userId) => connectionsSync(workspaceId, userId)],
+  [CUSTOM_CONNECTORS_SYNC_PATH, (workspaceId) => customConnectorsSync(workspaceId)],
+  [SKILLS_SYNC_PATH, (workspaceId) => skillsSync(workspaceId)],
+];
+
+/**
+ * Electric shape proxy (raw routes: they stream Electric's body through). The session must be
  * signed in and `?workspace=` must be its active workspace with a membership; the table, row
- * filter and secret are fixed here, and only Electric protocol params pass through.
+ * filter, columns and secret are fixed here, and only Electric protocol params pass through.
  */
 const SyncRoutes = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -189,47 +211,51 @@ const SyncRoutes = Layer.effectDiscard(
     const companies = yield* Companies;
     const electric = yield* Electric;
 
-    yield* router.add("GET", COMPANIES_SYNC_PATH, (request) =>
-      Effect.gen(function* () {
-        const headers = new Headers(request.headers);
+    for (const [path, specFor] of synced) {
+      yield* router.add("GET", path, (request) =>
+        Effect.gen(function* () {
+          const headers = new Headers(request.headers);
 
-        const session = yield* auth.session(headers).pipe(
-          Effect.tapError((error) => Effect.logError("session lookup failed", error)),
-          Effect.option,
-          Effect.map(Option.flatten),
-        );
+          const session = yield* auth.session(headers).pipe(
+            Effect.tapError((error) => Effect.logError("session lookup failed", error)),
+            Effect.option,
+            Effect.map(Option.flatten),
+          );
 
-        if (Option.isNone(session))
-          return syncError(new Unauthorized({ message: "Not signed in" }));
+          if (Option.isNone(session))
+            return syncError(new Unauthorized({ message: "Not signed in" }));
 
-        const query = new URL(request.url, "http://api").searchParams;
+          const query = new URL(request.url, "http://api").searchParams;
 
-        const workspace = yield* companies
-          .workspaceFor(
-            { userId: session.value.user.id, activeWorkspaceId: session.value.activeWorkspaceId },
-            query.get("workspace"),
-          )
-          .pipe(Effect.result);
+          const workspace = yield* companies
+            .workspaceFor(
+              { userId: session.value.user.id, activeWorkspaceId: session.value.activeWorkspaceId },
+              query.get("workspace"),
+            )
+            .pipe(Effect.result);
 
-        if (Result.isFailure(workspace)) {
-          return syncError(workspace.failure);
-        }
+          if (Result.isFailure(workspace)) {
+            return syncError(workspace.failure);
+          }
 
-        return yield* electric.sync(companiesSync(workspace.success), query, headers).pipe(
-          Effect.map(HttpServerResponse.fromWeb),
-          Effect.catchTag("ElectricError", (error) =>
-            Effect.logError("electric unreachable", error).pipe(
-              Effect.as(
-                HttpServerResponse.text("Sync service unavailable", {
-                  status: 502,
-                  headers: noStore,
-                }),
+          const spec = specFor(workspace.success, session.value.user.id);
+
+          return yield* electric.sync(spec, query, headers).pipe(
+            Effect.map(HttpServerResponse.fromWeb),
+            Effect.catchTag("ElectricError", (error) =>
+              Effect.logError("electric unreachable", error).pipe(
+                Effect.as(
+                  HttpServerResponse.text("Sync service unavailable", {
+                    status: 502,
+                    headers: noStore,
+                  }),
+                ),
               ),
             ),
-          ),
-        );
-      }).pipe(Effect.interruptible),
-    );
+          );
+        }).pipe(Effect.interruptible),
+      );
+    }
   }),
 );
 

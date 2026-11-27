@@ -1,5 +1,5 @@
 import add from "@carbon/icons/es/add/16.js";
-import type { SkillsShResult, SkillSummary } from "@crm/core/api";
+import type { SkillsShResult } from "@crm/core/api";
 import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import {
@@ -28,6 +28,8 @@ import {
   installSkillMutation,
   removeSkillMutation,
   setSkillEnabledMutation,
+  type SkillItem,
+  skillsCollection,
 } from "../../lib/skills.ts";
 
 const AddIcon = carbonIcon(add);
@@ -44,7 +46,7 @@ const SEARCH_PARAMS = createListSearchParams({ defaultSort: "createdAt", default
 
 type Column = "name" | "status" | "description" | "addedBy" | "createdAt";
 
-const COLUMNS: DataTableColumn<SkillSummary, Column>[] = [
+const COLUMNS: DataTableColumn<SkillItem, Column>[] = [
   {
     id: "name",
     kind: "title",
@@ -89,10 +91,10 @@ const COLUMNS: DataTableColumn<SkillSummary, Column>[] = [
 /** A row's "…" menu. */
 function skillRowMenu(actions: {
   open: (id: string) => void;
-  toggle: (row: SkillSummary) => void;
-  remove: (row: SkillSummary) => void;
+  toggle: (row: SkillItem) => void;
+  remove: (row: SkillItem) => void;
 }) {
-  return function SkillRowMenu(row: SkillSummary) {
+  return function SkillRowMenu(row: SkillItem) {
     return (
       <RecordRowMenu
         label={`Actions for ${row.name}`}
@@ -114,6 +116,8 @@ function skillRowMenu(actions: {
 function discoverColumns(install: {
   add: (id: string) => void;
   adding: string | null;
+  /** Whether the workspace has a copy, from the synced skills (not the search's snapshot). */
+  copied: (id: string) => boolean;
 }): StaticTableColumn<SkillsShResult>[] {
   return [
     {
@@ -140,7 +144,7 @@ function discoverColumns(install: {
       header: <span className="sr-only">Add</span>,
       label: "Add",
       cell: (row) =>
-        row.installed ? (
+        install.copied(row.id) ? (
           <span className="text-muted-foreground">Added</span>
         ) : (
           <Button
@@ -176,7 +180,7 @@ export function SkillsPanel({
   settledQuery,
   toolbar,
 }: Scope & {
-  skills: readonly SkillSummary[];
+  skills: readonly SkillItem[];
   view: "yours" | "discover";
   settledQuery: string;
   /** The page's tabs and search; the table shows them on one line with its Sort. */
@@ -188,11 +192,21 @@ export function SkillsPanel({
   return (
     <>
       {view === "yours" ? (
-        <YourSkills skills={skills} toolbar={toolbar} onOpen={(id) => void setOpen(id)} />
+        <YourSkills
+          workspaceId={workspaceId}
+          skills={skills}
+          toolbar={toolbar}
+          onOpen={(id) => void setOpen(id)}
+        />
       ) : (
         <div className="flex flex-col gap-6">
           {toolbar}
-          <DiscoverSkills scope={scope} query={settledQuery} onOpen={(id) => void setOpen(id)} />
+          <DiscoverSkills
+            scope={scope}
+            skills={skills}
+            query={settledQuery}
+            onOpen={(id) => void setOpen(id)}
+          />
         </div>
       )}
       {open ? (
@@ -200,6 +214,7 @@ export function SkillsPanel({
           <SkillSheet
             userId={userId}
             workspaceId={workspaceId}
+            skill={skills.find((skill) => skill.id === open) ?? null}
             id={open}
             onClose={() => void setOpen(null)}
           />
@@ -210,14 +225,17 @@ export function SkillsPanel({
 }
 
 function YourSkills({
+  workspaceId,
   skills,
   toolbar,
   onOpen,
 }: {
-  skills: readonly SkillSummary[];
+  workspaceId: string;
+  skills: readonly SkillItem[];
   toolbar: ReactNode;
   onOpen: (id: string) => void;
 }) {
+  const collection = skillsCollection(workspaceId);
   const setEnabled = useMutation({ ...setSkillEnabledMutation, onError });
 
   const remove = useMutation({
@@ -260,8 +278,8 @@ function YourSkills({
       onRowHover={preloadSheet}
       rowActions={skillRowMenu({
         open: onOpen,
-        toggle: (row) => setEnabled.mutate({ id: row.id, enabled: !row.enabled }),
-        remove: (row) => remove.mutate(row.id),
+        toggle: (row) => setEnabled.mutate({ collection, id: row.id, enabled: !row.enabled }),
+        remove: (row) => remove.mutate({ collection, id: row.id }),
       })}
     />
   );
@@ -269,28 +287,37 @@ function YourSkills({
 
 function DiscoverSkills({
   scope,
+  skills,
   query,
   onOpen,
 }: {
   scope: Scope;
+  skills: readonly SkillItem[];
   query: string;
   onOpen: (id: string) => void;
 }) {
   const text = query.trim();
+  const collection = skillsCollection(scope.workspaceId);
   const results = useQuery(discoverQuery(scope.userId, scope.workspaceId, text));
+  // "Added" follows the synced skills, so an install shows without searching again.
+  const copied = new Set(skills.map((skill) => skill.sourceId));
 
   const install = useMutation({
     ...installSkillMutation,
     onError,
-    onSuccess: (skill) => {
-      toast(`${skill.name} is added, but off. Read it, then enable it.`);
-      onOpen(skill.id);
+    onSuccess: (id) => {
+      // The new row has synced by now (the mutation awaited its txid).
+      const name = collection.get(id)?.name ?? "The skill";
+
+      toast(`${name} is added, but off. Read it, then enable it.`);
+      onOpen(id);
     },
   });
 
   const columns = discoverColumns({
-    add: (id) => install.mutate(id),
-    adding: install.isPending ? (install.variables ?? null) : null,
+    add: (sourceId) => install.mutate({ collection, sourceId }),
+    adding: install.isPending ? install.variables.sourceId : null,
+    copied: (id) => copied.has(id),
   });
 
   return (

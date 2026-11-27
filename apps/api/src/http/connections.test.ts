@@ -101,6 +101,10 @@ const FakeAuth = Layer.succeed(
 const upstream = fakeUpstream(integrations[0].mcpUrl);
 const rows: ConnectionRecord[] = [];
 const customs: (CustomConnectorRecord & { workspaceId: string })[] = [];
+let lastTxid = 0;
+
+/** Each write is one transaction: the result and a new txid, like the Prisma store. */
+const written = <A>(result: A) => ({ result, txid: ++lastTxid });
 
 const memoryStore: ConnectionStore = {
   isMember: async ({ workspaceId, userId }) => workspaceId === "ws_1" && userId === "user_1",
@@ -128,13 +132,13 @@ const memoryStore: ConnectionStore = {
         existing.integration === integration,
     );
 
-    if (!row) return null;
+    if (!row) return written(null);
 
     const next = { ...row, access, updatedAt: now };
 
     rows[rows.indexOf(row)] = next;
 
-    return next;
+    return written(next);
   },
   setCredentials: async (id, credentials) => {
     const row = rows.find((existing) => existing.id === id);
@@ -149,25 +153,27 @@ const memoryStore: ConnectionStore = {
         existing.integration === integration,
     );
 
-    if (index === -1) return false;
+    if (index === -1) return written(false);
 
     rows.splice(index, 1);
 
-    return true;
+    return written(true);
   },
   customConnectors: async (workspaceId) =>
     customs.filter((connector) => connector.workspaceId === workspaceId),
   addCustom: async ({ workspaceId }, connector) => {
-    if (customs.some((c) => c.workspaceId === workspaceId && c.key === connector.key)) return false;
+    if (customs.some((c) => c.workspaceId === workspaceId && c.key === connector.key)) {
+      return written(false);
+    }
 
     customs.push({ ...connector, workspaceId });
 
-    return true;
+    return written(true);
   },
   removeCustom: async (workspaceId, key) => {
     const index = customs.findIndex((c) => c.workspaceId === workspaceId && c.key === key);
 
-    if (index === -1) return false;
+    if (index === -1) return written(false);
 
     customs.splice(index, 1);
 
@@ -176,7 +182,7 @@ const memoryStore: ConnectionStore = {
         rows.splice(at, 1);
     }
 
-    return true;
+    return written(true);
   },
 };
 
@@ -248,7 +254,12 @@ type RequestBody =
 
 const decodeAuthorize = Schema.decodeUnknownSync(Schema.Struct({ url: Schema.String }));
 const decodeCatalog = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ id: Schema.String })));
-const decodeAccess = Schema.decodeUnknownSync(Schema.Struct({ access: Schema.String }));
+
+const decodeConnections = Schema.decodeUnknownSync(
+  Schema.Array(Schema.Struct({ access: Schema.String })),
+);
+
+const decodeTxid = Schema.decodeUnknownSync(Schema.Struct({ txid: Schema.Number }));
 
 const decodeClientMetadata = Schema.decodeUnknownSync(
   Schema.Struct({ redirect_uris: Schema.Array(Schema.String) }),
@@ -368,8 +379,16 @@ describe("connections", () => {
 
     const updated = await send("PATCH", "/api/connections/granola", member, { access: "write" });
 
-    expect(decodeAccess(await updated.json()).access).toBe("write");
-    expect((await send("DELETE", "/api/connections/granola", member)).status).toBe(204);
+    // Writes answer with their txid; the browser sees the row change through sync.
+    expect(decodeTxid(await updated.json()).txid).toBeGreaterThan(0);
+    const [connection] = decodeConnections(await (await get("/api/connections", member)).json());
+
+    expect(connection?.access).toBe("write");
+
+    const removed = await send("DELETE", "/api/connections/granola", member);
+
+    expect(removed.status).toBe(200);
+    expect(decodeTxid(await removed.json()).txid).toBeGreaterThan(0);
     expect((await send("DELETE", "/api/connections/granola", member)).status).toBe(404);
   });
 
@@ -389,14 +408,7 @@ describe("connections", () => {
       url: "https://mcp.notes.example/mcp",
     });
 
-    expect(await added.json()).toEqual({
-      id: "notes",
-      name: "Notes",
-      vendor: "notes.example",
-      domain: "notes.example",
-      summary: "Custom connector",
-      custom: true,
-    });
+    expect(decodeTxid(await added.json()).txid).toBeGreaterThan(0);
 
     const catalog = decodeCatalog(await (await get("/api/connections/catalog", member)).json());
 
@@ -414,7 +426,7 @@ describe("connections", () => {
 
     expect(refused.status).toBe(502);
     expect(internal.status).toBe(400);
-    expect((await send("DELETE", "/api/connections/custom/notes", member)).status).toBe(204);
+    expect((await send("DELETE", "/api/connections/custom/notes", member)).status).toBe(200);
     expect((await send("DELETE", "/api/connections/custom/notes", member)).status).toBe(404);
   });
 

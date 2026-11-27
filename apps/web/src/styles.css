@@ -1,5 +1,9 @@
 @import "@crm/ui/globals.css";
 
+/* This app's class names (shared components are listed in @crm/ui/globals.css). */
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
+
 /* While a pinned page is dragged: a grabbing cursor everywhere, and no peeks popping up. */
 body[data-reordering] {
   cursor: grabbing;

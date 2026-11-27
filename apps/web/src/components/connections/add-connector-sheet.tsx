@@ -12,14 +12,22 @@ import {
 import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { addConnectorMutation } from "../../lib/connections.ts";
+import { addConnectorMutation, customConnectorsCollection } from "../../lib/connections.ts";
 import { TextField } from "../text-field.tsx";
 
 /**
  * Add any remote MCP server to the workspace by URL. The API checks that it offers MCP OAuth
  * before saving; each person then connects to it from its card, as with the built-in apps.
  */
-export function AddConnectorSheet({ onClose }: { onClose: () => void }) {
+export function AddConnectorSheet({
+  workspaceId,
+  onClose,
+}: {
+  workspaceId: string;
+  onClose: () => void;
+}) {
+  const collection = customConnectorsCollection(workspaceId);
+
   const add = useMutation({
     ...addConnectorMutation,
     onError: (error) => toast.error(error.message),
@@ -29,11 +37,14 @@ export function AddConnectorSheet({ onClose }: { onClose: () => void }) {
     defaultValues: { name: "", url: "" },
     validationLogic: revalidateLogic({ mode: "blur", modeAfterSubmission: "change" }),
     onSubmit: async ({ value }) => {
-      const connector = await add.mutateAsync(value).catch(() => null);
+      const added = await add
+        .mutateAsync({ collection, ...value })
+        .then(() => true)
+        .catch(() => false);
 
-      if (!connector) return;
+      if (!added) return;
 
-      toast(`${connector.name} is added. Connect it from its card.`);
+      toast(`${value.name.trim()} is added. Connect it from its card.`);
       onClose();
     },
   });

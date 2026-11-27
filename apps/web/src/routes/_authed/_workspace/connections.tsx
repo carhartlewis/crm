@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { catalogQuery, connectionLogosQuery, connectionsQuery } from "../../../lib/connections.ts";
-import { skillsQuery } from "../../../lib/skills.ts";
 
 /** What an app's sign-in returned with. Set only by the API's OAuth callback redirect. */
 interface ConnectionsSearch {
@@ -42,16 +40,26 @@ export const Route = createFileRoute("/_authed/_workspace/connections")({
 
     return result;
   },
-  loader: ({ context: { queryClient, session } }) => {
+  /**
+   * Connections, custom connectors and skills sync through Electric. The loader starts all three
+   * syncs and waits for their first snapshot, so the page renders with data (it opens an empty
+   * tab on Discover). Dynamic imports keep TanStack DB and Electric out of cold entry.
+   */
+  loader: async ({ context: { queryClient, session } }) => {
     const workspaceId = session.session.activeOrganizationId ?? "";
 
-    // Logos may need a first fetch from context.dev: start it, but don't wait for it.
-    void queryClient.prefetchQuery(connectionLogosQuery(session.user.id, workspaceId));
+    const [connections, skills] = await Promise.all([
+      import("../../../lib/connections.ts"),
+      import("../../../lib/skills.ts"),
+    ]);
 
-    return Promise.all([
-      queryClient.fetchQuery(connectionsQuery(session.user.id, workspaceId)),
-      queryClient.fetchQuery(catalogQuery(session.user.id, workspaceId)),
-      queryClient.fetchQuery(skillsQuery(session.user.id, workspaceId)),
+    // Logos may need a first fetch from context.dev: start it, but don't wait for it.
+    void queryClient.prefetchQuery(connections.connectionLogosQuery(session.user.id, workspaceId));
+
+    await Promise.all([
+      connections.connectionsCollection(workspaceId).preload(),
+      connections.customConnectorsCollection(workspaceId).preload(),
+      skills.skillsCollection(workspaceId).preload(),
     ]);
   },
 });

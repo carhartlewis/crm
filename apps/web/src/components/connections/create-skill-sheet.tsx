@@ -19,7 +19,7 @@ import {
 import { type AnyFieldApi, revalidateLogic, useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { createSkillMutation } from "../../lib/skills.ts";
+import { createSkillMutation, skillsCollection } from "../../lib/skills.ts";
 import { TextField } from "../text-field.tsx";
 
 export interface SkillDraft {
@@ -67,10 +67,12 @@ function InstructionsField({ field }: { field: AnyFieldApi }) {
  * same rules as the API (`@crm/integrations`). A saved skill is enabled at once.
  */
 export function CreateSkillSheet({
+  workspaceId,
   initial,
   onClose,
   onCreated,
 }: {
+  workspaceId: string;
   initial: SkillDraft;
   onClose: () => void;
   onCreated: (id: string) => void;
@@ -84,12 +86,14 @@ export function CreateSkillSheet({
     defaultValues: initial,
     validationLogic: revalidateLogic({ mode: "blur", modeAfterSubmission: "change" }),
     onSubmit: async ({ value }) => {
-      const skill = await create.mutateAsync(value).catch(() => null);
+      const id = await create
+        .mutateAsync({ collection: skillsCollection(workspaceId), skill: value })
+        .catch(() => null);
 
-      if (!skill) return;
+      if (!id) return;
 
-      toast(`${skill.name} is added for the workspace.`);
-      onCreated(skill.id);
+      toast(`${value.name.trim()} is added for the workspace.`);
+      onCreated(id);
     },
   });
 

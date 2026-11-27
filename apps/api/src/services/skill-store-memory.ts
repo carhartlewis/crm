@@ -10,6 +10,10 @@ export function createMemorySkillStore(
 ) {
   const rows: SkillRecord[] = [];
   const memberships = new Set(members);
+  let lastTxid = 0;
+
+  /** Each write is one transaction: the result and a new txid, like the Prisma store. */
+  const written = <A>(result: A) => ({ result, txid: ++lastTxid });
 
   const store: SkillStore = {
     isMember: async ({ workspaceId, userId }) => memberships.has(`${workspaceId}:${userId}`),
@@ -21,7 +25,7 @@ export function createMemorySkillStore(
       rows.find((row) => row.workspaceId === workspaceId && row.id === id) ?? null,
     insert: async ({ workspaceId, userId }, skill, now) => {
       if (rows.some((row) => row.workspaceId === workspaceId && row.name === skill.name))
-        return null;
+        return written(null);
 
       const id = `skill_${rows.length + 1}`;
 
@@ -40,26 +44,26 @@ export function createMemorySkillStore(
         updatedAt: now,
       });
 
-      return id;
+      return written(id);
     },
     setEnabled: async (workspaceId, id, enabled, now) => {
       const index = rows.findIndex((row) => row.workspaceId === workspaceId && row.id === id);
       const row = rows[index];
 
-      if (!row) return false;
+      if (!row) return written(false);
 
       rows[index] = { ...row, enabled, updatedAt: now };
 
-      return true;
+      return written(true);
     },
     remove: async (workspaceId, id) => {
       const index = rows.findIndex((row) => row.workspaceId === workspaceId && row.id === id);
 
-      if (index === -1) return false;
+      if (index === -1) return written(false);
 
       rows.splice(index, 1);
 
-      return true;
+      return written(true);
     },
   };
 

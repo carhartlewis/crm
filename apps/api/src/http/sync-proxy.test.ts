@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
   companiesSync,
+  connectionsSync,
+  customConnectorsSync,
   electricRequestHeaders,
   electricUrlFor,
   privateCacheControl,
   proxyResponse,
   proxyResponseHeaders,
+  skillsSync,
 } from "./sync-proxy.ts";
 
 const electric = new URL("http://127.0.0.1:53000");
@@ -136,5 +139,50 @@ describe("proxyResponse", () => {
     expect(response.status).toBe(409);
     expect(response.headers.get("electric-handle")).toBe("h-2");
     expect(await response.text()).toBe('{"message":"must refetch"}');
+  });
+});
+
+/** The upstream query a spec produces for a client that sends nothing. */
+const upstream = (spec: Parameters<typeof electricUrlFor>[3]) =>
+  Object.fromEntries(electricUrlFor(electric, "s3cret", new URLSearchParams(), spec).searchParams);
+
+describe("synced tables", () => {
+  test("connections: only the caller's, and never their credentials", () => {
+    const params = upstream(connectionsSync("ws_a", "user_1"));
+
+    expect(params).toMatchObject({
+      table: "connection",
+      where: "workspace_id = $1 AND user_id = $2",
+      "params[1]": "ws_a",
+      "params[2]": "user_1",
+    });
+    expect(params["columns"]?.split(",")).not.toContain("credentials");
+    expect(params["columns"]?.split(",")).toContain("id");
+  });
+
+  test("a client's columns cannot widen a fixed column list", () => {
+    const client = new URLSearchParams({ columns: "id,credentials" });
+    const url = electricUrlFor(electric, "s3cret", client, connectionsSync("ws_a", "user_1"));
+
+    expect(url.searchParams.getAll("columns")).toEqual([
+      "id,workspace_id,user_id,integration,access,created_at,updated_at",
+    ]);
+  });
+
+  test("custom connectors and skills are per workspace; skill files stay on the server", () => {
+    expect(upstream(customConnectorsSync("ws_a"))).toMatchObject({
+      table: "custom_connector",
+      where: "workspace_id = $1",
+      "params[1]": "ws_a",
+    });
+
+    const skills = upstream(skillsSync("ws_a"));
+
+    expect(skills).toMatchObject({
+      table: "skill",
+      where: "workspace_id = $1",
+      "params[1]": "ws_a",
+    });
+    expect(skills["columns"]?.split(",")).not.toContain("files");
   });
 });

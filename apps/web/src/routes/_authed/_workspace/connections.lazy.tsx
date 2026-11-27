@@ -15,7 +15,8 @@ import { carbonIcon } from "@crm/ui/components/icon";
 import { Separator } from "@crm/ui/components/separator";
 import { Tabs, TabsList, TabsTrigger } from "@crm/ui/components/tabs";
 import { ListSearch } from "@crm/ui/patterns/data-table/list-search";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useLiveSuspenseQuery } from "@tanstack/react-db";
+import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link, useLocation } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -29,9 +30,15 @@ import {
 } from "../../../components/connections/create-skill-sheet.tsx";
 import { SkillsPanel } from "../../../components/connections/skills-panel.tsx";
 import { PageLayout } from "../../../components/shell/page.tsx";
-import { catalogQuery, connectionsQuery, outcomeMessage } from "../../../lib/connections.ts";
+import {
+  catalogOf,
+  connectionsCollection,
+  customConnectorsCollection,
+  outcomeMessage,
+} from "../../../lib/connections.ts";
 import { pageById } from "../../../lib/pages.ts";
-import { skillsQuery } from "../../../lib/skills.ts";
+import { workspaceQuery } from "../../../lib/session.ts";
+import { skillsCollection, toSkillItem } from "../../../lib/skills.ts";
 
 export const Route = createLazyFileRoute("/_authed/_workspace/connections")({
   component: Connections,
@@ -93,9 +100,29 @@ function Connections() {
     select: (location) => new URLSearchParams(location.searchStr).get("q") ?? "",
   });
 
-  const { data: connections } = useSuspenseQuery(connectionsQuery(session.user.id, workspaceId));
-  const { data: skills } = useSuspenseQuery(skillsQuery(session.user.id, workspaceId));
-  const { data: catalog } = useSuspenseQuery(catalogQuery(session.user.id, workspaceId));
+  // Synced rows (loaded by the route loader), read and filtered locally.
+  const connectionRows = connectionsCollection(workspaceId);
+  const customRows = customConnectorsCollection(workspaceId);
+  const skillRows = skillsCollection(workspaceId);
+
+  const { data: connections } = useLiveSuspenseQuery({
+    query: (q) => q.from({ connection: connectionRows }),
+  });
+
+  const { data: custom } = useLiveSuspenseQuery({
+    query: (q) =>
+      q.from({ connector: customRows }).orderBy(({ connector }) => connector.created_at, "asc"),
+  });
+
+  const { data: skillData } = useLiveSuspenseQuery({
+    query: (q) => q.from({ skill: skillRows }),
+  });
+
+  // Authors' names come from the workspace's members, which the shell already loads.
+  const { data: workspace } = useQuery(workspaceQuery(session.user.id, workspaceId));
+  const names = new Map(workspace?.members.map((member) => [member.userId, member.user.name]));
+  const skills = skillData.map((skill) => toSkillItem(skill, names));
+  const catalog = catalogOf(custom);
 
   // Without a `?view=`, a tab with nothing of yours opens on Discover. Decided from what you had
   // on arrival, so removing your last one doesn't swap the view out from under you.
@@ -186,6 +213,7 @@ function Connections() {
           <ConnectorsPanel
             catalog={catalog}
             connections={connections}
+            customConnectors={custom}
             userId={session.user.id}
             workspaceId={workspaceId}
             view={view}
@@ -218,10 +246,13 @@ function Connections() {
           void openDraft(file);
         }}
       />
-      {adding === "connector" ? <AddConnectorSheet onClose={() => void setAdding(null)} /> : null}
+      {adding === "connector" ? (
+        <AddConnectorSheet workspaceId={workspaceId} onClose={() => void setAdding(null)} />
+      ) : null}
       {adding === "skill" ? (
         <CreateSkillSheet
           key={`${draft.name}:${draft.content.length}`}
+          workspaceId={workspaceId}
           initial={draft}
           onClose={() => void setAdding(null)}
           onCreated={(id) => {

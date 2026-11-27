@@ -35,6 +35,10 @@ import { AppConfig } from "../config.ts";
 import { Database } from "./Database.ts";
 import { Images } from "./Images.ts";
 import { Kv } from "./Kv.ts";
+import { transactWithTxid, type Written } from "./txid.ts";
+
+/** A write's Postgres transaction id, for the client to await in its synced rows. */
+type TxId = { readonly txid: number };
 
 /** Who is acting: the session user and the session's (unverified) active workspace. */
 export interface Actor {
@@ -66,20 +70,21 @@ export interface ConnectionStore {
     row: { integration: string; access: Access; credentials: string },
     now: Date,
   ): Promise<void>;
+  /** Writes the browser makes return their txid (ADR 0012): it awaits it in the synced rows. */
   setAccess(
     owner: Owner,
     integration: string,
     access: Access,
     now: Date,
-  ): Promise<ConnectionRecord | null>;
+  ): Promise<Written<ConnectionRecord | null>>;
   setCredentials(id: string, credentials: string, now: Date): Promise<void>;
-  remove(owner: Owner, integration: string): Promise<boolean>;
+  remove(owner: Owner, integration: string): Promise<Written<boolean>>;
   /** The workspace's custom connectors. */
   customConnectors(workspaceId: string): Promise<readonly CustomConnectorRecord[]>;
   /** False when the workspace already has a connector with this key. */
-  addCustom(owner: Owner, connector: CustomConnectorRecord, now: Date): Promise<boolean>;
+  addCustom(owner: Owner, connector: CustomConnectorRecord, now: Date): Promise<Written<boolean>>;
   /** Removes the connector and every connection to it in the workspace. */
-  removeCustom(workspaceId: string, key: string): Promise<boolean>;
+  removeCustom(workspaceId: string, key: string): Promise<Written<boolean>>;
 }
 
 export interface CustomConnectorRecord {
@@ -112,11 +117,11 @@ export interface ConnectionsService {
   readonly addCustom: (
     actor: Actor,
     input: { name: string; url: string },
-  ) => Effect.Effect<CatalogEntry, NoActiveWorkspace | Invalid | UpstreamUnavailable>;
+  ) => Effect.Effect<TxId, NoActiveWorkspace | Invalid | UpstreamUnavailable>;
   readonly removeCustom: (
     actor: Actor,
     id: string,
-  ) => Effect.Effect<void, NoActiveWorkspace | NotFound>;
+  ) => Effect.Effect<TxId, NoActiveWorkspace | NotFound>;
   /** Each catalog app's stored logo, by app id; null when there is none. */
   readonly logos: (
     actor: Actor,
@@ -130,11 +135,11 @@ export interface ConnectionsService {
     actor: Actor,
     integration: string,
     access: Access,
-  ) => Effect.Effect<Connection, NoActiveWorkspace | NotFound>;
+  ) => Effect.Effect<TxId, NoActiveWorkspace | NotFound>;
   readonly remove: (
     actor: Actor,
     integration: string,
-  ) => Effect.Effect<void, NoActiveWorkspace | NotFound>;
+  ) => Effect.Effect<TxId, NoActiveWorkspace | NotFound>;
   /**
    * The app's OAuth redirect. The single-use `state` binds it to the sign-in that `authorize`
    * started. `userId` is the browser's signed-in user: when there is one it must be the user who
@@ -345,18 +350,20 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
 
       const added = yield* run("add custom", () => store.addCustom(scope, connector, deps.now()));
 
-      if (!added) {
+      if (!added.result) {
         return yield* new Invalid({ message: "There is already a connector with this name" });
       }
 
-      return toEntry(customIntegration(connector));
+      return { txid: added.txid };
     }),
 
     removeCustom: Effect.fn("Connections.removeCustom")(function* (actor, id) {
       const scope = yield* owner(actor);
       const removed = yield* run("remove custom", () => store.removeCustom(scope.workspaceId, id));
 
-      if (!removed) return yield* new NotFound({ message: "No such connector" });
+      if (!removed.result) return yield* new NotFound({ message: "No such connector" });
+
+      return { txid: removed.txid };
     }),
 
     logos: Effect.fn("Connections.logos")(function* (actor) {
@@ -425,9 +432,9 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
       const app = yield* findIntegration(scope.workspaceId, id);
       const row = yield* run("update", () => store.setAccess(scope, app.id, access, deps.now()));
 
-      if (!row) return yield* notConnected();
+      if (!row.result) return yield* notConnected();
 
-      return toConnection(row);
+      return { txid: row.txid };
     }),
 
     remove: Effect.fn("Connections.remove")(function* (actor, id) {
@@ -435,7 +442,9 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
       const app = yield* findIntegration(scope.workspaceId, id);
       const removed = yield* run("remove", () => store.remove(scope, app.id));
 
-      if (!removed) return yield* notConnected();
+      if (!removed.result) return yield* notConnected();
+
+      return { txid: removed.txid };
     }),
 
     callback: Effect.fn("Connections.callback")(function* (userId, params) {
@@ -541,46 +550,62 @@ export function prismaConnectionStore(db: Db): ConnectionStore {
       });
     },
     setAccess: ({ workspaceId, userId }, integration, access, now) =>
-      connections.where({ workspaceId, userId, integration }).update({ access, updatedAt: now }),
+      transactWithTxid(db, (tx) =>
+        tx.orm.public.Connection.where({ workspaceId, userId, integration }).update({
+          access,
+          updatedAt: now,
+        }),
+      ),
     setCredentials: async (id, credentials, now) => {
       await connections.where({ id }).update({ credentials, updatedAt: now });
     },
-    remove: async ({ workspaceId, userId }, integration) =>
-      (await connections.where({ workspaceId, userId, integration }).delete()) !== null,
+    remove: ({ workspaceId, userId }, integration) =>
+      transactWithTxid(
+        db,
+        async (tx) =>
+          (await tx.orm.public.Connection.where({ workspaceId, userId, integration }).delete()) !==
+          null,
+      ),
     customConnectors: async (workspaceId) =>
       (await db.orm.public.CustomConnector.where({ workspaceId }).all()).map(
         ({ key, name, mcpUrl }) => ({ key, name, mcpUrl }),
       ),
-    addCustom: async ({ workspaceId, userId }, connector, now) => {
-      const custom = db.orm.public.CustomConnector;
+    addCustom: ({ workspaceId, userId }, connector, now) =>
+      transactWithTxid(db, async (tx) => {
+        const custom = tx.orm.public.CustomConnector;
 
-      if (await custom.where({ workspaceId, key: connector.key }).first()) return false;
+        if (await custom.where({ workspaceId, key: connector.key }).first()) return false;
 
-      await custom.create({
-        id: crypto.randomUUID(),
-        workspaceId,
-        key: connector.key,
-        name: connector.name,
-        mcpUrl: connector.mcpUrl,
-        addedById: userId,
-        createdAt: now,
-      });
+        await custom.create({
+          id: crypto.randomUUID(),
+          workspaceId,
+          key: connector.key,
+          name: connector.name,
+          mcpUrl: connector.mcpUrl,
+          addedById: userId,
+          createdAt: now,
+        });
 
-      return true;
-    },
-    removeCustom: async (workspaceId, key) => {
-      const removed = await db.orm.public.CustomConnector.where({ workspaceId, key }).delete();
+        return true;
+      }),
+    removeCustom: (workspaceId, key) =>
+      transactWithTxid(db, async (tx) => {
+        const removed = await tx.orm.public.CustomConnector.where({ workspaceId, key }).delete();
 
-      if (removed === null) return false;
+        if (removed === null) return false;
 
-      // Everyone's connection to it goes too; the agent stops seeing its tools.
-      for (;;) {
-        // oxlint-disable-next-line no-await-in-loop -- one row per member at most.
-        const gone = await connections.where({ workspaceId, integration: key }).delete();
+        // Everyone's connection to it goes too, in the same transaction; the agent stops seeing
+        // its tools.
+        for (;;) {
+          // oxlint-disable-next-line no-await-in-loop -- one row per member at most.
+          const gone = await tx.orm.public.Connection.where({
+            workspaceId,
+            integration: key,
+          }).delete();
 
-        if (gone === null) return true;
-      }
-    },
+          if (gone === null) return true;
+        }
+      }),
   };
 }
 

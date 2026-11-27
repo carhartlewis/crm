@@ -16,3 +16,12 @@ CRM records (Companies first) must read, filter and sort locally, and writes mus
 ## Consequences
 
 Auth and row filtering stay server-side; adding a record type means a table with `workspace_id`, a proxy route with its fixed shape, and write endpoints returning txids. Shape columns reach the browser with table names, so CRM tables use snake_case columns. Code: `apps/api/src/http/sync-proxy.ts`, `apps/api/src/services/Companies.ts`, `@crm/core/api` (`CompaniesApi`, `Company`), `@crm/core/company`.
+
+## Addendum: connections, custom connectors and skills (2026-11)
+
+- **They sync too.** `GET /api/shapes/connections`, `/api/shapes/custom-connectors` and `/api/shapes/skills` follow the same rules (session, `?workspace=`, membership). The Connections page reads them with `useLiveSuspenseQuery`; the route loader waits for their first snapshot. The catalog is built in the browser from `@crm/integrations` plus the synced custom connectors. Only third-party data stays on TanStack Query: logos, skills.sh search, and each app's OAuth start.
+- **A shape can fix its columns.** `connection` syncs only the caller's rows (`workspace_id = $1 AND user_id = $2`) and never `credentials`; `skill` leaves out `files` (up to 1 MB per skill), which the skill sheet loads on demand from `GET /api/skills/:id`. A client's `columns` param is ignored.
+- **Writes return txids.** Changing access, disconnecting, removing a connector, enabling or removing a skill are optimistic collection writes. Adding a connector (the API checks the server for MCP OAuth) and adding a skill (validated, or copied from skills.sh) are not: the mutation calls the API, then awaits the returned txid in the collection, so it settles once the new row has synced. A new connection is written by the app's OAuth callback and simply arrives through sync, including when sign-in finished in the system browser.
+- **Replica identity.** Electric sets `REPLICA IDENTITY FULL` on a table the first time it serves a shape for it, so synced tables need no migration step for it.
+
+Code: `apps/api/src/http/sync-proxy.ts` (`connectionsSync`, `customConnectorsSync`, `skillsSync`), `apps/api/src/services/txid.ts`, `apps/web/src/lib/sync-collections.ts`, `apps/web/src/lib/connections.ts`, `apps/web/src/lib/skills.ts`.

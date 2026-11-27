@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isoTimestamp } from "./companies.ts";
+import { isoTimestamp } from "./sync-collections.ts";
 
 describe("isoTimestamp", () => {
   test("turns Postgres timestamptz text into ISO", () => {

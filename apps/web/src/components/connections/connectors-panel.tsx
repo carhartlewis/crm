@@ -24,7 +24,10 @@ import { toast } from "sonner";
 import {
   type Connection,
   connectionLogosQuery,
+  connectionsCollection,
   connectMutation,
+  type CustomConnector,
+  customConnectorsCollection,
   disconnectMutation,
   removeConnectorMutation,
   setAccessMutation,
@@ -57,6 +60,7 @@ function haystack(integration: CatalogEntry) {
 export function ConnectorsPanel({
   catalog,
   connections,
+  customConnectors,
   userId,
   workspaceId,
   view,
@@ -64,12 +68,14 @@ export function ConnectorsPanel({
 }: {
   catalog: readonly CatalogEntry[];
   connections: readonly Connection[];
+  customConnectors: readonly CustomConnector[];
   userId: string;
   workspaceId: string;
   view: "yours" | "discover";
   query: string;
 }) {
   const byIntegration = new Map(connections.map((entry) => [entry.integration, entry]));
+  const customIds = new Map(customConnectors.map((connector) => [connector.key, connector.id]));
   const { data: logos } = useQuery(connectionLogosQuery(userId, workspaceId));
   const needle = query.trim().toLowerCase();
 
@@ -95,7 +101,9 @@ export function ConnectorsPanel({
           {shown.map((integration) => (
             <IntegrationCard
               key={integration.id}
+              workspaceId={workspaceId}
               integration={integration}
+              customId={customIds.get(integration.id)}
               logo={logos?.[integration.id] ?? null}
               connection={byIntegration.get(integration.id)}
             />
@@ -117,14 +125,21 @@ export function SectionHeading({ count, children }: { count: number; children: s
 }
 
 function IntegrationCard({
+  workspaceId,
   integration,
+  customId,
   logo,
   connection,
 }: {
+  workspaceId: string;
   integration: CatalogEntry;
+  /** The synced row id, for a custom connector. */
+  customId: string | undefined;
   logo: string | null;
   connection: Connection | undefined;
 }) {
+  const connections = connectionsCollection(workspaceId);
+  const customConnectors = customConnectorsCollection(workspaceId);
   const connect = useMutation({ ...connectMutation, onError });
   const setAccess = useMutation({ ...setAccessMutation, onError });
 
@@ -141,12 +156,12 @@ function IntegrationCard({
   });
 
   // Custom connectors can be removed for the whole workspace, from either menu.
-  const removeItem = integration.custom ? (
+  const removeItem = customId ? (
     <>
       <DropdownMenuSeparator />
       <DropdownMenuItem
         variant="destructive"
-        onClick={() => removeConnector.mutate(integration.id)}
+        onClick={() => removeConnector.mutate({ collection: customConnectors, id: customId })}
       >
         Remove from workspace
       </DropdownMenuItem>
@@ -212,7 +227,7 @@ function IntegrationCard({
                   value={access}
                   onValueChange={(next: Access) =>
                     next !== access &&
-                    setAccess.mutate({ integration: integration.id, access: next })
+                    setAccess.mutate({ collection: connections, id: connection.id, access: next })
                   }
                 >
                   {(["read", "write"] as const).map((option) => (
@@ -225,7 +240,7 @@ function IntegrationCard({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
-                onClick={() => disconnect.mutate(integration.id)}
+                onClick={() => disconnect.mutate({ collection: connections, id: connection.id })}
               >
                 Disconnect
               </DropdownMenuItem>

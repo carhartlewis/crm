@@ -1,8 +1,12 @@
-@import "tailwindcss";
+/*
+ * Class candidates come only from explicit `@source` globs: these shared components here, and
+ * each app's own files in its stylesheet. Without `source(none)`, the Bun plugin also scans
+ * every bundled module (Effect, TanStack DB, Electric…) and ships utilities nothing uses.
+ */
+@import "tailwindcss" source(none);
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@source "../../../apps/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
 
 @custom-variant dark (&:is(.dark *));

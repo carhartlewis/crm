@@ -1,7 +1,7 @@
 import { mutationOptions } from "@tanstack/react-query";
 import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 import { createCollection } from "@tanstack/react-db";
-import { registerSynced } from "./synced.ts";
+import { isoTimestamp, perWorkspace, syncedWrite, type WriteBody } from "./sync-collections.ts";
 
 /**
  * A company row exactly as Electric syncs it (snake_case, timestamps as ISO strings). A type
@@ -22,48 +22,9 @@ export interface CompanyInput {
   readonly domain: string | null;
 }
 
-/**
- * Postgres sends `timestamptz` as text ("2026-11-26 23:53:53.944+00"), which `Date` doesn't parse
- * everywhere. Rows keep ISO strings, the same as optimistic rows.
- */
-export function isoTimestamp(value: string) {
-  const parsed = new Date(value.replace(" ", "T").replace(/([+-]\d{2})$/, "$1:00"));
-
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
-}
-
-/** The body of a company write: what the API contract accepts (all fields, or a patch). */
-interface CompanyWrite {
-  readonly id?: string | undefined;
-  readonly name?: string | undefined;
-  readonly domain?: string | null | undefined;
-}
-
 /** Calls a write endpoint and returns the Postgres txid to await in the Electric stream. */
-async function write(path: string, method: "POST" | "PATCH" | "DELETE", body?: CompanyWrite) {
-  const response = await fetch(path, {
-    method,
-    credentials: "same-origin",
-    headers: body ? { "content-type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (!response.ok) {
-    const failure: { message?: unknown } = await response.json().catch(() => ({}));
-
-    throw new Error(
-      String(failure.message) === failure.message
-        ? failure.message
-        : "The change couldn't be saved",
-    );
-  }
-
-  const result: { txid?: unknown } = await response.json();
-
-  if (!Number.isSafeInteger(result.txid)) throw new Error("The server returned no transaction id");
-
-  return Number(result.txid);
-}
+const write = async (path: string, method: "POST" | "PATCH" | "DELETE", body?: WriteBody) =>
+  (await syncedWrite(path, method, body)).txid;
 
 function createCompaniesCollection(workspaceId: string) {
   return createCollection(
@@ -121,30 +82,8 @@ function createCompaniesCollection(workspaceId: string) {
 
 export type CompaniesCollection = ReturnType<typeof createCompaniesCollection>;
 
-const collections = new Map<string, CompaniesCollection>();
-
 /** The synced companies of a workspace: one collection per workspace, created on first use. */
-export function companiesCollection(workspaceId: string): CompaniesCollection {
-  let collection = collections.get(workspaceId);
-
-  if (!collection) {
-    collection = createCompaniesCollection(workspaceId);
-    collections.set(workspaceId, collection);
-  }
-
-  return collection;
-}
-
-/** Stops syncing every workspace but `keep` (after a switch), or all of them (sign-out). */
-async function releaseCompanies(keep?: string) {
-  const released = [...collections].filter(([workspaceId]) => workspaceId !== keep);
-
-  for (const [workspaceId] of released) collections.delete(workspaceId);
-
-  await Promise.all(released.map(([, collection]) => collection.cleanup()));
-}
-
-registerSynced(releaseCompanies);
+export const companiesCollection = perWorkspace(createCompaniesCollection);
 
 interface CreateCompany {
   readonly collection: CompaniesCollection;

@@ -35,6 +35,8 @@ export interface SyncSpec {
   where: string;
   /** Positional values for `$1`, `$2`, … in `where`. */
   params: readonly string[];
+  /** The columns that reach the browser (primary key included); all of them when absent. */
+  columns?: readonly string[];
 }
 
 /** The `/v1/shape` URL for `spec`, carrying only the client's protocol params. */
@@ -52,6 +54,8 @@ export function electricUrlFor(
 
   url.searchParams.set("table", spec.table);
   url.searchParams.set("where", spec.where);
+
+  if (spec.columns) url.searchParams.set("columns", spec.columns.join(","));
 
   for (const [index, value] of spec.params.entries()) {
     url.searchParams.set(`params[${index + 1}]`, value);
@@ -121,4 +125,52 @@ export function proxyResponse(upstream: Response) {
 /** Companies of one workspace. The workspace id is bound as a parameter, never spliced in. */
 export function companiesSync(workspaceId: string): SyncSpec {
   return { table: "company", where: "workspace_id = $1", params: [workspaceId] };
+}
+
+/**
+ * One user's connections in one workspace. `credentials` (encrypted upstream tokens) is left
+ * out, so it never reaches a browser.
+ */
+export function connectionsSync(workspaceId: string, userId: string): SyncSpec {
+  return {
+    table: "connection",
+    where: "workspace_id = $1 AND user_id = $2",
+    params: [workspaceId, userId],
+    columns: ["id", "workspace_id", "user_id", "integration", "access", "created_at", "updated_at"],
+  };
+}
+
+/** Custom connectors of one workspace. */
+export function customConnectorsSync(workspaceId: string): SyncSpec {
+  return {
+    table: "custom_connector",
+    where: "workspace_id = $1",
+    params: [workspaceId],
+    columns: ["id", "workspace_id", "key", "name", "mcp_url", "added_by_id", "created_at"],
+  };
+}
+
+/**
+ * Skills of one workspace, without `files`: a skill's extra files can reach 1 MB, so they load
+ * on demand when someone opens the skill.
+ */
+export function skillsSync(workspaceId: string): SyncSpec {
+  return {
+    table: "skill",
+    where: "workspace_id = $1",
+    params: [workspaceId],
+    columns: [
+      "id",
+      "workspace_id",
+      "name",
+      "description",
+      "content",
+      "source",
+      "source_id",
+      "enabled",
+      "added_by_id",
+      "created_at",
+      "updated_at",
+    ],
+  };
 }

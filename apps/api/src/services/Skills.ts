@@ -22,6 +22,7 @@ import { createPreloader, type Kv as KvStore } from "@crm/core/kv";
 import { Context, Effect, Layer, Schema } from "effect";
 import { Database } from "./Database.ts";
 import { Kv } from "./Kv.ts";
+import { transactWithTxid, type Written } from "./txid.ts";
 
 type Owner = { readonly workspaceId: string; readonly userId: string };
 
@@ -51,10 +52,18 @@ export interface SkillStore {
   isMember(owner: Owner): Promise<boolean>;
   list(workspaceId: string): Promise<readonly SkillRecord[]>;
   find(workspaceId: string, id: string): Promise<SkillRecord | null>;
-  /** The new skill's id; null when the workspace already has a skill with this name. */
-  insert(owner: Owner, skill: NewSkill, now: Date): Promise<string | null>;
-  setEnabled(workspaceId: string, id: string, enabled: boolean, now: Date): Promise<boolean>;
-  remove(workspaceId: string, id: string): Promise<boolean>;
+  /**
+   * The new skill's id; null when the workspace already has a skill with this name. Writes the
+   * browser makes return their txid (ADR 0012): it awaits it in the synced rows.
+   */
+  insert(owner: Owner, skill: NewSkill, now: Date): Promise<Written<string | null>>;
+  setEnabled(
+    workspaceId: string,
+    id: string,
+    enabled: boolean,
+    now: Date,
+  ): Promise<Written<boolean>>;
+  remove(workspaceId: string, id: string): Promise<Written<boolean>>;
 }
 
 export type NewSkill = SkillPackage & {
@@ -84,11 +93,11 @@ export interface SkillsService {
   readonly create: (
     actor: SkillActor,
     input: { name: string; description: string; content: string },
-  ) => Effect.Effect<SkillSummary, NoActiveWorkspace | Invalid>;
+  ) => Effect.Effect<AddedSkill, NoActiveWorkspace | Invalid>;
   readonly install: (
     actor: SkillActor,
     sourceId: string,
-  ) => Effect.Effect<SkillSummary, NoActiveWorkspace | Invalid | UpstreamUnavailable>;
+  ) => Effect.Effect<AddedSkill, NoActiveWorkspace | Invalid | UpstreamUnavailable>;
   readonly get: (
     actor: SkillActor,
     id: string,
@@ -97,11 +106,11 @@ export interface SkillsService {
     actor: SkillActor,
     id: string,
     enabled: boolean,
-  ) => Effect.Effect<SkillSummary, NoActiveWorkspace | NotFound>;
+  ) => Effect.Effect<TxId, NoActiveWorkspace | NotFound>;
   readonly remove: (
     actor: SkillActor,
     id: string,
-  ) => Effect.Effect<void, NoActiveWorkspace | NotFound>;
+  ) => Effect.Effect<TxId, NoActiveWorkspace | NotFound>;
   /** The enabled skills of a workspace, for the agent. Empty for a non-member. */
   readonly forAgent: (owner: Owner) => Promise<readonly AgentSkill[]>;
 }
@@ -113,6 +122,12 @@ export interface SkillsDependencies {
   readonly fetch?: Fetch;
   readonly now: () => Date;
 }
+
+/** A write's Postgres transaction id, for the client to await in its synced rows. */
+type TxId = { readonly txid: number };
+
+/** A skill just added: its id, and the transaction that added it. */
+type AddedSkill = { readonly id: string; readonly txid: number };
 
 const noWorkspace = () =>
   new NoActiveWorkspace({ message: "Choose a workspace you belong to first" });
@@ -234,7 +249,7 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
 
       const name = input.name.trim();
 
-      const id = yield* run("insert", () =>
+      const inserted = yield* run("insert", () =>
         store.insert(
           scope,
           {
@@ -250,10 +265,10 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
         ),
       );
 
-      if (!id)
+      if (!inserted.result)
         return yield* new Invalid({ message: `This workspace already has a skill named ${name}` });
 
-      return toSummary(yield* found(scope.workspaceId, id).pipe(Effect.orDie));
+      return { id: inserted.result, txid: inserted.txid };
     }),
 
     install: Effect.fn("Skills.install")(function* (actor, sourceId) {
@@ -274,7 +289,7 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
         ),
       );
 
-      const id = yield* run("insert", () =>
+      const inserted = yield* run("insert", () =>
         store.insert(
           scope,
           { ...skill, source: "skills.sh", sourceId, enabled: false },
@@ -282,13 +297,13 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
         ),
       );
 
-      if (!id) {
+      if (!inserted.result) {
         return yield* new Invalid({
           message: `This workspace already has a skill named ${skill.name}`,
         });
       }
 
-      return toSummary(yield* found(scope.workspaceId, id).pipe(Effect.orDie));
+      return { id: inserted.result, txid: inserted.txid };
     }),
 
     get: Effect.fn("Skills.get")(function* (actor, id) {
@@ -304,16 +319,18 @@ export function makeSkills(deps: SkillsDependencies): SkillsService {
         store.setEnabled(scope.workspaceId, id, enabled, deps.now()),
       );
 
-      if (!changed) return yield* notFound();
+      if (!changed.result) return yield* notFound();
 
-      return toSummary(yield* found(scope.workspaceId, id));
+      return { txid: changed.txid };
     }),
 
     remove: Effect.fn("Skills.remove")(function* (actor, id) {
       const scope = yield* owner(actor);
       const removed = yield* run("remove", () => store.remove(scope.workspaceId, id));
 
-      if (!removed) return yield* notFound();
+      if (!removed.result) return yield* notFound();
+
+      return { txid: removed.txid };
     }),
 
     forAgent: async (scope) => {
@@ -380,31 +397,45 @@ export function prismaSkillStore(db: Db): SkillStore {
       ),
     find: async (workspaceId, id) =>
       (await withAuthor([await skills.where({ workspaceId, id }).first()]))[0] ?? null,
-    insert: async ({ workspaceId, userId }, skill, now) => {
-      if (await skills.where({ workspaceId, name: skill.name }).first()) return null;
+    insert: ({ workspaceId, userId }, skill, now) =>
+      transactWithTxid(db, async (tx) => {
+        const rows = tx.orm.public.Skill;
 
-      const id = crypto.randomUUID();
+        if (await rows.where({ workspaceId, name: skill.name }).first()) return null;
 
-      await skills.create({
-        id,
-        workspaceId,
-        name: skill.name,
-        description: skill.description,
-        content: skill.content,
-        files: skill.files,
-        source: skill.source,
-        sourceId: skill.sourceId,
-        enabled: skill.enabled,
-        addedById: userId,
-        createdAt: now,
-        updatedAt: now,
-      });
+        const id = crypto.randomUUID();
 
-      return id;
-    },
-    setEnabled: async (workspaceId, id, enabled, now) =>
-      (await skills.where({ workspaceId, id }).update({ enabled, updatedAt: now })) !== null,
-    remove: async (workspaceId, id) => (await skills.where({ workspaceId, id }).delete()) !== null,
+        await rows.create({
+          id,
+          workspaceId,
+          name: skill.name,
+          description: skill.description,
+          content: skill.content,
+          files: skill.files,
+          source: skill.source,
+          sourceId: skill.sourceId,
+          enabled: skill.enabled,
+          addedById: userId,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        return id;
+      }),
+    setEnabled: (workspaceId, id, enabled, now) =>
+      transactWithTxid(
+        db,
+        async (tx) =>
+          (await tx.orm.public.Skill.where({ workspaceId, id }).update({
+            enabled,
+            updatedAt: now,
+          })) !== null,
+      ),
+    remove: (workspaceId, id) =>
+      transactWithTxid(
+        db,
+        async (tx) => (await tx.orm.public.Skill.where({ workspaceId, id }).delete()) !== null,
+      ),
   };
 }
 
