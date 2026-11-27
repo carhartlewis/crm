@@ -214,7 +214,7 @@ function IntegrationCard({
               // Same line shape as an added card, so a grid of both reads evenly.
               <>
                 <Badge variant="outline" className="shrink-0">
-                  Not added
+                  Not installed
                 </Badge>
                 <span aria-hidden className="shrink-0">
                   ·
