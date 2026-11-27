@@ -64,3 +64,24 @@ export const createAndOpenWorkspaceMutation = mutationOptions({
     return workspace;
   },
 });
+
+/**
+ * Renames the active workspace or changes its website. The server re-validates both, and a new
+ * website brings its logo; a changed website does not research it again until a member asks.
+ */
+export const updateWorkspaceMutation = mutationOptions({
+  mutationKey: ["workspaces", "update"],
+  mutationFn: async (
+    { workspaceId, value }: { workspaceId: string; value: WorkspaceInput },
+    { client },
+  ) => {
+    const { error } = await authClient.organization.update({
+      organizationId: workspaceId,
+      data: toWorkspaceInput(value),
+    });
+
+    if (error) throw new Error(error.message ?? "Couldn't save the workspace");
+
+    await resetAuth(client);
+  },
+});

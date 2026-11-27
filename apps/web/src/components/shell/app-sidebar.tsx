@@ -14,6 +14,8 @@ import {
 } from "@crm/ui/components/sidebar";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { haptic } from "../../lib/haptics.ts";
+import { isSettingsPath } from "../../lib/settings.ts";
+import { SettingsNav } from "../settings/settings-nav.tsx";
 import { ariaKeyShortcuts, shortcuts } from "../../lib/shortcuts.ts";
 import { PinnedNav } from "./pinned-nav.tsx";
 import { RowShortcut } from "./row-shortcut.tsx";
@@ -31,7 +33,8 @@ export interface AppSidebarProps {
 }
 
 export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: AppSidebarProps) {
-  const onHome = useRouterState({ select: (state) => state.location.pathname === "/" });
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const onHome = pathname === "/";
 
   return (
     <Sidebar variant="inset">
@@ -42,27 +45,31 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
         </div>
       </SidebarHeader>
       <SidebarContent ref={rubberBandScroll} className="overscroll-none">
-        <div>
-          <SidebarGroup>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={onHome}
-                  aria-keyshortcuts={ariaKeyShortcuts(shortcuts.home)}
-                  render={<Link to="/" />}
-                >
-                  <HomeIcon />
-                  <span>Home</span>
-                  <RowShortcut shortcut={shortcuts.home} />
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel>Pinned</SidebarGroupLabel>
-            <PinnedNav userId={userId} workspaceId={workspaceId} />
-          </SidebarGroup>
-        </div>
+        {isSettingsPath(pathname) ? (
+          <SettingsNav />
+        ) : (
+          <div>
+            <SidebarGroup>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={onHome}
+                    aria-keyshortcuts={ariaKeyShortcuts(shortcuts.home)}
+                    render={<Link to="/" />}
+                  >
+                    <HomeIcon />
+                    <span>Home</span>
+                    <RowShortcut shortcut={shortcuts.home} />
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+            <SidebarGroup>
+              <SidebarGroupLabel>Pinned</SidebarGroupLabel>
+              <PinnedNav userId={userId} workspaceId={workspaceId} />
+            </SidebarGroup>
+          </div>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <WorkspaceMenu userId={userId} />

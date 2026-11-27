@@ -38,7 +38,7 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Onboarding shell**: The full-window layout for sign-in, setup and route-level states: shader backdrop, app mark, title, content.
 
-**Pinned pages**: The workspace's top-level pages in the sidebar: Companies, Contacts, Workflows, Workspace knowledge, Connections. Each user orders them by dragging; ⌥1–⌥9 open them in that order.
+**Pinned pages**: The workspace's top-level pages in the sidebar: Companies, Contacts, Workflows, Connections. Each user orders them by dragging; ⌥1–⌥9 open them in that order.
 
 **Peek**: The card that opens when you hover or focus a pinned page: what it holds, its shortcut, and the workspace's members. Its code and data load on hover, before it opens.
 
@@ -62,6 +62,8 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Fact**: One statement Supermemory extracted from sources. Members can forget a wrong fact; a newer fact can replace an older one.
 
-**Workspace knowledge**: The page that shows the workspace's own memory. A company's memory is on its Knowledge tab.
+**Settings**: Pages under `/settings`; the sidebar swaps to their links. Workspace settings (General, Memory) are shared by every member; personal settings (Profile: name, picture, theme) are the user's own.
+
+**Memory graph**: Supermemory's canvas of sources and the facts read from them, in Workspace settings → Memory and on a company's Knowledge tab.
 
 **Jev**: The decision model (`typesafe-ai/jev` on the Vercel AI Gateway) that judges each chat message and sent email: sensitive, lasting, which company, already known, or a correction. Thresholds in `@crm/memory/jev` decide what is kept.

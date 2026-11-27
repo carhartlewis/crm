@@ -7,6 +7,7 @@ import { Auth } from "./services/Auth.ts";
 import { Connections } from "./services/Connections.ts";
 import { Companies } from "./services/Companies.ts";
 import { Electric } from "./services/Electric.ts";
+import { Images } from "./services/Images.ts";
 import { Memory } from "./services/Memory.ts";
 import { Skills } from "./services/Skills.ts";
 
@@ -24,6 +25,7 @@ const Server = Layer.unwrap(
         Connections.layer,
         Skills.layer,
         Memory.layer,
+        Images.layer,
       ]),
       Layer.provide(BunHttpServer.layer({ port: config.port })),
     );

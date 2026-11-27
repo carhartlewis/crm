@@ -5,6 +5,7 @@ import {
   CUSTOM_CONNECTORS_SYNC_PATH,
   CurrentSession,
   CurrentUser,
+  Invalid,
   NoActiveWorkspace,
   SKILLS_SYNC_PATH,
   Unauthorized,
@@ -18,6 +19,7 @@ import { Auth, type McpPrincipal } from "../services/Auth.ts";
 import { Companies } from "../services/Companies.ts";
 import { type Actor, Connections } from "../services/Connections.ts";
 import { Electric } from "../services/Electric.ts";
+import { Images } from "../services/Images.ts";
 import { type AgentResult, Memory } from "../services/Memory.ts";
 import { Skills } from "../services/Skills.ts";
 import { AuthenticationLive } from "./Authentication.ts";
@@ -36,11 +38,31 @@ const SystemHandlers = HttpApiBuilder.group(CrmApi, "system", (handlers) =>
 );
 
 const AccountHandlers = HttpApiBuilder.group(CrmApi, "account", (handlers) =>
-  handlers.handle("me", () =>
-    Effect.gen(function* () {
-      return yield* CurrentUser;
-    }),
-  ),
+  Effect.gen(function* () {
+    const images = yield* Images;
+
+    return handlers
+      .handle("me", () =>
+        Effect.gen(function* () {
+          return yield* CurrentUser;
+        }),
+      )
+      .handle("avatar", ({ payload }) =>
+        Effect.gen(function* () {
+          const user = yield* CurrentUser;
+          const bytes = Uint8Array.fromBase64(payload.image);
+          const url = yield* Effect.promise(() => images.uploadAvatar(user.id, bytes));
+
+          if (!url) {
+            return yield* Effect.fail(
+              new Invalid({ message: "Choose a PNG, JPEG or WebP image under 1 MB" }),
+            );
+          }
+
+          return { url };
+        }),
+      );
+  }),
 );
 
 /** The acting user and the session's workspace; services verify membership. */
@@ -132,6 +154,8 @@ const MemoryHandlers = HttpApiBuilder.group(CrmApi, "memory", (handlers) =>
       .handle("company", ({ params }) =>
         Effect.flatMap(actor, (who) => memory.company(who, params.id)),
       )
+      .handle("graph", ({ query }) => Effect.flatMap(actor, (who) => memory.graph(who, query)))
+      .handle("search", ({ query }) => Effect.flatMap(actor, (who) => memory.search(who, query)))
       .handle("addNote", ({ payload }) =>
         Effect.flatMap(actor, (who) => memory.addNote(who, payload)),
       )

@@ -1,3 +1,4 @@
+import { createImageCache, createMemoryStorage } from "@crm/core/storage";
 import { SessionUser } from "@crm/core/api";
 import { createMemoryKv } from "@crm/core/kv";
 import { afterAll, describe, expect, test } from "bun:test";
@@ -5,6 +6,7 @@ import { Effect, Layer, Option } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 import { Auth, AuthError, type SessionInfo } from "../services/Auth.ts";
 import { Companies, makeCompanies } from "../services/Companies.ts";
+import { Images } from "../services/Images.ts";
 import { makeMemory, Memory } from "../services/Memory.ts";
 import { createMemoryDirectory } from "../services/memory-directory-memory.ts";
 import { Connections, makeConnections } from "../services/Connections.ts";
@@ -151,6 +153,7 @@ const app = HttpRouter.toWebHandler(
           now: () => new Date(),
         }),
       ),
+      Layer.succeed(Images, createImageCache({ storage: createMemoryStorage() })),
       // Memory is covered in Memory.test.ts; here it is off.
       Layer.succeed(
         Memory,

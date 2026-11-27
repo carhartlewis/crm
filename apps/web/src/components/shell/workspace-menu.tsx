@@ -3,6 +3,9 @@ import arrowsHorizontal from "@carbon/icons/es/arrows--horizontal/16.js";
 import chevronDown from "@carbon/icons/es/chevron--down/16.js";
 import logout from "@carbon/icons/es/logout/16.js";
 import screen from "@carbon/icons/es/screen/16.js";
+import settings from "@carbon/icons/es/settings/16.js";
+import building from "@carbon/icons/es/building/16.js";
+import userIcon from "@carbon/icons/es/user/16.js";
 import { Avatar, AvatarFallback, AvatarImage } from "@crm/ui/components/avatar";
 import {
   DropdownMenu,
@@ -33,6 +36,9 @@ const AddIcon = carbonIcon(add);
 const ChevronDownIcon = carbonIcon(chevronDown);
 const LogoutIcon = carbonIcon(logout);
 const ThemeIcon = carbonIcon(screen);
+const SettingsIcon = carbonIcon(settings);
+const WorkspaceIcon = carbonIcon(building);
+const PersonIcon = carbonIcon(userIcon);
 
 const THEMES = [
   { value: "light", label: "Light" },
@@ -112,6 +118,22 @@ export function WorkspaceMenu({ userId }: { userId: string }) {
                   <DropdownMenuItem onClick={() => void navigate({ to: "/new-workspace" })}>
                     <AddIcon />
                     Create new workspace
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <SettingsIcon />
+                  Settings
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem onClick={() => void navigate({ to: "/settings/account" })}>
+                    <PersonIcon />
+                    Personal settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void navigate({ to: "/settings" })}>
+                    <WorkspaceIcon />
+                    Workspace settings
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>

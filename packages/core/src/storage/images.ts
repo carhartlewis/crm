@@ -18,6 +18,11 @@ export interface ImageCache {
   isStored(url: string): boolean;
   /** Copies a user's profile picture. `null` when there is none or it isn't a usable image. */
   avatar(userId: string, source: string): Promise<string | null>;
+  /**
+   * Stores a picture a user uploaded as their profile picture. `null` when the bytes are not
+   * a PNG, JPEG, GIF, WebP or ICO image, or are larger than the limit.
+   */
+  uploadAvatar(userId: string, bytes: Uint8Array): Promise<string | null>;
   /** Copies a website's favicon, shared by every workspace on that host. */
   favicon(website: string): Promise<string | null>;
   /**
@@ -39,6 +44,17 @@ export function createImageCache({
   timeoutMs = 5000,
   maxBytes = 1024 * 1024,
 }: ImageCacheDependencies): ImageCache {
+  async function store(key: string, bytes: Uint8Array) {
+    const contentType = bytes.byteLength <= maxBytes ? sniffImageType(bytes) : null;
+
+    if (!contentType) return null;
+
+    const stored = await storage.put(key, bytes, { contentType });
+
+    // Keys are stable, so the version busts browser and CDN caches when the image changes.
+    return `${stored.url}?v=${shortHash(bytes)}`;
+  }
+
   async function copy(key: string, source: string | null) {
     if (!source) return null;
 
@@ -47,19 +63,14 @@ export function createImageCache({
     if (!response.ok || !response.body) return null;
 
     const bytes = await readAtMost(response.body, maxBytes);
-    const contentType = bytes && sniffImageType(bytes);
 
-    if (!bytes || !contentType) return null;
-
-    const stored = await storage.put(key, bytes, { contentType });
-
-    // Keys are stable, so the version busts browser and CDN caches when the image changes.
-    return `${stored.url}?v=${shortHash(bytes)}`;
+    return bytes ? store(key, bytes) : null;
   }
 
   return {
     isStored: (url) => storage.isStored(url),
     avatar: (userId, source) => copy(`users/${userId}/avatar`, avatarSource(source)),
+    uploadAvatar: (userId, bytes) => store(`users/${userId}/avatar`, bytes),
     favicon: (website) => {
       const host = websiteHost(website);
 

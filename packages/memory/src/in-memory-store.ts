@@ -132,6 +132,7 @@ export function createInMemoryStore(options: { now?: () => Date } = {}) {
           text: fact.text,
           similarity,
           createdAt: fact.createdAt,
+          sourceId: fact.sourceId,
         }));
     },
 
@@ -157,6 +158,24 @@ export function createInMemoryStore(options: { now?: () => Date } = {}) {
       }
 
       return count;
+    },
+
+    async graph(namespace, limit) {
+      const part = partition(namespace);
+
+      return [...part.sources.values()].slice(0, limit).map(({ source, updatedAt }) => ({
+        sourceId: source.sourceId,
+        kind: source.kind,
+        title: source.title,
+        summary: null,
+        createdAt: updatedAt,
+        updatedAt,
+        facts: [...part.facts.values()].flatMap((fact) =>
+          fact.sourceId === source.sourceId
+            ? [Object.assign({}, fact, { isForgotten: fact.forgotten, updatedAt: fact.createdAt })]
+            : [],
+        ),
+      }));
     },
 
     async deleteNamespace(namespace) {

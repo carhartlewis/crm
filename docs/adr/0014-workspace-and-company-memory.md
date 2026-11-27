@@ -40,8 +40,10 @@ notes, chats with the assistant and the emails members send.
   not the API (agentic-first).
 - **Emails are read from the agent's own tool calls.** A successful call to a connected app's send,
   reply or forward tool is an email candidate; its recipients' domains pick the company.
-- **Members see and correct memory.** The "Workspace knowledge" page and each company's Knowledge
-  tab show the profile, recent facts and sources, take notes, and forget facts. The agent has
+- **Members see and correct memory.** Workspace settings → Memory and each company's Knowledge
+  tab draw the memory as Supermemory's graph (`@supermemory/memory-graph`, as in comp-neo):
+  sources and the facts read from them, with search. Members add notes, research the website
+  again, open a source and forget wrong facts. The agent has
   `crm__search`, `crm__remember` and `crm__forget` (forget asks first). Recalled text is data,
   never instructions.
 

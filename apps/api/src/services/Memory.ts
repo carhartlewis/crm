@@ -1,6 +1,8 @@
 import {
   Invalid,
   type Knowledge,
+  type MemoryGraph,
+  type MemoryHit,
   NoActiveWorkspace,
   NotFound,
   UpstreamUnavailable,
@@ -10,6 +12,7 @@ import { createContextDev, type CompanyResearcher } from "@crm/core/brand";
 import type { Db } from "@crm/core/db";
 import {
   EMPTY_PROFILE,
+  type GraphSource,
   type MemorySource,
   type MemoryStore,
   type MemorySubject,
@@ -86,6 +89,11 @@ type MemoryError = NoActiveWorkspace | NotFound | Invalid | UpstreamUnavailable;
 export interface MemoryService {
   readonly workspace: (actor: Actor) => Effect.Effect<Knowledge, MemoryError>;
   readonly company: (actor: Actor, id: string) => Effect.Effect<Knowledge, MemoryError>;
+  readonly graph: (actor: Actor, input: Target) => Effect.Effect<MemoryGraph, MemoryError>;
+  readonly search: (
+    actor: Actor,
+    input: Target & { q: string },
+  ) => Effect.Effect<readonly MemoryHit[], MemoryError>;
   readonly addNote: (
     actor: Actor,
     input: Target & { text: string },
@@ -128,6 +136,49 @@ const RESEARCH_SOURCE = "website-research";
 const FACT_LIMIT = 100;
 const SOURCE_LIMIT = 20;
 const RECALL_COMPANIES = 3;
+const GRAPH_SOURCES = 60;
+
+/** Sources and facts in the shape `@supermemory/memory-graph` draws. */
+export function toMemoryGraph(spaceId: string, sources: readonly GraphSource[]): MemoryGraph {
+  return {
+    documents: sources.map((source) => ({
+      id: source.sourceId,
+      title: source.title,
+      summary: source.summary,
+      documentType: source.kind ?? "source",
+      createdAt: source.createdAt,
+      updatedAt: source.updatedAt,
+      memories: source.facts.map((fact) => ({
+        id: fact.id,
+        memory: fact.text,
+        content: null,
+        isStatic: fact.isStatic,
+        spaceId,
+        isLatest: fact.isLatest,
+        isForgotten: fact.isForgotten,
+        forgetAfter: null,
+        forgetReason: null,
+        version: fact.version,
+        parentMemoryId: null,
+        rootMemoryId: null,
+        createdAt: fact.createdAt,
+        updatedAt: fact.updatedAt,
+        relation: null,
+        updatesMemoryId: null,
+        nextVersionId: null,
+        memoryRelations: null,
+      })),
+    })),
+    totals: {
+      sources: sources.length,
+      facts: sources.reduce(
+        (total, source) =>
+          total + source.facts.filter((fact) => fact.isLatest && !fact.isForgotten).length,
+        0,
+      ),
+    },
+  };
+}
 
 const noWorkspace = () =>
   new NoActiveWorkspace({ message: "Choose a workspace you belong to first" });
@@ -399,6 +450,33 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
       Effect.flatMap(member(actor), (workspaceId) =>
         knowledge(namespace(workspaceId, { type: "workspace" })),
       ),
+
+    graph: (actor, input) =>
+      Effect.gen(function* () {
+        const workspaceId = yield* member(actor);
+        const ns = yield* target(workspaceId, input);
+
+        if (!store) return { documents: [], totals: { sources: 0, facts: 0 } };
+
+        const sources = yield* stored("graph", (memory) => memory.graph(ns, GRAPH_SOURCES));
+
+        return toMemoryGraph(ns, sources);
+      }),
+
+    search: (actor, input) =>
+      Effect.gen(function* () {
+        const workspaceId = yield* member(actor);
+        const ns = yield* target(workspaceId, input);
+        const query = input.q.trim().slice(0, 500);
+
+        if (!query || !store) return [];
+
+        const hits = yield* stored("search", (memory) =>
+          memory.search(ns, { query, limit: 12, threshold: 0.3 }),
+        );
+
+        return hits.map((hit) => ({ id: hit.factId, text: hit.text, sourceId: hit.sourceId }));
+      }),
 
     company: (actor, id) =>
       Effect.gen(function* () {

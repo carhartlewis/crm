@@ -49,11 +49,6 @@ export class SystemApi extends HttpApiGroup.make("system", { topLevel: true }).a
   HttpApiEndpoint.get("health", "/health", { success: HttpApiSchema.NoContent }),
 ) {}
 
-export class AccountApi extends HttpApiGroup.make("account")
-  .add(HttpApiEndpoint.get("me", "/me", { success: SessionUser }))
-  .middleware(Authentication)
-  .prefix("/account") {}
-
 /** The id is not in the caller's active workspace (or does not exist). */
 export class NotFound extends Schema.TaggedError<NotFound>()(
   "NotFound",
@@ -74,6 +69,24 @@ export class Invalid extends Schema.TaggedError<Invalid>()(
   { message: Schema.String },
   { httpApiStatus: 400 },
 ) {}
+
+/** A picture a user chose, already cropped to a square in the browser, as base64. */
+export const AvatarUpload = Schema.Struct({
+  image: Schema.String.check(Schema.isMaxLength(1_500_000)),
+});
+
+export class AccountApi extends HttpApiGroup.make("account")
+  .add(HttpApiEndpoint.get("me", "/me", { success: SessionUser }))
+  /** Stores the picture and returns its URL; the client then saves it as the user's image. */
+  .add(
+    HttpApiEndpoint.post("avatar", "/avatar", {
+      payload: AvatarUpload,
+      success: Schema.Struct({ url: Schema.String }),
+      error: [Invalid],
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/account") {}
 
 /**
  * A `company` row exactly as the Electric shape sends it: snake_case table columns, timestamps
@@ -353,6 +366,59 @@ export const Knowledge = Schema.Struct({
 
 export type Knowledge = typeof Knowledge.Type;
 
+const GraphRelation = Schema.Literals(["updates", "extends", "derives"]);
+
+/**
+ * Sources and their facts in the shape `@supermemory/memory-graph` draws: each document is a
+ * source, each memory a fact extracted from it.
+ */
+export const MemoryGraph = Schema.Struct({
+  documents: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      title: Schema.NullOr(Schema.String),
+      summary: Schema.NullOr(Schema.String),
+      documentType: Schema.String,
+      createdAt: Schema.String,
+      updatedAt: Schema.String,
+      memories: Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          memory: Schema.String,
+          content: Schema.NullOr(Schema.String),
+          isStatic: Schema.Boolean,
+          spaceId: Schema.String,
+          isLatest: Schema.Boolean,
+          isForgotten: Schema.Boolean,
+          forgetAfter: Schema.NullOr(Schema.String),
+          forgetReason: Schema.NullOr(Schema.String),
+          version: Schema.Number,
+          parentMemoryId: Schema.NullOr(Schema.String),
+          rootMemoryId: Schema.NullOr(Schema.String),
+          createdAt: Schema.String,
+          updatedAt: Schema.String,
+          relation: Schema.NullOr(GraphRelation),
+          updatesMemoryId: Schema.NullOr(Schema.String),
+          nextVersionId: Schema.NullOr(Schema.String),
+          memoryRelations: Schema.NullOr(Schema.Record(Schema.String, GraphRelation)),
+        }),
+      ),
+    }),
+  ),
+  totals: Schema.Struct({ sources: Schema.Number, facts: Schema.Number }),
+});
+
+export type MemoryGraph = typeof MemoryGraph.Type;
+
+/** A fact that matches a search, with the source it came from. */
+export const MemoryHit = Schema.Struct({
+  id: Schema.String,
+  text: Schema.String,
+  sourceId: Schema.NullOr(Schema.String),
+});
+
+export type MemoryHit = typeof MemoryHit.Type;
+
 const MemoryErrors = [NotFound, NoActiveWorkspace, Invalid, UpstreamUnavailable];
 
 /** The optional company a memory call is about; without it, the workspace's own memory. */
@@ -365,6 +431,16 @@ const MemoryTarget = { companyId: Schema.optional(Schema.String) };
 export class MemoryApi extends HttpApiGroup.make("memory")
   .add(
     HttpApiEndpoint.get("workspace", "/", { success: Knowledge, error: MemoryErrors }),
+    HttpApiEndpoint.get("graph", "/graph", {
+      query: MemoryTarget,
+      success: MemoryGraph,
+      error: MemoryErrors,
+    }),
+    HttpApiEndpoint.get("search", "/search", {
+      query: { ...MemoryTarget, q: Schema.String },
+      success: Schema.Array(MemoryHit),
+      error: MemoryErrors,
+    }),
     HttpApiEndpoint.get("company", "/companies/:id", {
       params: { id: Schema.String },
       success: Knowledge,

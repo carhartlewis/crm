@@ -188,6 +188,7 @@ export function createSupermemoryStore(options: {
             rerank: "order",
             limit: request.limit,
             threshold: request.threshold ?? 0.4,
+            include: { documents: true },
           }),
         );
 
@@ -200,8 +201,46 @@ export function createSupermemoryStore(options: {
                   text: result.memory,
                   similarity: result.similarity,
                   createdAt: result.system.createdAt ?? result.system.updatedAt,
+                  sourceId: result.included?.document?.id ?? null,
                 },
               ],
+        );
+      } catch (error) {
+        if (error instanceof MemoryStoreError && error.kind === "not_found") return [];
+
+        throw error;
+      }
+    },
+
+    async graph(namespace, limit) {
+      try {
+        const listed = await call(() =>
+          client.list(namespace, "documents", { limit, sort: "updatedAt", order: "desc" }),
+        );
+
+        // One read per source: the list doesn't carry facts. A source that fails to load is
+        // drawn without its facts rather than failing the whole graph.
+        return await Promise.all(
+          listed.documents.map(async (document) => {
+            const full = await call(() =>
+              client.documents.get(namespace, document.id, { include: "memories" }),
+            ).catch(() => null);
+
+            return {
+              sourceId: document.id,
+              kind: SourceKind.parse(document.metadata["kind"] ?? null),
+              title: document.title ?? String(document.metadata["title"] ?? "Untitled"),
+              summary: document.summary,
+              createdAt: document.system.createdAt,
+              updatedAt: document.system.updatedAt,
+              facts: (full?.memories ?? []).map((raw) =>
+                Object.assign(toFact(raw), {
+                  isForgotten: raw.isForgotten,
+                  updatedAt: raw.system.updatedAt ?? raw.system.createdAt,
+                }),
+              ),
+            };
+          }),
         );
       } catch (error) {
         if (error instanceof MemoryStoreError && error.kind === "not_found") return [];

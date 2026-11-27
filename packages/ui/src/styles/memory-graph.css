@@ -1,0 +1,40 @@
+:root {
+  /* The memory graph canvas reads these from the document root once, when it mounts, so
+     globals.css imports this file. Adapted from comp-neo. The frame paints the page background;
+     the canvas stays transparent. Sources and facts take the primary color; edges and controls
+     take the neutral tokens. */
+  --graph-bg: transparent;
+  --graph-dot: var(--border);
+  --graph-doc-fill: var(--card);
+  --graph-doc-stroke: var(--primary);
+  --graph-doc-inner: var(--background);
+  --graph-mem-fill: var(--card);
+  --graph-mem-fill-hover: var(--muted);
+  --graph-mem-stroke: var(--primary);
+  --graph-accent: var(--primary);
+  --graph-glow: transparent;
+  --graph-icon: var(--primary);
+  --graph-text-primary: var(--foreground);
+  --graph-text-secondary: var(--muted-foreground);
+  --graph-text-muted: var(--muted-foreground);
+  --graph-edge-document: var(--muted-foreground);
+  --graph-edge-derives: var(--chart-4);
+  --graph-edge-updates: var(--primary);
+  --graph-edge-extends: var(--muted-foreground);
+  --graph-mem-border-forgotten: var(--muted-foreground);
+  --graph-mem-border-expiring: var(--chart-3);
+  --graph-mem-border-recent: var(--primary);
+  --graph-popover-bg: var(--popover);
+  --graph-popover-border: var(--border);
+  --graph-popover-text-primary: var(--popover-foreground);
+  --graph-popover-text-secondary: var(--muted-foreground);
+  --graph-popover-text-muted: var(--muted-foreground);
+  --graph-control-bg: var(--popover);
+  --graph-control-border: var(--border);
+}
+
+/* A click on the canvas focuses the graph so Enter opens the selected source. Only keyboard
+   focus draws the ring around the frame. */
+[data-slot="memory-graph"] [tabindex]:focus:not(:focus-visible) {
+  outline: none;
+}

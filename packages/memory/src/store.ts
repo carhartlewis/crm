@@ -1,4 +1,11 @@
-import type { FactPage, MemoryProfile, MemorySource, SearchHit, SourceSummary } from "./types.ts";
+import type {
+  FactPage,
+  GraphSource,
+  MemoryProfile,
+  MemorySource,
+  SearchHit,
+  SourceSummary,
+} from "./types.ts";
 
 export interface SearchRequest {
   readonly query: string;
@@ -24,6 +31,8 @@ export interface MemoryStore {
   profile(namespace: string): Promise<MemoryProfile>;
   /** Marks facts as forgotten; recall and search skip them. Returns how many changed. */
   forgetFacts(namespace: string, factIds: readonly string[]): Promise<number>;
+  /** The newest sources with their facts, for the memory graph. */
+  graph(namespace: string, limit: number): Promise<readonly GraphSource[]>;
   /** Deletes every source and fact in the namespace, such as a deleted company's. */
   deleteNamespace(namespace: string): Promise<void>;
 }

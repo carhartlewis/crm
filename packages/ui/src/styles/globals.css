@@ -6,6 +6,7 @@
 @import "tailwindcss" source(none);
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./memory-graph.css";
 
 @source "../**/*.{ts,tsx}";
 

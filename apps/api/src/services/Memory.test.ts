@@ -267,3 +267,38 @@ describe("the agent", () => {
     expect(store.namespaces()).not.toContain(ns("ws1", "c-acme"));
   });
 });
+
+describe("the memory graph", () => {
+  test("draws each source with its facts, and search points back at the source", async () => {
+    const { memory } = setup();
+
+    await memory.researchWorkspace("ws1");
+    await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
+
+    const graph = await Effect.runPromise(memory.graph(alice, {}));
+
+    expect(graph.documents.map((document) => document.documentType).toSorted()).toEqual([
+      "member_note",
+      "website_research",
+    ]);
+    expect(graph.totals.sources).toBe(2);
+
+    const note = graph.documents.find((document) => document.documentType === "member_note");
+
+    expect(note?.memories.map((fact) => fact.memory)).toEqual(["We close deals in Q4."]);
+
+    const hits = await Effect.runPromise(memory.search(alice, { q: "close deals Q4" }));
+
+    expect(hits[0]?.sourceId).toBe(note?.id);
+  });
+
+  test("is refused for a company outside the workspace", async () => {
+    const { memory } = setup();
+
+    const error = await Effect.runPromise(
+      Effect.flip(memory.graph(alice, { companyId: "c-other" })),
+    );
+
+    expect(error).toBeInstanceOf(NotFound);
+  });
+});

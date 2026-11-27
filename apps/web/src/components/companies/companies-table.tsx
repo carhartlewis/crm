@@ -29,6 +29,7 @@ import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { workspaceQuery } from "../../lib/session.ts";
 import { noPosition, type ListPosition, useListKeys } from "../records/use-list-keys.ts";
 import { CompanyForm } from "./company-form.tsx";
+import { CompanyKnowledge } from "./company-knowledge.tsx";
 
 const SEARCH_PARAMS = createListSearchParams<never, "owner">({
   defaultSort: "updatedAt",
@@ -36,7 +37,7 @@ const SEARCH_PARAMS = createListSearchParams<never, "owner">({
   facetIds: ["owner"],
 });
 
-const SHEET_TABS = ["overview"] as const;
+const SHEET_TABS = ["overview", "knowledge"] as const;
 
 type Column = "name" | "domain" | "owner" | "updatedAt" | "createdAt";
 
@@ -248,6 +249,20 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
                   onSubmit={async (input) => {
                     await update.mutateAsync({ collection, id: current.id, input });
                   }}
+                />
+              </div>
+            ) : null,
+          },
+          {
+            id: "knowledge",
+            label: "Knowledge",
+            content: current ? (
+              <div className="p-4">
+                <CompanyKnowledge
+                  key={current.id}
+                  userId={userId}
+                  workspaceId={workspaceId}
+                  company={current}
                 />
               </div>
             ) : null,

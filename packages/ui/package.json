@@ -48,7 +48,8 @@
     "./patterns/record-sheet/use-record-sheet-params": "./src/patterns/record-sheet/use-record-sheet-params.ts",
     "./patterns/skeleton-lines": "./src/patterns/skeleton-lines.tsx",
     "./patterns/ui-copy": "./src/patterns/ui-copy.ts",
-    "./patterns/visually-hidden": "./src/patterns/visually-hidden.tsx"
+    "./patterns/visually-hidden": "./src/patterns/visually-hidden.tsx",
+    "./patterns/memory-graph": "./src/patterns/memory-graph.tsx"
   },
   "scripts": {
     "check-types": "bun check --no-script --project tsconfig.json"
@@ -59,6 +60,7 @@
     "@fontsource-variable/geist": "5.3.0",
     "@paper-design/shaders-react": "0.0.82",
     "@pierre/words": "0.3.0",
+    "@supermemory/memory-graph": "0.3.0",
     "border-beam": "1.4.1",
     "class-variance-authority": "0.7.1",
     "cmdk": "1.1.1",

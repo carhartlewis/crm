@@ -51,6 +51,8 @@ export interface SearchHit {
   readonly text: string;
   readonly similarity: number;
   readonly createdAt: string;
+  /** The source the fact was extracted from, when the store says. */
+  readonly sourceId: string | null;
 }
 
 /** Supermemory's maintained summary: lasting facts, and what is true now. */
@@ -70,4 +72,18 @@ export interface SourceSummary {
   readonly title: string;
   readonly status: "processing" | "done" | "failed";
   readonly updatedAt: string;
+}
+
+/** A source with the facts extracted from it, for the memory graph. */
+export interface GraphSource {
+  readonly sourceId: string;
+  readonly kind: MemorySourceKind | null;
+  readonly title: string;
+  readonly summary: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly facts: readonly (MemoryFact & {
+    readonly isForgotten: boolean;
+    readonly updatedAt: string;
+  })[];
 }
