@@ -4,6 +4,7 @@ import type {
   MemoryProfile,
   MemorySource,
   SearchHit,
+  SourceDetail,
   SourceSummary,
 } from "./types.ts";
 
@@ -26,6 +27,8 @@ export interface MemoryStore {
   putSource(namespace: string, source: MemorySource): Promise<void>;
   deleteSource(namespace: string, sourceId: string): Promise<void>;
   listSources(namespace: string, limit: number): Promise<readonly SourceSummary[]>;
+  /** One source with its text, or null when there is none. */
+  getSource(namespace: string, sourceId: string): Promise<SourceDetail | null>;
   listFacts(namespace: string, page: { cursor: string | null; limit: number }): Promise<FactPage>;
   search(namespace: string, request: SearchRequest): Promise<readonly SearchHit[]>;
   profile(namespace: string): Promise<MemoryProfile>;

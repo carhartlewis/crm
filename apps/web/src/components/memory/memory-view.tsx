@@ -18,9 +18,10 @@ import {
 } from "../../lib/memory.ts";
 import { AddNoteSheet } from "./add-note-sheet.tsx";
 import { sourceKindLabel } from "./memory-copy.ts";
-import { SourceSheet } from "./source-sheet.tsx";
 
 const MemoryCanvas = preloadable(() => import("./memory-canvas.tsx"));
+
+const SourceSheet = preloadable(() => import("./source-sheet.tsx"));
 
 const AddIcon = carbonIcon(add);
 
@@ -140,7 +141,10 @@ export function MemoryView({
           labels={LABELS}
           loading={graph.isPending}
           highlightIds={highlighted}
-          onOpenMemory={(id) => void setState({ source: id })}
+          onOpenMemory={(id) => {
+            void SourceSheet.preload();
+            void setState({ source: id });
+          }}
           empty={
             query
               ? "No matching facts."
@@ -187,13 +191,16 @@ export function MemoryView({
           onClose={() => void setState({ note: false })}
         />
       ) : null}
-      {open ? (
-        <SourceSheet
-          key={open.id}
-          source={open}
-          target={target}
-          onClose={() => void setState({ source: null })}
-        />
+      {state.source ? (
+        <Suspense fallback={null}>
+          <SourceSheet
+            userId={userId}
+            workspaceId={workspaceId}
+            target={target}
+            source={open ?? null}
+            onClose={() => void setState({ source: null })}
+          />
+        </Suspense>
       ) : null}
     </>
   );

@@ -354,6 +354,15 @@ export const MemorySource = Schema.Struct({
 
 export type MemorySource = typeof MemorySource.Type;
 
+/** A source with its text and when it was first saved, for its record sheet. */
+export const MemorySourceDetail = Schema.Struct({
+  ...MemorySource.fields,
+  content: Schema.String,
+  createdAt: Schema.String,
+});
+
+export type MemorySourceDetail = typeof MemorySourceDetail.Type;
+
 /** A workspace's or a company's memory, as the Workspace knowledge page and record sheet show it. */
 export const Knowledge = Schema.Struct({
   /** False when the API has no memory store configured. */
@@ -439,6 +448,19 @@ export class MemoryApi extends HttpApiGroup.make("memory")
     HttpApiEndpoint.get("search", "/search", {
       query: { ...MemoryTarget, q: Schema.String },
       success: Schema.Array(MemoryHit),
+      error: MemoryErrors,
+    }),
+    HttpApiEndpoint.get("source", "/sources/:id", {
+      params: { id: Schema.String },
+      query: MemoryTarget,
+      success: MemorySourceDetail,
+      error: MemoryErrors,
+    }),
+    /** Deletes a source and every fact read from it. */
+    HttpApiEndpoint.delete("deleteSource", "/sources/:id", {
+      params: { id: Schema.String },
+      query: MemoryTarget,
+      success: HttpApiSchema.NoContent,
       error: MemoryErrors,
     }),
     HttpApiEndpoint.get("company", "/companies/:id", {

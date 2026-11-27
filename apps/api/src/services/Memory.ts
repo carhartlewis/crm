@@ -2,6 +2,7 @@ import {
   Invalid,
   type Knowledge,
   type MemoryGraph,
+  type MemorySourceDetail,
   type MemoryHit,
   NoActiveWorkspace,
   NotFound,
@@ -90,6 +91,14 @@ export interface MemoryService {
   readonly workspace: (actor: Actor) => Effect.Effect<Knowledge, MemoryError>;
   readonly company: (actor: Actor, id: string) => Effect.Effect<Knowledge, MemoryError>;
   readonly graph: (actor: Actor, input: Target) => Effect.Effect<MemoryGraph, MemoryError>;
+  readonly source: (
+    actor: Actor,
+    input: Target & { id: string },
+  ) => Effect.Effect<MemorySourceDetail, MemoryError>;
+  readonly deleteSource: (
+    actor: Actor,
+    input: Target & { id: string },
+  ) => Effect.Effect<void, MemoryError>;
   readonly search: (
     actor: Actor,
     input: Target & { q: string },
@@ -461,6 +470,33 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
         const sources = yield* stored("graph", (memory) => memory.graph(ns, GRAPH_SOURCES));
 
         return toMemoryGraph(ns, sources);
+      }),
+
+    source: (actor, input) =>
+      Effect.gen(function* () {
+        const workspaceId = yield* member(actor);
+        const ns = yield* target(workspaceId, input);
+        const found = yield* stored("source", (memory) => memory.getSource(ns, input.id));
+
+        if (!found) return yield* Effect.fail(new NotFound({ message: "Source not found" }));
+
+        return {
+          id: found.sourceId,
+          kind: found.kind,
+          title: found.title,
+          status: found.status,
+          content: found.content,
+          createdAt: found.createdAt,
+          updatedAt: found.updatedAt,
+        };
+      }),
+
+    deleteSource: (actor, input) =>
+      Effect.gen(function* () {
+        const workspaceId = yield* member(actor);
+        const ns = yield* target(workspaceId, input);
+
+        yield* stored("delete source", (memory) => memory.deleteSource(ns, input.id));
       }),
 
     search: (actor, input) =>

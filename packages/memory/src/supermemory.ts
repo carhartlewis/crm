@@ -158,6 +158,32 @@ export function createSupermemoryStore(options: {
       }
     },
 
+    async getSource(namespace, sourceId) {
+      try {
+        const document = await call(() => client.documents.get(namespace, sourceId, {}));
+        const { status, dreamingStatus, createdAt, updatedAt } = document.system;
+
+        return {
+          sourceId: document.id,
+          kind: SourceKind.parse(document.metadata["kind"] ?? null),
+          title: document.title ?? String(document.metadata["title"] ?? "Untitled"),
+          status:
+            status === "failed"
+              ? "failed"
+              : status === "done" && dreamingStatus === "done"
+                ? "done"
+                : "processing",
+          content: document.content ?? "",
+          createdAt,
+          updatedAt,
+        };
+      } catch (error) {
+        if (error instanceof MemoryStoreError && error.kind === "not_found") return null;
+
+        throw error;
+      }
+    },
+
     async listFacts(namespace, page) {
       try {
         const query: ListRequest = { limit: page.limit, sort: "createdAt", order: "desc" };

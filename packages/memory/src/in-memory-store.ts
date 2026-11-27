@@ -100,6 +100,22 @@ export function createInMemoryStore(options: { now?: () => Date } = {}) {
         }));
     },
 
+    async getSource(namespace, sourceId) {
+      const saved = partition(namespace).sources.get(sourceId);
+
+      return saved
+        ? {
+            sourceId,
+            kind: saved.source.kind,
+            title: saved.source.title,
+            status: "done" as const,
+            content: saved.source.content,
+            createdAt: saved.updatedAt,
+            updatedAt: saved.updatedAt,
+          }
+        : null;
+    },
+
     async listFacts(namespace, page) {
       const facts = live(namespace).toReversed();
       const start = page.cursor ? Number(page.cursor) : 0;

@@ -302,3 +302,25 @@ describe("the memory graph", () => {
     expect(error).toBeInstanceOf(NotFound);
   });
 });
+
+describe("a source", () => {
+  test("opens with its text, and deleting it removes its facts", async () => {
+    const { memory } = setup();
+
+    await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
+
+    const [note] = (await Effect.runPromise(memory.graph(alice, {}))).documents;
+    const source = await Effect.runPromise(memory.source(alice, { id: note?.id ?? "" }));
+
+    expect(source.content).toBe("We close deals in Q4.");
+    expect(source.kind).toBe("member_note");
+
+    await Effect.runPromise(memory.deleteSource(alice, { id: source.id }));
+
+    expect((await Effect.runPromise(memory.graph(alice, {}))).documents).toEqual([]);
+
+    const missing = await Effect.runPromise(Effect.flip(memory.source(alice, { id: source.id })));
+
+    expect(missing).toBeInstanceOf(NotFound);
+  });
+});

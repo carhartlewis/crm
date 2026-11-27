@@ -155,6 +155,12 @@ const MemoryHandlers = HttpApiBuilder.group(CrmApi, "memory", (handlers) =>
         Effect.flatMap(actor, (who) => memory.company(who, params.id)),
       )
       .handle("graph", ({ query }) => Effect.flatMap(actor, (who) => memory.graph(who, query)))
+      .handle("source", ({ params, query }) =>
+        Effect.flatMap(actor, (who) => memory.source(who, { ...query, id: params.id })),
+      )
+      .handle("deleteSource", ({ params, query }) =>
+        Effect.flatMap(actor, (who) => memory.deleteSource(who, { ...query, id: params.id })),
+      )
       .handle("search", ({ query }) => Effect.flatMap(actor, (who) => memory.search(who, query)))
       .handle("addNote", ({ payload }) =>
         Effect.flatMap(actor, (who) => memory.addNote(who, payload)),

@@ -87,3 +87,9 @@ export interface GraphSource {
     readonly updatedAt: string;
   })[];
 }
+
+/** One source with its text, for its record sheet. */
+export interface SourceDetail extends SourceSummary {
+  readonly content: string;
+  readonly createdAt: string;
+}

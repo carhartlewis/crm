@@ -1,4 +1,4 @@
-import type { Knowledge, MemoryGraph, MemoryHit } from "@crm/core/api";
+import type { Knowledge, MemoryGraph, MemoryHit, MemorySourceDetail } from "@crm/core/api";
 import { mutationOptions, queryOptions, type QueryClient } from "@tanstack/react-query";
 import { request, send } from "./api-fetch.ts";
 
@@ -66,6 +66,21 @@ export const memorySearchQuery = (
     staleTime: 30_000,
   });
 
+/** One source with its text, for its record sheet. */
+export const memorySourceQuery = (
+  userId: string,
+  workspaceId: string,
+  target: MemoryTarget,
+  id: string,
+) =>
+  queryOptions({
+    queryKey: [...memoryKeys.target(userId, workspaceId, target), "source", id],
+    queryFn: () =>
+      request<MemorySourceDetail>(
+        `/api/memory/sources/${encodeURIComponent(id)}?${targetQuery(target)}`,
+      ),
+  });
+
 const refresh = (client: QueryClient) => client.invalidateQueries({ queryKey: memoryKeys.all });
 
 /** The body of a memory write: its target, plus a note's text or a fact's id. */
@@ -89,5 +104,15 @@ export const researchMutation = mutationOptions({
 export const forgetMutation = mutationOptions({
   mutationKey: [...memoryKeys.all, "forget"],
   mutationFn: (fact: MemoryTarget & { factId: string }) => post("/api/memory/forget", fact),
+  onSettled: (_data, _error, _variables, _result, { client }) => refresh(client),
+});
+
+export const deleteSourceMutation = mutationOptions({
+  mutationKey: [...memoryKeys.all, "delete-source"],
+  mutationFn: async (source: MemoryTarget & { id: string }) => {
+    await send(`/api/memory/sources/${encodeURIComponent(source.id)}?${targetQuery(source)}`, {
+      method: "DELETE",
+    });
+  },
   onSettled: (_data, _error, _variables, _result, { client }) => refresh(client),
 });
