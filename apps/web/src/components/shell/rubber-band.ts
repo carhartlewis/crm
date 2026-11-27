@@ -21,7 +21,8 @@ const SPRING_BACK_MS = 150;
  * Callback ref for a scroll container: pulling past either end (wheel or trackpad) stretches
  * all of its content with resistance, and letting go springs it back. On a trackpad, wheel
  * events go on for a second or two after the finger lifts (momentum); the first fading step
- * counts as letting go, and the rest of that momentum is swallowed. Every child moves as one;
+ * counts as letting go, and the rest of that momentum, still pushing past the edge, is ignored.
+ * A scroll back into the list scrolls at once. Every child moves as one;
  * moving only the first would slide it over the rest. Only when the content
  * overflows: a list that fits stays still. Native overscroll is off
  * (`overscroll-none` on the container) so the two don't fight. Style writes only: no renders.
@@ -68,17 +69,26 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
     const atTop = scroller.scrollTop <= 0;
     const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
 
-    const pulling =
-      overscroll !== 0 || (event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom);
+    const pastEdge = (event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom);
 
-    if ((!pulling && !released) || content().length === 0) return;
+    // After letting go, only momentum that still pushes past the edge is ignored; the edge
+    // stops it anyway. Anything else is a new scroll, and scrolls.
+    if (released && pastEdge) {
+      event.preventDefault();
+      clearTimeout(release);
+      release = setTimeout(endGesture, RELEASE_GAP_MS);
+
+      return;
+    }
+
+    released = false;
+
+    if ((overscroll === 0 && !pastEdge) || content().length === 0) return;
 
     event.preventDefault();
     clearTimeout(release);
     // Wheel events have no "finger lifted": a short gap in them ends the gesture.
     release = setTimeout(endGesture, RELEASE_GAP_MS);
-
-    if (released) return;
 
     const step = Math.abs(event.deltaY);
 
