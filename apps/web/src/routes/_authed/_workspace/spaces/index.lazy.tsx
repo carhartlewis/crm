@@ -86,11 +86,6 @@ function SpacesList({ userId, workspaceId }: { userId: string; workspaceId: stri
             );
           })}
         </ul>
-        {api.isReady && api.spaces.length === 0 && (
-          <p className="mt-4 text-sm text-pretty text-muted-foreground">
-            No spaces yet. A space shares its chats with everyone who joins it.
-          </p>
-        )}
       </PageShellContent>
     </PageShell>
   );
