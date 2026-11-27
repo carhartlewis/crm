@@ -817,32 +817,39 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
           {lead}
           {search != null && <div className="wide-slot @2xl:order-last @2xl:ml-auto">{search}</div>}
           {hasFilterControls && (
-            <Button
-              type="button"
-              variant="outline"
-              className="narrow-only w-full justify-between"
-              aria-expanded={filtersOpen}
-              aria-controls={filtersId}
-              onClick={() => setFiltersOpen((open) => !open)}
-            >
-              <span className="flex items-center gap-2">
-                <Filter />
-                {UI_COPY.tableOptions}
-                {activeFilterCount > 0 && (
-                  <span className="tabular-nums opacity-60">({activeFilterCount})</span>
-                )}
-              </span>
-              <ChevronDown
-                className={cn(
-                  "shrink-0 opacity-60 transition-transform",
-                  filtersOpen && "rotate-180",
-                )}
-              />
-            </Button>
+            // A wrapper fades: the Button's own `inline-flex` would keep it shown.
+            <div className="narrow-only">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-between"
+                aria-expanded={filtersOpen}
+                aria-controls={filtersId}
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                <span className="flex items-center gap-2">
+                  <Filter />
+                  {UI_COPY.tableOptions}
+                  {activeFilterCount > 0 && (
+                    <span className="tabular-nums opacity-60">({activeFilterCount})</span>
+                  )}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "shrink-0 opacity-60 transition-transform",
+                    filtersOpen && "rotate-180",
+                  )}
+                />
+              </Button>
+            </div>
           )}
           <div
             id={filtersId}
-            className={cn("flex flex-col gap-2 @2xl:contents", !filtersOpen && "wide-only")}
+            // A real box, not `contents`, so its buttons fade with it. Open below 42rem, it stacks.
+            className={cn(
+              "flex-col gap-2 @2xl:flex @2xl:flex-row @2xl:flex-wrap @2xl:items-center",
+              filtersOpen ? "flex" : "wide-only",
+            )}
           >
             {leadingActions}
 
