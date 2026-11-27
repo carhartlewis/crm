@@ -52,7 +52,9 @@ export function Shortcuts({
     {
       enabled: () => claimsCopyShortcut(window.getSelection(), document.activeElement),
       enableOnFormTags: false,
-      preventDefault: true,
+      // The same test, not `true`: the hook prevents the default even when `enabled` says no,
+      // which swallowed ⌘C on selected text, so nothing was copied.
+      preventDefault: () => claimsCopyShortcut(window.getSelection(), document.activeElement),
     },
     [setCreate],
   );
