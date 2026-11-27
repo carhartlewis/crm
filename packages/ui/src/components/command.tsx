@@ -161,7 +161,7 @@ function CommandItem({
       {...props}
     >
       {children}
-      <CheckmarkIcon className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
+      <CheckmarkIcon className="ml-auto opacity-0 group-has-data-[slot=command-item-hint]/command-item:ml-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
     </CommandPrimitive.Item>
   );
 }
@@ -171,12 +171,60 @@ function CommandShortcut({ className, ...props }: React.ComponentProps<"span">) 
     <span
       data-slot="command-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-data-selected/command-item:text-foreground",
+        "ml-auto text-xs tracking-widest text-muted-foreground group-has-data-[slot=command-item-hint]/command-item:ml-0 group-data-selected/command-item:text-foreground",
         className,
       )}
       {...props}
     />
   );
+}
+
+/** Muted text at the end of an item, such as the section a search result comes from. */
+function CommandItemHint({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="command-item-hint"
+      className={cn("ml-auto shrink-0 text-xs text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * An item's label with the characters a search matched in bold. `ranges` is a flat list of
+ * [start, end) offsets into `text`, in order; without it the text shows as is.
+ */
+function CommandMatch({
+  text,
+  ranges,
+  className,
+}: {
+  text: string;
+  ranges?: readonly number[] | null;
+  className?: string;
+}) {
+  const parts: React.ReactNode[] = [];
+  let at = 0;
+
+  const marks = ranges ?? [];
+
+  for (let index = 0; index + 1 < marks.length; index += 2) {
+    const start = marks[index] ?? 0;
+    const end = marks[index + 1] ?? start;
+
+    if (start > at) parts.push(text.slice(at, start));
+
+    parts.push(
+      <span key={start} data-slot="command-match" className="font-semibold text-foreground">
+        {text.slice(start, end)}
+      </span>,
+    );
+    at = end;
+  }
+
+  if (at < text.length) parts.push(text.slice(at));
+
+  return <span className={cn("min-w-0 truncate", className)}>{parts}</span>;
 }
 
 export {
@@ -189,4 +237,6 @@ export {
   CommandItem,
   CommandShortcut,
   CommandSeparator,
+  CommandItemHint,
+  CommandMatch,
 };

@@ -12,7 +12,9 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandItemHint,
   CommandList,
+  CommandMatch,
   CommandShortcut,
 } from "@crm/ui/components/command";
 import { carbonIcon } from "@crm/ui/components/icon";
@@ -20,7 +22,9 @@ import { useSidebar } from "@crm/ui/components/sidebar";
 import { useTheme } from "@crm/ui/components/theme-provider";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useState, type ComponentType } from "react";
 import { toast } from "sonner";
+import { rankCommands, type Searchable } from "../../lib/command-search.ts";
 import { pageById, pageForPath, type Page } from "../../lib/pages.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
 import { sessionQuery, signOutMutation, workspacesQuery } from "../../lib/session.ts";
@@ -57,6 +61,16 @@ export interface CommandPaletteProps {
   readonly userId: string;
 }
 
+/** One row of ⌘K. `id` is unique and is cmdk's value for it. */
+interface PaletteCommand extends Searchable {
+  readonly id: string;
+  readonly icon: ComponentType;
+  readonly shortcut?: Shortcut;
+  /** The active workspace: shown checked, and not selectable. */
+  readonly current?: boolean;
+  readonly run: () => void;
+}
+
 async function copyLink() {
   try {
     await navigator.clipboard.writeText(window.location.href);
@@ -68,6 +82,17 @@ async function copyLink() {
 
 function Keys({ shortcut }: { shortcut: Shortcut | undefined }) {
   return shortcut ? <CommandShortcut>{shortcutKeys(shortcut).join("")}</CommandShortcut> : null;
+}
+
+/** The sections in the order they show, each with its commands in order. */
+function bySection(commands: readonly PaletteCommand[]) {
+  const sections = new Map<string, PaletteCommand[]>();
+
+  for (const command of commands) {
+    sections.set(command.section, [...(sections.get(command.section) ?? []), command]);
+  }
+
+  return [...sections];
 }
 
 /**
@@ -100,9 +125,96 @@ export default function CommandPalette({ open, onOpenChange, userId }: CommandPa
 
   const activeId = session?.session.activeOrganizationId;
 
-  const run = (action: () => void) => () => {
+  const commands: PaletteCommand[] = [
+    ...(current
+      ? [
+          {
+            id: "copy-link",
+            label: `Copy link to ${current.label}`,
+            section: current.label,
+            icon: LinkIcon,
+            run: () => void copyLink(),
+          },
+        ]
+      : []),
+    {
+      id: "go:/",
+      label: "Home",
+      section: "Go to",
+      icon: HomeIcon,
+      shortcut: shortcuts.home,
+      run: () => void navigate({ to: "/" }),
+    },
+    ...order.map((id, index) => {
+      const page = pageById(id);
+
+      return {
+        id: `go:${page.to}`,
+        label: page.label,
+        section: "Go to",
+        keywords: [page.description],
+        icon: page.icon,
+        shortcut: pinnedShortcut(index),
+        run: () => void navigate({ to: page.to }),
+      };
+    }),
+    ...settingsGroups.flatMap((group) =>
+      group.pages.map((page) => ({
+        id: `go:${page.to}`,
+        label: page.label,
+        section: `${group.label} settings`,
+        keywords: ["preferences"],
+        icon: page.icon,
+        run: () => void navigate({ to: page.to }),
+      })),
+    ),
+    ...(workspaces.length > 1
+      ? workspaces.map((workspace) => ({
+          id: `workspace:${workspace.id}`,
+          label: `Switch to ${workspace.name}`,
+          section: "Workspaces",
+          icon: SwitchIcon,
+          current: workspace.id === activeId,
+          run: () => switchWorkspace.mutate(workspace.id),
+        }))
+      : []),
+    {
+      id: "go:/new-workspace",
+      label: "Create a workspace",
+      section: "Workspaces",
+      keywords: ["new"],
+      icon: AddIcon,
+      run: () => void navigate({ to: "/new-workspace" }),
+    },
+    {
+      id: "toggle-sidebar",
+      label: "Toggle sidebar",
+      section: "Actions",
+      icon: SidebarIcon,
+      shortcut: shortcuts.sidebar,
+      run: toggleSidebar,
+    },
+    ...(["light", "dark", "system"] as const).map((theme) => ({
+      id: `theme:${theme}`,
+      label: `Use ${theme} theme`,
+      section: "Actions",
+      keywords: ["appearance", "mode"],
+      icon: ThemeIcon,
+      run: () => setTheme(theme),
+    })),
+    {
+      id: "log-out",
+      label: "Log out",
+      section: "Actions",
+      keywords: ["sign out"],
+      icon: LogoutIcon,
+      run: () => signOut.mutate(),
+    },
+  ];
+
+  const select = (command: PaletteCommand) => () => {
     onOpenChange(false);
-    action();
+    command.run();
   };
 
   return (
@@ -112,113 +224,68 @@ export default function CommandPalette({ open, onOpenChange, userId }: CommandPa
       title="Search"
       description="Search pages and commands"
     >
-      <Command loop>
-        <CommandInput
-          placeholder={
-            current ? `Search ${current.label.toLowerCase()} and commands…` : "Search or jump to…"
-          }
-        />
-        <CommandList>
-          <CommandEmpty>No results</CommandEmpty>
-          {current && (
-            <CommandGroup heading={current.label}>
-              <CommandItem
-                value={`copy link ${current.label}`}
-                onSelect={run(() => void copyLink())}
-              >
-                <LinkIcon />
-                {`Copy link to ${current.label}`}
-              </CommandItem>
-            </CommandGroup>
-          )}
-          <CommandGroup heading="Go to">
-            <CommandItem value="home" onSelect={run(() => void navigate({ to: "/" }))}>
-              <HomeIcon />
-              Home
-              <Keys shortcut={shortcuts.home} />
-            </CommandItem>
-            {order.map((id, index) => {
-              const page = pageById(id);
-              const PageIcon = page.icon;
-
-              return (
-                <CommandItem
-                  key={id}
-                  value={page.label}
-                  keywords={[page.description]}
-                  onSelect={run(() => void navigate({ to: page.to }))}
-                >
-                  <PageIcon />
-                  {page.label}
-                  <Keys shortcut={pinnedShortcut(index)} />
-                </CommandItem>
-              );
-            })}
-          </CommandGroup>
-          {settingsGroups.map((group) => (
-            <CommandGroup key={group.label} heading={`${group.label} settings`}>
-              {group.pages.map((page) => {
-                const PageIcon = page.icon;
-
-                return (
-                  <CommandItem
-                    key={page.to}
-                    value={`${group.label} settings ${page.label}`}
-                    keywords={["settings", "preferences"]}
-                    onSelect={run(() => void navigate({ to: page.to }))}
-                  >
-                    <PageIcon />
-                    {page.label}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          ))}
-          <CommandGroup heading="Workspaces">
-            {workspaces.length > 1 &&
-              workspaces.map((workspace) => (
-                <CommandItem
-                  key={workspace.id}
-                  value={`workspace ${workspace.name}`}
-                  data-checked={workspace.id === activeId}
-                  disabled={workspace.id === activeId}
-                  onSelect={run(() => switchWorkspace.mutate(workspace.id))}
-                >
-                  <SwitchIcon />
-                  {`Switch to ${workspace.name}`}
-                </CommandItem>
-              ))}
-            <CommandItem
-              value="create a new workspace"
-              onSelect={run(() => void navigate({ to: "/new-workspace" }))}
-            >
-              <AddIcon />
-              Create a workspace
-            </CommandItem>
-          </CommandGroup>
-          <CommandGroup heading="Actions">
-            <CommandItem value="toggle sidebar" onSelect={run(toggleSidebar)}>
-              <SidebarIcon />
-              Toggle sidebar
-              <Keys shortcut={shortcuts.sidebar} />
-            </CommandItem>
-            {(["light", "dark", "system"] as const).map((theme) => (
-              <CommandItem
-                key={theme}
-                value={`theme ${theme}`}
-                onSelect={run(() => setTheme(theme))}
-              >
-                <ThemeIcon />
-                {`Use ${theme} theme`}
-              </CommandItem>
-            ))}
-            <CommandItem value="log out sign out" onSelect={run(() => signOut.mutate())}>
-              <LogoutIcon />
-              Log out
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </Command>
+      <PaletteSearch
+        commands={commands}
+        select={select}
+        placeholder={
+          current ? `Search ${current.label.toLowerCase()} and commands…` : "Search or jump to…"
+        }
+      />
     </CommandDialog>
+  );
+}
+
+/**
+ * The search box and results. Mounted only while the palette is open, so it opens empty. With
+ * no query, commands show under their sections; with one, they show best match first
+ * (`rankCommands`), each with its section, so cmdk's own filter is off.
+ */
+function PaletteSearch({
+  commands,
+  select,
+  placeholder,
+}: {
+  commands: readonly PaletteCommand[];
+  select: (command: PaletteCommand) => () => void;
+  placeholder: string;
+}) {
+  const [query, setQuery] = useState("");
+  const results = rankCommands(commands, query);
+
+  const row = (command: PaletteCommand, ranges: readonly number[] | null, hint: boolean) => {
+    const Icon = command.icon;
+
+    return (
+      <CommandItem
+        key={command.id}
+        value={command.id}
+        data-checked={command.current}
+        disabled={command.current}
+        onSelect={select(command)}
+      >
+        <Icon />
+        <CommandMatch text={command.label} ranges={ranges} />
+        {hint ? <CommandItemHint>{command.section}</CommandItemHint> : null}
+        <Keys shortcut={command.shortcut} />
+      </CommandItem>
+    );
+  };
+
+  return (
+    <Command loop shouldFilter={false}>
+      <CommandInput placeholder={placeholder} value={query} onValueChange={setQuery} />
+      <CommandList>
+        <CommandEmpty>No results</CommandEmpty>
+        {query.trim() === "" ? (
+          bySection(commands).map(([section, items]) => (
+            <CommandGroup key={section} heading={section}>
+              {items.map((command) => row(command, null, false))}
+            </CommandGroup>
+          ))
+        ) : (
+          <CommandGroup>{results.map(({ item, ranges }) => row(item, ranges, true))}</CommandGroup>
+        )}
+      </CommandList>
+    </Command>
   );
 }
