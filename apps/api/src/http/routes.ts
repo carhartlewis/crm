@@ -635,6 +635,28 @@ const AgentProxyRoutes = Layer.effectDiscard(
     };
 
     yield* router.add("*", "/api/chats/:id/agent/*", () => HttpEffect.fromWebHandler(handler));
+
+    // The agent names a chat after its first turn (a small model, in the agent; ADR 0018). Same
+    // tokens as the gateway: the agent's own, signed for the chat's caller and workspace.
+    const decodeTitle = Schema.decodeUnknownOption(
+      Schema.Struct({ sessionId: Schema.String, title: Schema.String }),
+    );
+
+    const title = auth.protectMcp(async (request, principal) => {
+      const body = Option.getOrNull(decodeTitle(await request.json().catch(() => null)));
+
+      if (body === null) return Response.json({ message: "Invalid request" }, { status: 400 });
+
+      const result = await Effect.runPromise(
+        Effect.result(chats.titleFromAgent(principal, body.sessionId, body.title)),
+      );
+
+      return Result.isSuccess(result)
+        ? new Response(null, { status: 204, headers: noStore })
+        : proxyFailure(result.failure);
+    });
+
+    yield* router.add("POST", "/api/agent/chats/title", () => HttpEffect.fromWebHandler(title));
   }),
 );
 

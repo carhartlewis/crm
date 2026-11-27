@@ -18,7 +18,7 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'6cf217e5f10326624439bdfcc4a496bc8a4b1582e38e22e244b300d0a66b388c'>;
+  StorageHashBase<'b37cc24233474209c56905e969c451d70ea2ae97144a8a1ef5b1594f8cd0ddfe'>;
 export type ExecutionHash =
   ExecutionHashBase<'bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f'>;
 export type ProfileHash =
@@ -322,6 +322,7 @@ export namespace Models {
     readonly [RelationKeys]?: 'user';
   };
   export type public_Chat = {
+    autoTitle: FieldOutputTypes['public']['Chat']['autoTitle'];
     createdAt: FieldOutputTypes['public']['Chat']['createdAt'];
     createdById: FieldOutputTypes['public']['Chat']['createdById'];
     id: FieldOutputTypes['public']['Chat']['id'];
@@ -866,6 +867,16 @@ type ContractBase = Omit<
             };
             readonly chat: {
               columns: {
+                readonly auto_title: {
+                  readonly dataType: 'pg/bool';
+                  readonly codecId: 'pg/bool@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/bool@1', true>;
+                  };
+                  readonly many: false;
+                };
                 readonly created_at: {
                   readonly dataType: 'pg/timestamptz';
                   readonly codecId: 'pg/timestamptz-date@1';
@@ -3327,6 +3338,10 @@ type ContractBase = Omit<
           };
           readonly Chat: {
             readonly fields: {
+              readonly autoTitle: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -3419,6 +3434,7 @@ type ContractBase = Omit<
               readonly table: 'chat';
               readonly namespaceId: 'public';
               readonly fields: {
+                readonly autoTitle: { readonly column: 'auto_title' };
                 readonly createdAt: { readonly column: 'created_at' };
                 readonly createdById: { readonly column: 'created_by_id' };
                 readonly id: { readonly column: 'id' };

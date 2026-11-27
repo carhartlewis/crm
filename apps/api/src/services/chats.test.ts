@@ -422,3 +422,36 @@ describe("joining spaces", () => {
     expect(await outcome(chats.joinSpace(mallory, space))).toBe("NotFound");
   });
 });
+
+describe("titles from the agent", () => {
+  test("names a chat once, and never over a person's title", async () => {
+    const { chats, rows } = setup();
+    const named = chatId();
+    const renamed = chatId();
+
+    await run(
+      chats.create(alice, { id: named, title: "hi can you list our companies", spaceId: null }),
+    );
+    await run(chats.create(alice, { id: renamed, title: "Hi", spaceId: null }));
+    await run(chats.update(alice, renamed, { title: "My title" }));
+
+    const caller = { userId: "alice", workspaceId: "ws_a" };
+
+    await run(chats.titleFromAgent(caller, "ses_1", "Company list"));
+    await run(chats.titleFromAgent(caller, "ses_1", "Something else"));
+    await run(chats.titleFromAgent(caller, "ses_2", "Greeting"));
+
+    expect(rows().chats.get(named)?.title).toBe("Company list");
+    expect(rows().chats.get(renamed)?.title).toBe("My title");
+  });
+
+  test("only for someone who sees the chat", async () => {
+    const { chats } = setup();
+
+    await run(chats.create(alice, { id: chatId(), title: "Hi", spaceId: null }));
+
+    expect(
+      await outcome(chats.titleFromAgent({ userId: "bob", workspaceId: "ws_a" }, "ses_1", "X")),
+    ).toBe("NotFound");
+  });
+});

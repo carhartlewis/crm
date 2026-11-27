@@ -14,7 +14,8 @@ import {
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { spaceColor } from "../../../../components/chat/chat-menu.tsx";
 import { JoinSpaceButton, SpaceMenu } from "../../../../components/chat/space-actions.tsx";
-import { useChats } from "../../../../components/chat/use-chats.ts";
+import { type ChatsApi, useChats } from "../../../../components/chat/use-chats.ts";
+import type { Chat } from "../../../../lib/chats.ts";
 import { WorkspacePageHeader } from "../../../../components/shell/page-header.tsx";
 
 const EditIcon = carbonIcon(edit);
@@ -90,46 +91,80 @@ function SpaceView({
         </PageShellActions>
       </WorkspacePageHeader>
       <PageShellContent>
-        <div className="animate-enter flex flex-col gap-2">
-          {space && (
-            <p className="text-sm text-pretty text-muted-foreground select-text">
-              {[space.description, `${members} ${members === 1 ? "member" : "members"}`]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          )}
-          {!joined && space && (
-            <div className="flex flex-col items-start gap-3">
-              <p className="text-sm text-pretty text-muted-foreground">
-                Join this space to see its chats and start new ones in it.
-              </p>
-              <JoinSpaceButton space={space} api={api} userId={userId} workspaceId={workspaceId} />
-            </div>
-          )}
-          {joined && api.isReady && chats.length === 0 && (
-            <p className="text-sm text-pretty text-muted-foreground">
-              {isPrivate ? "Chats only you see appear here." : "No chats in this space yet."}
-            </p>
-          )}
-          {chats.map((chat) => (
-            <Link
-              key={chat.id}
-              to="/chats/$chatId"
-              params={{ chatId: chat.id }}
-              className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="select-text">{chat.title}</CardTitle>
-                  <CardDescription>
-                    <FormattedDate value={chat.last_message_at} />
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <SpaceBody
+          spaceId={spaceId}
+          userId={userId}
+          workspaceId={workspaceId}
+          api={api}
+          chats={chats}
+          joined={joined}
+          members={members}
+        />
       </PageShellContent>
     </PageShell>
+  );
+}
+
+/** What a space holds: its description, a Join button for non-members, and its chats. */
+function SpaceBody({
+  spaceId,
+  userId,
+  workspaceId,
+  api,
+  chats,
+  joined,
+  members,
+}: {
+  spaceId: string;
+  userId: string;
+  workspaceId: string;
+  api: ChatsApi;
+  chats: readonly Chat[];
+  joined: boolean;
+  members: number;
+}) {
+  const isPrivate = spaceId === "private";
+  const space = api.spaces.find((item) => item.id === spaceId);
+
+  return (
+    <div className="animate-enter flex flex-col gap-2">
+      {space && (
+        <p className="text-sm text-pretty text-muted-foreground select-text">
+          {[space.description, `${members} ${members === 1 ? "member" : "members"}`]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      )}
+      {!joined && space && (
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-sm text-pretty text-muted-foreground">
+            Join this space to see its chats and start new ones in it.
+          </p>
+          <JoinSpaceButton space={space} api={api} userId={userId} workspaceId={workspaceId} />
+        </div>
+      )}
+      {joined && api.isReady && chats.length === 0 && (
+        <p className="text-sm text-pretty text-muted-foreground">
+          {isPrivate ? "Chats only you see appear here." : "No chats in this space yet."}
+        </p>
+      )}
+      {chats.map((chat) => (
+        <Link
+          key={chat.id}
+          to="/chats/$chatId"
+          params={{ chatId: chat.id }}
+          className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="select-text">{chat.title}</CardTitle>
+              <CardDescription>
+                <FormattedDate value={chat.last_message_at} />
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      ))}
+    </div>
   );
 }

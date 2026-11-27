@@ -47,6 +47,17 @@ export function createMemoryChatStore(members: Iterable<string>, now = () => Dat
     role,
     chat: async (id) => rows.chats.get(id) ?? null,
     isSpaceMember: async (spaceId, userId) => rows.members.has(`${spaceId}:${userId}`),
+    chatBySession: async (sessionId) =>
+      [...rows.chats.values()].find((chat) => chat.sessionId === sessionId) ?? null,
+    setAutoTitle: async (id, title) => {
+      const chat = rows.chats.get(id);
+
+      if (!chat || chat.autoTitle === false) return false;
+
+      rows.chats.set(id, { ...chat, title, autoTitle: false });
+
+      return true;
+    },
     touch: async (id) => {
       const chat = rows.chats.get(id);
 

@@ -61,6 +61,37 @@ export function spaceDescriptionError(value: string) {
   return result.ok ? undefined : result.message;
 }
 
+/**
+ * What the agent asks a small model after a chat's first turn, to name it in the sidebar.
+ */
+export function chatTitlePrompt(message: string, reply: string) {
+  return [
+    "Name this chat for a sidebar list. Reply with the title only: 2 to 6 words, plain text, no quotes, no full stop, in the language of the message.",
+    "",
+    `Message: ${message.slice(0, 2_000)}`,
+    `Reply: ${reply.slice(0, 2_000)}`,
+  ].join("\n");
+}
+
+/** A model's title, cleaned: one line, no quotes or trailing full stop, at most 60 characters. */
+export function cleanGeneratedTitle(raw: string): string | undefined {
+  const line =
+    raw
+      .split("\n")
+      .find((item) => item.trim())
+      ?.trim() ?? "";
+
+  const title = line
+    .replace(/^title:\s*/i, "")
+    .replace(/^["'“‘`*]+|["'”’`*]+$/g, "")
+    .replace(/[.。]$/, "")
+    .trim();
+
+  if (!title) return undefined;
+
+  return title.length > 60 ? `${title.slice(0, 59).trimEnd()}…` : title;
+}
+
 /** A chat's first title: the first line of the first message, cut at a word near 60 characters. */
 export function titleFromMessage(message: string) {
   const line = message.trim().split("\n")[0]?.replaceAll(/\s+/g, " ") ?? "";

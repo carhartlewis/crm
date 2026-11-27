@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createId, ID_PREFIXES } from "../ids/index.ts";
 import {
+  cleanGeneratedTitle,
   callDecision,
   callKind,
   decodeStoredLayout,
@@ -116,5 +117,14 @@ describe("permission modes", () => {
     expect(callKind("send_email", { readOnlyHint: true })).toBe("risky");
     expect(callKind("get_api_keys", { readOnlyHint: true })).toBe("risky");
     expect(callKind("search_threads", undefined)).toBe("risky");
+  });
+});
+
+describe("generated chat titles", () => {
+  test("keep one clean line", () => {
+    expect(cleanGeneratedTitle('"Customer list review."\n')).toBe("Customer list review");
+    expect(cleanGeneratedTitle("Title: Q4 pipeline")).toBe("Q4 pipeline");
+    expect(cleanGeneratedTitle("   ")).toBeUndefined();
+    expect(cleanGeneratedTitle("x".repeat(80))?.length).toBe(60);
   });
 });

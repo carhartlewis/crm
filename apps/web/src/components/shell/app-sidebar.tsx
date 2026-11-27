@@ -18,6 +18,7 @@ import { preloadable } from "@crm/ui/lib/preloadable";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { prewarmChat } from "../../lib/chat-api.ts";
+import { usePinnedOrder } from "../../lib/pinned-order.ts";
 import { haptic } from "../../lib/haptics.ts";
 import { isSettingsPath } from "../../lib/settings.ts";
 import { shortcuts } from "../../lib/shortcuts.ts";
@@ -46,6 +47,13 @@ export interface AppSidebarProps {
 
 export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: AppSidebarProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const pinned = usePinnedOrder(userId);
+
+  // One highlighted row: a pinned space highlights itself; any other space highlights Spaces.
+  const openSpace = pathname.startsWith("/spaces/") ? pathname.slice("/spaces/".length) : null;
+
+  const spacesActive =
+    pathname === "/spaces" || (openSpace !== null && !pinned.includes(`space:${openSpace}`));
 
   return (
     <Sidebar variant="inset">
@@ -77,10 +85,7 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
             <SidebarGroup>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/spaces" || pathname.startsWith("/spaces/")}
-                    render={<Link to="/spaces" />}
-                  >
+                  <SidebarMenuButton isActive={spacesActive} render={<Link to="/spaces" />}>
                     <SpacesIcon />
                     <span>Spaces</span>
                   </SidebarMenuButton>

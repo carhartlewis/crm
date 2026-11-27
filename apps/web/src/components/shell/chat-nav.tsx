@@ -109,11 +109,13 @@ interface PinGroupProps extends RowProps {
  * (pinned spaces). Drag to reorder within the group, a haptic tick per slot.
  */
 function PinGroup({ label, kinds, api, userId, workspaceId, pathname, onRequest }: PinGroupProps) {
+  const shown = new Set(kinds);
+
   // Pins whose chat or space is gone (deleted, or not synced yet) are skipped, not shown empty.
   const visible = api.layout.pinned.flatMap((key, index) => {
     const entry = parsePinKey(key);
 
-    if (!entry || !kinds.includes(entry.kind)) return [];
+    if (!entry || !shown.has(entry.kind)) return [];
 
     if (entry.kind === "page") return isPageId(entry.id) ? [{ key, index, pin: entry }] : [];
 

@@ -277,6 +277,13 @@
           },
           "Chat": {
             "fields": {
+              "autoTitle": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "createdAt": {
                 "nullable": false,
                 "type": {
@@ -409,6 +416,9 @@
             },
             "storage": {
               "fields": {
+                "autoTitle": {
+                  "column": "auto_title"
+                },
                 "createdAt": {
                   "column": "created_at"
                 },
@@ -4125,6 +4135,15 @@
             },
             "chat": {
               "columns": {
+                "auto_title": {
+                  "codecId": "pg/bool@1",
+                  "dataType": "pg/bool",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nullable": false
+                },
                 "created_at": {
                   "codecId": "pg/timestamptz-date@1",
                   "dataType": "pg/timestamptz",
@@ -6847,7 +6866,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "6cf217e5f10326624439bdfcc4a496bc8a4b1582e38e22e244b300d0a66b388c"
+    "storageHash": "b37cc24233474209c56905e969c451d70ea2ae97144a8a1ef5b1594f8cd0ddfe"
   },
   "execution": {
     "executionHash": "bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f",

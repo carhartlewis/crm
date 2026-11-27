@@ -460,6 +460,9 @@ model Chat {
   lastMessageAt DateTime   @map("last_message_at")
   // `manual`, `auto` or `bypass` (ADR 0019): how much the agent may do without asking.
   permissionMode String    @default("manual") @map("permission_mode")
+  // The title was made by the CRM (from the first message, then by the agent); a person's rename
+  // turns it off so the agent never overwrites it.
+  autoTitle     Boolean    @default(true) @map("auto_title")
 
   @@index([workspaceId])
   @@index([spaceId])

@@ -44,6 +44,8 @@ export interface ChatRow {
   readonly sessionId: string;
   /** `manual`, `auto` or `bypass` (ADR 0019). */
   readonly permissionMode: string;
+  /** The CRM made the title; a person's rename turns it off. Absent means on. */
+  readonly autoTitle?: boolean;
 }
 
 export interface SpaceRow {
@@ -60,6 +62,7 @@ export interface ChatPatch {
   title?: string;
   spaceId?: string | null;
   permissionMode?: PermissionMode;
+  autoTitle?: boolean;
 }
 
 /** The space columns its maker (or an admin) may change. */
@@ -101,6 +104,9 @@ export interface ChatStore {
   role(workspaceId: string, userId: string): Promise<string | null>;
   chat(id: string): Promise<ChatRow | null>;
   isSpaceMember(spaceId: string, userId: string): Promise<boolean>;
+  chatBySession(sessionId: string): Promise<ChatRow | null>;
+  /** Sets a title the agent made, only while the chat's title is still the CRM's own. */
+  setAutoTitle(id: string, title: string): Promise<boolean>;
   /** Marks a message sent now (Recents order). */
   touch(id: string): Promise<void>;
 }
@@ -197,6 +203,15 @@ export interface ChatsService {
   /** Join and leave a space (ADR 0020). Any member of the workspace may join any space. */
   readonly joinSpace: (actor: ChatActor, id: string) => Effect.Effect<TxId, Failure>;
   readonly leaveSpace: (actor: ChatActor, id: string) => Effect.Effect<TxId, Failure>;
+  /**
+   * The agent names a chat after its first turn (a small model, in the agent). Kept only while
+   * the title is still the CRM's own; the caller must see the chat.
+   */
+  readonly titleFromAgent: (
+    caller: { userId: string; workspaceId: string },
+    sessionId: string,
+    title: string,
+  ) => Effect.Effect<void, Failure>;
   readonly saveSidebar: (
     actor: ChatActor,
     input: { id: string; pinned: readonly string[]; folders: readonly FolderInput[] },
@@ -420,7 +435,11 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
 
         const patch: ChatPatch = {};
 
-        if (title?.ok) patch.title = title.value;
+        // A person's title is theirs: the agent stops naming the chat.
+        if (title?.ok) {
+          patch.title = title.value;
+          patch.autoTitle = false;
+        }
 
         if (spaceId !== undefined) patch.spaceId = spaceId;
 
@@ -636,6 +655,27 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
         return ok(undefined);
       }),
 
+    titleFromAgent: (caller, sessionId, title) =>
+      run("titleFromAgent", async () => {
+        const name = normalizeChatTitle(title);
+
+        if (!name.ok) return fail(new Invalid({ message: name.message }));
+
+        const chat = await store.chatBySession(sessionId);
+
+        if (
+          !chat ||
+          chat.workspaceId !== caller.workspaceId ||
+          !(await canSee(chat, caller.userId, store.isSpaceMember))
+        ) {
+          return fail(notFound());
+        }
+
+        await store.setAutoTitle(chat.id, name.value);
+
+        return ok(undefined);
+      }),
+
     saveSidebar: (actor, input) => {
       const layout = parseSidebarLayout(input.pinned, input.folders);
 
@@ -764,6 +804,14 @@ export function prismaChatStore(db: Db): ChatStore {
       (await db.orm.public.Member.where({ organizationId: workspaceId, userId }).first())?.role ??
       null,
     chat: async (id) => db.orm.public.Chat.where({ id }).first(),
+    chatBySession: async (sessionId) => db.orm.public.Chat.where({ sessionId }).first(),
+    setAutoTitle: async (id, title) =>
+      (await db.orm.public.Chat.where({ id, autoTitle: true }).update({
+        title,
+        // Named once: later turns don't rename it.
+        autoTitle: false,
+        updatedAt: new Date(),
+      })) !== null,
     isSpaceMember: async (spaceId, userId) =>
       (await db.orm.public.ChatSpaceMember.where({ spaceId, userId }).first()) !== null,
     touch: async (id) => {
