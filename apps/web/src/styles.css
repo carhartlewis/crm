@@ -12,3 +12,38 @@ body[data-reordering] {
 body[data-reordering] [data-slot="preview-card-content"] {
   visibility: hidden;
 }
+
+/* A chat dragged onto Pinned, a folder or a space (components/shell/chat-drag.ts). */
+[data-drag-chat][data-dragging] {
+  opacity: 0.4;
+}
+
+[data-drag-ghost] {
+  border-radius: var(--radius-md);
+  background: var(--sidebar-accent);
+  box-shadow: var(--shadow-md);
+}
+
+/* The folder or space under the pointer. */
+[data-drop-mark="on"] > [data-sidebar="menu-button"] {
+  background: var(--sidebar-accent);
+}
+
+/* Where the chat lands in Pinned: a line above or below the row. */
+:is([data-drop-mark="before"], [data-drop-mark="after"])::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0.5rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sidebar-ring);
+  pointer-events: none;
+}
+
+[data-drop-mark="before"]::before {
+  top: -1px;
+}
+
+[data-drop-mark="after"]::before {
+  bottom: -1px;
+}

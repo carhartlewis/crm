@@ -21,7 +21,8 @@ export function siblingShift(index: number, from: number, to: number, pitch: num
 const reorderingListeners = new Set<() => void>();
 let reordering = false;
 
-function setReordering(value: boolean) {
+/** Marks a drag as running or done; other sidebar drags (chat-drag.ts) share the flag. */
+export function setReordering(value: boolean) {
   if (value === reordering) return;
 
   reordering = value;

@@ -10,6 +10,15 @@ export function togglePin(order: readonly PinKey[], key: PinKey): PinKey[] {
   return order.includes(key) ? order.filter((item) => item !== key) : [...order, key];
 }
 
+/** Pins `key` at `index` in the order (moving it there if it is already pinned). */
+export function pinAt(order: readonly PinKey[], key: PinKey, index: number): PinKey[] {
+  const at = order.slice(0, index).filter((item) => item === key).length;
+  const without = order.filter((item) => item !== key);
+  const place = Math.max(0, Math.min(index - at, without.length));
+
+  return [...without.slice(0, place), key, ...without.slice(place)];
+}
+
 /** Puts a chat in a folder (taking it out of any other), or in none with `null`. */
 export function moveToFolder(
   folders: readonly Folder[],

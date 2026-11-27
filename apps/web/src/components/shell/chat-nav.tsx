@@ -38,11 +38,12 @@ import { haptic } from "../../lib/haptics.ts";
 import { useShownPathname } from "../../lib/shown-path.ts";
 import { isPageId, pageById, pageForPath } from "../../lib/pages.ts";
 import { ariaKeyShortcuts, pinnedShortcut } from "../../lib/shortcuts.ts";
-import { recentChats } from "../../lib/sidebar-layout.ts";
+import { folderOf, moveToFolder, pinAt, recentChats } from "../../lib/sidebar-layout.ts";
 import { type ChatMenuRequest, MenuIcon, spaceColor } from "../chat/chat-menu.tsx";
 import { NameDialog } from "../chat/name-dialog.tsx";
-import { type ChatsApi, reorderPinnedAt, useChats } from "../chat/use-chats.ts";
+import { type ChatsApi, editLayoutAt, reorderPinnedAt, useChats } from "../chat/use-chats.ts";
 import { NavLink } from "./nav-link.tsx";
+import { chatDragDrop } from "./chat-drag.ts";
 import { reorderable } from "./reorder.ts";
 
 const AddIcon = carbonIcon(add);
@@ -74,8 +75,36 @@ export default function ChatNav({ userId, workspaceId }: NavProps) {
 
   const rowProps = { api, userId, workspaceId, pathname, onRequest: setDialog };
 
+  const moveChat = useMutation({
+    ...updateChatMutation,
+    onError: (error) => toast.error(error.message),
+  }).mutate;
+
+  // Drag a chat from Recents or a folder onto Pinned, a folder or a joined space, a haptic tick
+  // per target. Edits read the current layout at the drop, so this callback stays stable.
+  const dragRef = useCallback(
+    (root: HTMLDivElement | null) =>
+      chatDragDrop({
+        onTargetChange: haptic,
+        onDrop: (chatId, drop) => {
+          if (drop.kind === "space") {
+            moveChat({ workspaceId, id: chatId, spaceId: drop.id });
+
+            return;
+          }
+
+          editLayoutAt(workspaceId, userId, (layout) =>
+            drop.kind === "pinned"
+              ? { ...layout, pinned: pinAt(layout.pinned, pinKey("chat", chatId), drop.index) }
+              : { ...layout, folders: moveToFolder(layout.folders, chatId, drop.id) },
+          );
+        },
+      })(root),
+    [workspaceId, userId, moveChat],
+  );
+
   return (
-    <div>
+    <div ref={dragRef}>
       <PinGroup label="Pinned" kinds={["page", "chat"]} {...rowProps} />
       <PinGroup label="Spaces" kinds={["space"]} {...rowProps} />
       <FoldersGroup {...rowProps} />
@@ -154,7 +183,8 @@ function PinGroup({ label, kinds, api, userId, workspaceId, pathname, onRequest 
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
-      <SidebarMenu ref={listRef} aria-label={label}>
+      {/* Pinned takes chats dropped between its rows (chat-drag.ts). */}
+      <SidebarMenu ref={listRef} aria-label={label} data-drop-pinned={hotkeys || undefined}>
         {visible.map(({ key, index: pinIndex, pin: item }, index) => {
           const shortcut = hotkeys ? pinnedShortcut(index) : undefined;
 
@@ -246,7 +276,7 @@ function FoldersGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
           );
 
           return (
-            <SidebarMenuItem key={folder.id}>
+            <SidebarMenuItem key={folder.id} data-drop-folder={folder.id}>
               <SidebarMenuButton aria-expanded={open} onClick={() => toggle(folder.id)}>
                 <FolderIcon />
                 <span>{folder.name}</span>
@@ -341,11 +371,18 @@ function ChatRow({ chat, icon, shortcutIndex, pinIndex, ...props }: ChatRowProps
   const shortcut = shortcutIndex === undefined ? undefined : pinnedShortcut(shortcutIndex);
   const key = pinKey("chat", chat.id);
   const pinned = props.api.layout.pinned.includes(key);
+  // An unpinned chat drags onto Pinned, a folder or a space (chat-drag.ts); a pinned one reorders.
+  const draggable = pinIndex === undefined;
 
   return (
     <SidebarMenuItem
-      data-reorder-item={pinIndex === undefined ? undefined : true}
+      data-reorder-item={draggable ? undefined : true}
       data-pin-index={pinIndex}
+      data-drag-chat={draggable ? chat.id : undefined}
+      data-chat-space={draggable ? (chat.space_id ?? "") : undefined}
+      data-chat-folder={
+        draggable ? (folderOf(props.api.layout.folders, chat.id)?.id ?? "") : undefined
+      }
     >
       <SidebarMenuButton
         isActive={props.pathname === `/chats/${chat.id}`}
@@ -392,10 +429,12 @@ function SpaceRow({ space, shortcutIndex, pinIndex, ...props }: SpaceRowProps) {
   });
 
   // As in Glass: a pinned space shows Unpin and Leave on hover; its other actions are on its page.
+  // A joined space takes chats dropped on it (chat-drag.ts).
   return (
     <SidebarMenuItem
       data-reorder-item={pinIndex === undefined ? undefined : true}
       data-pin-index={pinIndex}
+      data-drop-space={joined ? space.id : undefined}
     >
       <SidebarMenuButton
         isActive={props.pathname === `/spaces/${space.id}`}

@@ -42,20 +42,32 @@ function layoutOf(row: SidebarRow | undefined, fallback: readonly PinKey[]): Sid
 }
 
 /**
- * Moves a pinned item, reading the current row and order at the moment of the drop: the drag
- * handler stays the same function across renders.
+ * Edits the sidebar layout, reading the current row and order at the moment of the edit: drag
+ * handlers stay the same function across renders.
  */
-export function reorderPinnedAt(workspaceId: string, userId: string, from: number, to: number) {
+export function editLayoutAt(
+  workspaceId: string,
+  userId: string,
+  edit: (layout: SidebarLayout) => SidebarLayout,
+) {
   const collection = sidebarCollection(workspaceId);
   const row = [...collection.values()][0];
   const layout = layoutOf(row, readPinnedOrder(userId));
-  const next = { ...layout, pinned: moveItem(layout.pinned, from, to) };
+  const next = edit(layout);
 
   writePinnedOrder(userId, next.pinned);
   saveLayout(collection, row, { workspaceId, userId }, next).catch((error: Error) => {
     writePinnedOrder(userId, layout.pinned);
     toast.error(error.message);
   });
+}
+
+/** Moves a pinned item (a reorder drag). */
+export function reorderPinnedAt(workspaceId: string, userId: string, from: number, to: number) {
+  editLayoutAt(workspaceId, userId, (layout) => ({
+    ...layout,
+    pinned: moveItem(layout.pinned, from, to),
+  }));
 }
 
 /**
@@ -167,6 +179,7 @@ export function useChats(workspaceId: string, userId: string) {
     // Whether the synced data (not the device's copy) is in: empty states wait for it.
     isReady: chats.isReady && spaces.isReady && rows.isReady,
     togglePin: (key: PinKey) => save({ ...layout, pinned: togglePin(layout.pinned, key) }),
+
     moveToFolder: (chatId: string, folderId: string | null) =>
       save({ ...layout, folders: moveToFolder(layout.folders, chatId, folderId) }),
     /** Makes a folder, optionally with a chat in it, and returns its id. */

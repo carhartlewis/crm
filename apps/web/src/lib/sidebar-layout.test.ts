@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createId, ID_PREFIXES } from "@crm/core/ids";
 import { pinKey } from "@crm/core/chat";
-import { forgetChat, moveToFolder, recentChats, togglePin } from "./sidebar-layout.ts";
+import { forgetChat, moveToFolder, pinAt, recentChats, togglePin } from "./sidebar-layout.ts";
 
 const chat = () => createId(ID_PREFIXES.chat);
 const folder = () => createId(ID_PREFIXES.folder);
@@ -92,5 +92,22 @@ describe("sidebar layout", () => {
     );
 
     expect(recents.map((item) => item.id)).toEqual([joined]);
+  });
+
+  test("a chat dropped between pins lands in that slot, and moves if already pinned", () => {
+    const order = [pinKey("page", "companies"), pinKey("page", "contacts"), pinKey("chat", "a")];
+
+    expect(pinAt(order, pinKey("chat", "b"), 1)).toEqual([
+      "page:companies",
+      "chat:b",
+      "page:contacts",
+      "chat:a",
+    ]);
+    expect(pinAt(order, pinKey("chat", "b"), 3)).toEqual([...order, "chat:b"]);
+    expect(pinAt(order, pinKey("chat", "a"), 0)).toEqual([
+      "chat:a",
+      "page:companies",
+      "page:contacts",
+    ]);
   });
 });

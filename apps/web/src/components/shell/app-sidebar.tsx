@@ -26,7 +26,6 @@ import { shortcuts } from "../../lib/shortcuts.ts";
 import { HotkeyTooltip } from "../hotkey-tooltip.tsx";
 import { SettingsNav } from "../settings/settings-nav.tsx";
 import { PinnedNav } from "./pinned-nav.tsx";
-import { rubberBandScroll } from "./rubber-band.ts";
 import { TitleBarControls } from "./title-bar.tsx";
 import { WorkspaceMenu } from "./workspace-menu.tsx";
 
@@ -80,7 +79,7 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
           </Link>
         </HotkeyTooltip>
       </SidebarHeader>
-      <SidebarContent ref={rubberBandScroll} className="overscroll-none">
+      <SidebarContent className="overscroll-contain">
         {isSettingsPath(pathname) ? (
           <SettingsNav />
         ) : (
