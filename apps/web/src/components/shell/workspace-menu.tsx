@@ -22,8 +22,8 @@ import { carbonIcon } from "@crm/ui/components/icon";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@crm/ui/components/sidebar";
 import { useTheme } from "@crm/ui/components/theme-provider";
 import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { initials } from "../../lib/initials.ts";
 import { sessionQuery, signOutMutation, workspacesQuery } from "../../lib/session.ts";
 import { switchWorkspaceMutation } from "../../lib/workspaces.ts";
@@ -45,7 +45,7 @@ export function WorkspaceMenu({ userId }: { userId: string }) {
   const { data: session } = useSuspenseQuery(sessionQuery);
   const { data: workspaces } = useSuspenseQuery(workspacesQuery(userId));
   const { theme, setTheme } = useTheme();
-  const [, setCreate] = useCreateSheet();
+  const navigate = useNavigate();
   const activeId = session?.session.activeOrganizationId;
   const active = workspaces.find((workspace) => workspace.id === activeId) ?? workspaces[0];
   const user = session?.user;
@@ -109,7 +109,7 @@ export function WorkspaceMenu({ userId }: { userId: string }) {
                     ))}
                   </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => void setCreate("workspace")}>
+                  <DropdownMenuItem onClick={() => void navigate({ to: "/new-workspace" })}>
                     <AddIcon />
                     Create new workspace
                   </DropdownMenuItem>
