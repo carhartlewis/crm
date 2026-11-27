@@ -21,7 +21,7 @@ export function RecordRail({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-full w-80 min-w-0 shrink-0 flex-col gap-4.5 self-stretch overflow-y-auto overflow-x-hidden pr-2 pb-6">
+    <div className="flex h-full w-64 min-w-0 shrink-0 flex-col gap-4.5 self-stretch overflow-y-auto overflow-x-hidden pr-2 pb-6">
       {children}
     </div>
   );
@@ -46,7 +46,7 @@ export function RailFacts({ facts }: { facts: readonly RailFactItem[] }) {
 function RailFact({ kind, label, value }: RailFactItem) {
   return (
     <div className="flex min-h-9 min-w-0 shrink-0 items-center justify-between gap-3 text-body">
-      <dt className="w-28 shrink-0 truncate text-muted-foreground">{label}</dt>
+      <dt className="w-20 shrink-0 truncate text-muted-foreground">{label}</dt>
       <dd
         className={cn(
           "min-w-0 flex-1 truncate text-right text-foreground",
