@@ -15,6 +15,14 @@ export function isAppUrl(url: string, appOrigin: string) {
   return URL.canParse(url) && new URL(url).origin === appOrigin;
 }
 
+/** Permissions the app's own pages get: copy buttons, and notifications when a chat needs you. */
+const APP_PERMISSIONS = new Set(["clipboard-sanitized-write", "notifications"]);
+
+/** Every other permission, and every permission for another origin, is denied. */
+export function allowsPermission(permission: string, url: string, appOrigin: string) {
+  return APP_PERMISSIONS.has(permission) && isAppUrl(url, appOrigin);
+}
+
 /**
  * CSP for the app origin. Dev allows inline scripts for the Bun dev server's injected
  * bootstrap; packaged builds load only same-origin scripts.

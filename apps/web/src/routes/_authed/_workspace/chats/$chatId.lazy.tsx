@@ -97,6 +97,7 @@ function ChatPage() {
         key={chatId}
         chatId={chatId}
         userId={userId}
+        title={chat?.title ?? "Chat"}
         permissionMode={chat?.permission_mode ?? "manual"}
         onPermissionModeChange={(mode) => {
           // The mode picked last is also where the next new chat starts.

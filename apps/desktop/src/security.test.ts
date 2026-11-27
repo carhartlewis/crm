@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { contentSecurityPolicy, isAllowedExternal, isAppUrl } from "./security.ts";
+import {
+  allowsPermission,
+  contentSecurityPolicy,
+  isAllowedExternal,
+  isAppUrl,
+} from "./security.ts";
 
 describe("desktop security policy", () => {
   test("only https and mailto links leave the app", () => {
@@ -21,6 +26,16 @@ describe("desktop security policy", () => {
     expect(isAppUrl("http://localhost:3000/sign-in", "http://localhost:3000")).toBe(true);
     expect(isAppUrl("http://localhost:3001/api", "http://localhost:3000")).toBe(false);
     expect(isAppUrl("https://evil.example/", "http://localhost:3000")).toBe(false);
+  });
+
+  test("only the app may copy and notify; everything else is denied", () => {
+    const app = "http://localhost:3000";
+
+    expect(allowsPermission("notifications", "http://localhost:3000/chats/1", app)).toBe(true);
+    expect(allowsPermission("clipboard-sanitized-write", app, app)).toBe(true);
+    expect(allowsPermission("notifications", "https://evil.example/", app)).toBe(false);
+    expect(allowsPermission("media", app, app)).toBe(false);
+    expect(allowsPermission("geolocation", app, app)).toBe(false);
   });
 
   test("packaged builds forbid inline scripts and plugins", () => {

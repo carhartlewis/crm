@@ -14,7 +14,12 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { createHaptics, nativeHaptics } from "./haptics.ts";
 import { startLoopback } from "./loopback.ts";
-import { contentSecurityPolicy, isAllowedExternal, isAppUrl } from "./security.ts";
+import {
+  allowsPermission,
+  contentSecurityPolicy,
+  isAllowedExternal,
+  isAppUrl,
+} from "./security.ts";
 
 const WEB_URL = new URL(process.env["CRM_WEB_URL"] ?? "https://localhost:3000");
 const API_URL = new URL(process.env["CRM_API_URL"] ?? "http://localhost:3001");
@@ -52,15 +57,12 @@ app.on("web-contents-created", (_event, contents) => {
 function hardenSession() {
   const ses = session.defaultSession;
 
-  // Deny by default; copy buttons need clipboard writes from the app itself.
+  // Deny by default; the app itself may copy and notify (`allowsPermission`).
   ses.setPermissionRequestHandler((contents, permission, callback) =>
-    callback(
-      permission === "clipboard-sanitized-write" && isAppUrl(contents.getURL(), WEB_URL.origin),
-    ),
+    callback(allowsPermission(permission, contents.getURL(), WEB_URL.origin)),
   );
-  ses.setPermissionCheckHandler(
-    (_contents, permission, origin) =>
-      permission === "clipboard-sanitized-write" && isAppUrl(origin, WEB_URL.origin),
+  ses.setPermissionCheckHandler((_contents, permission, origin) =>
+    allowsPermission(permission, origin, WEB_URL.origin),
   );
 
   ses.webRequest.onHeadersReceived({ urls: [`${WEB_URL.origin}/*`] }, (details, callback) => {

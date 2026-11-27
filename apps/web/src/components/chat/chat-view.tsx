@@ -33,9 +33,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { activeTurn } from "eve/events";
 import { useEveAgent } from "eve/react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { branchOf, chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
+import { askToNotify, chatNotice, newQuestion, notifyChat } from "../../lib/chat-notify.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { ReplyResponse } from "./reply-islands.tsx";
 import { Composer } from "./composer.tsx";
@@ -74,6 +75,8 @@ function waitingApprovals(messages: readonly EveMessage[]) {
 export interface ChatViewProps {
   readonly chatId: string;
   readonly userId: string;
+  /** The chat's title, for notifications while the window is in the background. */
+  readonly title: string;
   /** The chat's permission mode, and how to change it (ADR 0019). */
   readonly permissionMode: string;
   readonly onPermissionModeChange: (mode: PermissionMode) => void;
@@ -91,6 +94,7 @@ export interface ChatViewProps {
 export function ChatView({
   chatId,
   userId,
+  title,
   permissionMode,
   onPermissionModeChange,
   history,
@@ -100,6 +104,8 @@ export function ChatView({
   // The composer's text box, for Edit to put a message back.
   const field = useRef<HTMLTextAreaElement | null>(null);
   const queryClient = useQueryClient();
+  // Questions asked before this moment were seen when the chat was last open.
+  const [openedAt] = useState(Date.now);
 
   // The saved history is behind once the chat moves on; the next visit reads it again.
   const historyChanged = () =>
@@ -111,6 +117,18 @@ export function ChatView({
     initialEvents: history.events as readonly SessionStreamEvent[],
     initialSession: history.session,
     resume: true,
+    // While the window is in the background, a finished reply or a question shows as a
+    // notification (as in T3 Code); catching up on the chat never does.
+    onFinish: (snapshot) => {
+      const reply = snapshot.messages.findLast((message) => message.role === "assistant");
+
+      notifyChat(chatNotice("finished", title, reply ? messageText(reply) : ""));
+    },
+    onEvent: (event) => {
+      const question = newQuestion(event, openedAt);
+
+      if (question !== null) notifyChat(chatNotice("input", title, question));
+    },
   });
 
   // Sends, answers and stops resolve when the server accepts them; a refusal (such as a session
@@ -119,6 +137,8 @@ export function ChatView({
     // While a turn runs, Jev decides whether the message redirects it or waits (see the API's
     // follow-up judge); the person never chooses.
     mutationFn: async ({ text }: { text: string }) => {
+      askToNotify();
+
       const task = activeTurn(agent.view) === undefined ? null : lastRequest(agent.messages);
       const mode = task === null ? "steer" : await followUpMode(chatId, text, task);
 
@@ -430,12 +450,7 @@ function ToolCall({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <ToolStep
-        label={stepLabel(part)}
-        detail={stepDetail(part)}
-        state={stepState(part)}
-        error={part.error?.message}
-      />
+      <ToolStep label={stepLabel(part)} detail={stepDetail(part)} state={stepState(part)} />
       {/* Approvals wait in one card above the composer; other questions stay with their call. */}
       {part.interaction?.status === "open" && part.interaction.request.kind !== "approval" && (
         <InteractionPrompt interaction={part.interaction} onAnswer={onAnswer} />
