@@ -386,6 +386,11 @@
   }
 }
 
+/* A chat reply spans its column, as wide as the composer; the reading measure is for documents. */
+[data-slot="message-content"] [data-slot="markdown"] [data-markdown="root"] {
+  max-width: none;
+}
+
 [data-slot="markdown"] {
   & [data-markdown="h1"] {
     font-size: 1.125em;
