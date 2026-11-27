@@ -51,3 +51,5 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 **Access level**: `read` (only the app's read-only tools) or `write` (all its tools). Chosen per connection; nothing is configured per app.
 
 **Gateway**: The MCP server at `/api/mcp` that gives the agent the tools of the user's connections, named `<app>__<tool>`. better-auth MCP issues its tokens (ADR 0013).
+
+**Skill**: Instructions the agent loads when they apply, shared by everyone in a workspace. Copied from skills.sh or written in the CRM; starts disabled until a member reads and enables it (ADR 0013).

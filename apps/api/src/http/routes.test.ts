@@ -8,6 +8,8 @@ import { Companies, makeCompanies } from "../services/Companies.ts";
 import { Connections, makeConnections } from "../services/Connections.ts";
 import { createMemoryCompanyStore } from "../services/company-store-memory.ts";
 import { Electric, makeElectric } from "../services/Electric.ts";
+import { createMemorySkillStore } from "../services/skill-store-memory.ts";
+import { makeSkills, Skills } from "../services/Skills.ts";
 import { loopbackUrl } from "./desktop.ts";
 import { Routes } from "./routes.ts";
 
@@ -134,6 +136,10 @@ const app = HttpRouter.toWebHandler(
       FakeCompanies,
       FakeElectric,
       FakeConnections,
+      Layer.succeed(
+        Skills,
+        makeSkills({ store: createMemorySkillStore([]).store, now: () => new Date() }),
+      ),
       HttpServer.layerServices,
     ]),
   ),

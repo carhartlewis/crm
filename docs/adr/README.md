@@ -16,4 +16,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0010](0010-carbon-icons-per-icon-modules.md)      | Carbon icons from per-icon modules                                                       |
 | [0011](0011-guards-own-auth-navigation.md)         | Directory routes with one guard per pathless layout; auth changes re-run guards          |
 | [0012](0012-electric-sync-behind-the-api.md)       | Electric behind the authenticated API proxy; workspace-scoped shapes; client ids; txids  |
-| [0013](0013-connections-through-an-mcp-gateway.md) | Connected apps reach the agent through one MCP gateway, guarded by better-auth MCP       |
+| [0013](0013-connections-through-an-mcp-gateway.md) | Connected apps and workspace skills reach the agent through better-auth MCP tokens       |

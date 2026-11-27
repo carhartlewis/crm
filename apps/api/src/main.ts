@@ -7,6 +7,7 @@ import { Auth } from "./services/Auth.ts";
 import { Connections } from "./services/Connections.ts";
 import { Companies } from "./services/Companies.ts";
 import { Electric } from "./services/Electric.ts";
+import { Skills } from "./services/Skills.ts";
 
 const Server = Layer.unwrap(
   Effect.gen(function* () {
@@ -15,7 +16,7 @@ const Server = Layer.unwrap(
     const Cors = HttpRouter.cors({ allowedOrigins: [config.webOrigin.origin], credentials: true });
 
     return HttpRouter.serve(Layer.mergeAll(Routes, Cors)).pipe(
-      Layer.provide([Auth.layer, Companies.layer, Electric.layer, Connections.layer]),
+      Layer.provide([Auth.layer, Companies.layer, Electric.layer, Connections.layer, Skills.layer]),
       Layer.provide(BunHttpServer.layer({ port: config.port })),
     );
   }),

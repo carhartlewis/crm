@@ -21,6 +21,7 @@ model User {
   oauthAccessTokens  OauthAccessToken[]
   oauthConsents      OauthConsent[]
   connections        Connection[]
+  skills             Skill[]
 
   @@map("user")
 }
@@ -90,6 +91,7 @@ model Workspace {
   members     Member[]
   invitations Invitation[]
   connections Connection[]
+  skills      Skill[]
 
   @@map("workspace")
 }
@@ -350,4 +352,32 @@ model Connection {
   @@unique([workspaceId, userId, integration])
   @@index([userId])
   @@map("connection")
+}
+
+// A skill shared by everyone in a workspace (`@crm/integrations` skills). The agent loads the
+// enabled ones each turn. Installed from skills.sh (pinned copy; `source_id` is the skills.sh id)
+// or written in the CRM. New skills start disabled until someone reads and enables them.
+
+model Skill {
+  id          String               @id
+  workspaceId String               @map("workspace_id")
+  workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Lowercase letters, digits and hyphens; the name the agent loads it by.
+  name        String
+  description String
+  // The SKILL.md body, without its frontmatter.
+  content     String
+  // Other files of the skill package, by relative path.
+  files       Json(storage: jsonb)
+  // "skills.sh" or "custom".
+  source      String
+  sourceId    String?              @map("source_id")
+  enabled     Boolean
+  addedById   String?              @map("added_by_id")
+  addedBy     User?                @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime             @map("created_at")
+  updatedAt   DateTime             @map("updated_at")
+
+  @@unique([workspaceId, name])
+  @@map("skill")
 }

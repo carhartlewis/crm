@@ -1,5 +1,6 @@
 import type { Access } from "@crm/integrations";
 import { mutationOptions, queryOptions, type QueryClient } from "@tanstack/react-query";
+import { request, send } from "./api-fetch.ts";
 
 /** A connection as the API returns it (`Connection` in `@crm/core/api`). */
 export interface Connection {
@@ -15,34 +16,6 @@ export const connectionKeys = {
   list: (userId: string, workspaceId: string) =>
     [...connectionKeys.all, userId, workspaceId] as const,
 };
-
-/** The body of an API error (the `@crm/core/api` error schemas all carry a `message`). */
-interface ApiFailure {
-  readonly message?: string;
-}
-
-async function send(path: string, init: RequestInit = {}) {
-  const response = await fetch(path, {
-    ...init,
-    credentials: "same-origin",
-    headers: init.body ? { "content-type": "application/json" } : undefined,
-  });
-
-  if (!response.ok) {
-    const failure: ApiFailure = await response.json().catch(() => ({}));
-
-    throw new Error(failure.message ?? "Something went wrong. Try again.");
-  }
-
-  return response;
-}
-
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await send(path, init);
-
-  // SAFETY: the endpoint's success schema in `@crm/core/api` is `T`; each caller names it.
-  return (await response.json()) as T;
-}
 
 export const connectionsQuery = (userId: string, workspaceId: string) =>
   queryOptions({

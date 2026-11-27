@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { connectionsQuery } from "../../../lib/connections.ts";
+import { skillsQuery } from "../../../lib/skills.ts";
 
 /** What an app's sign-in returned with. Set only by the API's OAuth callback redirect. */
 interface ConnectionsSearch {
@@ -41,8 +42,12 @@ export const Route = createFileRoute("/_authed/_workspace/connections")({
 
     return result;
   },
-  loader: ({ context: { queryClient, session } }) =>
-    queryClient.fetchQuery(
-      connectionsQuery(session.user.id, session.session.activeOrganizationId ?? ""),
-    ),
+  loader: ({ context: { queryClient, session } }) => {
+    const workspaceId = session.session.activeOrganizationId ?? "";
+
+    return Promise.all([
+      queryClient.fetchQuery(connectionsQuery(session.user.id, workspaceId)),
+      queryClient.fetchQuery(skillsQuery(session.user.id, workspaceId)),
+    ]);
+  },
 });

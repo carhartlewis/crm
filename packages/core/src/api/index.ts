@@ -182,11 +182,89 @@ export class ConnectionsApi extends HttpApiGroup.make("connections")
   .middleware(Authentication)
   .prefix("/connections") {}
 
+export const SkillSource = Schema.Literals(["skills.sh", "custom"]);
+
+/** A workspace skill as members see it in lists. */
+export const SkillSummary = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.String,
+  source: SkillSource,
+  /** The skills.sh id the copy was made from; null for custom skills. */
+  sourceId: Schema.NullOr(Schema.String),
+  enabled: Schema.Boolean,
+  addedBy: Schema.NullOr(Schema.Struct({ id: Schema.String, name: Schema.String })),
+  fileCount: Schema.Number,
+  createdAt: Schema.String,
+  updatedAt: Schema.String,
+});
+
+export type SkillSummary = typeof SkillSummary.Type;
+
+/** A skill with its instructions, to read before enabling it. */
+export const SkillDetail = Schema.Struct({
+  ...SkillSummary.fields,
+  content: Schema.String,
+  files: Schema.Array(Schema.Struct({ path: Schema.String, size: Schema.Number })),
+});
+
+export type SkillDetail = typeof SkillDetail.Type;
+
+/** A skills.sh search result. */
+export const SkillsShResult = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  source: Schema.String,
+  installs: Schema.Number,
+  /** This workspace already has a copy. */
+  installed: Schema.Boolean,
+});
+
+export type SkillsShResult = typeof SkillsShResult.Type;
+
+const SkillErrors = [NotFound, NoActiveWorkspace];
+
+/** Skills shared by everyone in the active workspace. Any member can add, enable or remove one. */
+export class SkillsApi extends HttpApiGroup.make("skills")
+  .add(
+    HttpApiEndpoint.get("list", "/", { success: Schema.Array(SkillSummary), error: SkillErrors }),
+    HttpApiEndpoint.get("discover", "/discover", {
+      query: { q: Schema.String },
+      success: Schema.Array(SkillsShResult),
+      error: [...SkillErrors, UpstreamUnavailable],
+    }),
+    /** Copies a skill from skills.sh into the workspace, disabled until someone enables it. */
+    HttpApiEndpoint.post("install", "/install", {
+      payload: Schema.Struct({ sourceId: Schema.String }),
+      success: SkillSummary,
+      error: [...SkillErrors, Invalid, UpstreamUnavailable],
+    }),
+    HttpApiEndpoint.get("get", "/:id", {
+      params: { id: Schema.String },
+      success: SkillDetail,
+      error: SkillErrors,
+    }),
+    HttpApiEndpoint.patch("update", "/:id", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ enabled: Schema.Boolean }),
+      success: SkillSummary,
+      error: SkillErrors,
+    }),
+    HttpApiEndpoint.delete("remove", "/:id", {
+      params: { id: Schema.String },
+      success: HttpApiSchema.NoContent,
+      error: SkillErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/skills") {}
+
 export class CrmApi extends HttpApi.make("crm")
   .add(SystemApi)
   .add(AccountApi)
   .add(CompaniesApi)
   .add(ConnectionsApi)
+  .add(SkillsApi)
   .prefix("/api") {}
 
 /**

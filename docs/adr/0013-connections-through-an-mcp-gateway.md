@@ -23,3 +23,10 @@ Users connect their own apps (Granola, Superhuman, and more later) so the agent 
 - The gateway discovery documents are at the origin root (`/.well-known/oauth-protected-resource/api/mcp`, `/.well-known/oauth-authorization-server/api/auth`). A production proxy in front of the API must forward them as well as `/api/*`.
 - The agent uses node-redis, not Bun's client, because eve bundles it for Node.
 - If the user changes workspace, the agent's token keeps the workspace it was authorized in until the user signs in to the gateway again.
+
+## Addendum: workspace skills (2026-11)
+
+- **Skills are shared per workspace.** Table `skill`. Any member can add, enable, disable or remove one. Personal skills are not built yet.
+- **skills.sh is the catalog.** `@crm/integrations/skills-sh` searches it and fetches a skill's package. The API stores a pinned copy (SKILL.md body plus its other text files, at most 1 MB and 200 files, paths kept inside the skill folder). Updates on skills.sh do not change the copy.
+- **A new skill starts disabled.** Someone reads it in the CRM, then enables it. A skill is third-party text that steers the agent, so nobody turns one on without seeing it.
+- **The agent loads enabled skills each turn** (`agent/skills/workspace.ts`, eve `defineDynamic`) from `GET /api/agent/skills`, with the same better-auth MCP token as the gateway. Skills appear after the user has signed the agent in to the CRM once.

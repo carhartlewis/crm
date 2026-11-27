@@ -15,6 +15,7 @@ import { Auth, type McpPrincipal } from "../services/Auth.ts";
 import { Companies } from "../services/Companies.ts";
 import { type Actor, Connections } from "../services/Connections.ts";
 import { Electric } from "../services/Electric.ts";
+import { Skills } from "../services/Skills.ts";
 import { AuthenticationLive } from "./Authentication.ts";
 import { clientIp, withClientIp } from "./client-ip.ts";
 import { callbackFromUrl, startFromUrl } from "./desktop.ts";
@@ -79,8 +80,36 @@ const ConnectionsHandlers = HttpApiBuilder.group(CrmApi, "connections", (handler
   }),
 );
 
+const SkillsHandlers = HttpApiBuilder.group(CrmApi, "skills", (handlers) =>
+  Effect.gen(function* () {
+    const skills = yield* Skills;
+
+    return handlers
+      .handle("list", () => Effect.flatMap(actor, skills.list))
+      .handle("discover", ({ query }) =>
+        Effect.flatMap(actor, (who) => skills.discover(who, query.q)),
+      )
+      .handle("install", ({ payload }) =>
+        Effect.flatMap(actor, (who) => skills.install(who, payload.sourceId)),
+      )
+      .handle("get", ({ params }) => Effect.flatMap(actor, (who) => skills.get(who, params.id)))
+      .handle("update", ({ params, payload }) =>
+        Effect.flatMap(actor, (who) => skills.setEnabled(who, params.id, payload.enabled)),
+      )
+      .handle("remove", ({ params }) =>
+        Effect.flatMap(actor, (who) => skills.remove(who, params.id)),
+      );
+  }),
+);
+
 const ApiRoutes = HttpApiBuilder.layer(CrmApi).pipe(
-  Layer.provide([SystemHandlers, AccountHandlers, CompaniesHandlers, ConnectionsHandlers]),
+  Layer.provide([
+    SystemHandlers,
+    AccountHandlers,
+    CompaniesHandlers,
+    ConnectionsHandlers,
+    SkillsHandlers,
+  ]),
   Layer.provide(AuthenticationLive),
 );
 
@@ -214,6 +243,7 @@ const ConnectionRoutes = Layer.effectDiscard(
     const router = yield* HttpRouter.HttpRouter;
     const auth = yield* Auth;
     const connections = yield* Connections;
+    const skills = yield* Skills;
 
     const gateway = createGateway<McpPrincipal>({
       connections: connections.gatewayConnections,
@@ -234,6 +264,13 @@ const ConnectionRoutes = Layer.effectDiscard(
     const mcp = auth.protectMcp((request, principal) => gateway.fetch(request, principal));
 
     yield* router.add("POST", "/api/mcp", () => HttpEffect.fromWebHandler(mcp));
+
+    // The workspace's enabled skills, for the agent. Same better-auth MCP token as the gateway.
+    const agentSkills = auth.protectMcp(async (_request, principal) =>
+      Response.json(await skills.forAgent(principal), { headers: { "cache-control": "no-store" } }),
+    );
+
+    yield* router.add("GET", "/api/agent/skills", () => HttpEffect.fromWebHandler(agentSkills));
     // Stateless gateway: no SSE stream to resume and no session to end.
     yield* router.add("GET", "/api/mcp", () =>
       Effect.succeed(HttpServerResponse.empty({ status: 405, headers: { allow: "POST" } })),

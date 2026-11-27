@@ -1,4 +1,7 @@
-// Client-safe: the catalog and the access policy. Server code imports `./oauth` and `./gateway`.
+// Client-safe: the catalog, the access policy and skill rules. Server code imports `./oauth`,
+// `./gateway` and `./skills-sh`.
 export * from "./access.ts";
 
 export * from "./catalog.ts";
+
+export * from "./skills.ts";

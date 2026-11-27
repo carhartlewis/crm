@@ -10,6 +10,8 @@ import { Auth, AuthError } from "../services/Auth.ts";
 import { Companies, makeCompanies } from "../services/Companies.ts";
 import { createMemoryCompanyStore } from "../services/company-store-memory.ts";
 import { Electric, makeElectric } from "../services/Electric.ts";
+import { createMemorySkillStore } from "../services/skill-store-memory.ts";
+import { makeSkills, Skills } from "../services/Skills.ts";
 import {
   type ConnectionRecord,
   type ConnectionStore,
@@ -191,6 +193,10 @@ const app = HttpRouter.toWebHandler(
       FakeConnections,
       FakeCompanies,
       FakeElectric,
+      Layer.succeed(
+        Skills,
+        makeSkills({ store: createMemorySkillStore([]).store, now: () => new Date() }),
+      ),
       HttpServer.layerServices,
     ]),
   ),

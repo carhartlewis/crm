@@ -8,7 +8,8 @@
     "./oauth": "./src/oauth.ts",
     "./gateway": "./src/gateway.ts",
     "./logos": "./src/logos.ts",
-    "./testing": "./src/fake-upstream.ts"
+    "./testing": "./src/fake-upstream.ts",
+    "./skills-sh": "./src/skills-sh.ts"
   },
   "scripts": {
     "check-types": "bun check --no-script --project tsconfig.json"
