@@ -135,6 +135,24 @@ describe("image cache", () => {
     expect(await images.avatar("u1", "https://lh3.googleusercontent.com/a/big")).toBeNull();
   });
 
+  test("keeps a contact photo at full size, past the smaller image limit", async () => {
+    const storage = createMemoryStorage();
+    const photo = new Uint8Array(4096);
+    photo.set(PNG);
+
+    const { impl } = fakeFetch({
+      "https://media.brand.dev/pfp/p.png": () => new Response(photo),
+      "https://media.brand.dev/pfp/huge.png": () => new Response(new Uint8Array(8192).fill(1)),
+    });
+
+    const images = createImageCache({ storage, fetch: impl, maxBytes: 1024, photoMaxBytes: 4096 });
+
+    expect(await images.contactPhoto("c1", "https://media.brand.dev/pfp/p.png")).toStartWith(
+      "memory://storage/contacts/c1/photo?v=",
+    );
+    expect(await images.contactPhoto("c2", "https://media.brand.dev/pfp/huge.png")).toBeNull();
+  });
+
   test("never fetches a non-https avatar", () => {
     expect(avatarSource("http://169.254.169.254/latest")).toBeNull();
     expect(avatarSource("not a url")).toBeNull();

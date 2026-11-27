@@ -342,7 +342,6 @@ describe("the memory graph", () => {
 
     expect(graph.documents.map((document) => document.documentType).toSorted()).toEqual([
       "member_note",
-      "website_research",
       "workspace",
     ]);
     expect(graph.totals.sources).toBe(2);
@@ -356,7 +355,34 @@ describe("the memory graph", () => {
     expect(hits[0]?.sourceId).toBe(note?.id);
   });
 
-  test("links every source to its workspace, through a fact", async () => {
+  test("puts the record's website research at the centre, with every other source linked to it", () => {
+    const graph = toMemoryGraph(
+      "ns",
+      [
+        graphSource("note", [graphFact("f3")]),
+        graphSource("website-research", [graphFact("f1"), graphFact("f2")]),
+        graphSource("chat", []),
+      ],
+      { kind: "company", title: "Roo Capital" },
+    );
+
+    const [core, ...sources] = graph.documents;
+
+    expect(graph.documents.map((document) => document.id)).not.toContain(MEMORY_CORE_ID);
+    expect(core).toMatchObject({
+      id: "website-research",
+      title: "Roo Capital",
+      documentType: "company",
+    });
+    expect(core?.memories.map((memory) => [memory.id, memory.memoryRelations])).toEqual([
+      ["f1", { chat: "extends" }],
+      ["f2", null],
+    ]);
+    expect(sources.map((document) => document.id)).toEqual(["note", "chat"]);
+    expect(sources[0]?.memories[0]?.memoryRelations).toEqual({ "website-research": "derives" });
+  });
+
+  test("draws a core for the record until its research lands", async () => {
     const graph = toMemoryGraph(
       "ns",
       [

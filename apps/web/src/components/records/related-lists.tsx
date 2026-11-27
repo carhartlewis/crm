@@ -22,7 +22,7 @@ import type { Contact } from "../../lib/contacts.ts";
 import type { Deal } from "../../lib/deals.ts";
 import { calendarDate } from "../../lib/record-format.ts";
 import { TextDetail } from "./detail-fields.tsx";
-import { ContactAvatar, MemberAvatar, MoneyCell } from "./record-visuals.tsx";
+import { ContactAvatar, MemberAvatar, MoneyCell, MARK_SIZE } from "./record-visuals.tsx";
 import type { Member } from "./use-crm.ts";
 import { type StageChange, StageMenu } from "./stage-menu.tsx";
 
@@ -92,7 +92,7 @@ export function AddContactRow({
                   }}
                   value={`${contactName(contact)} ${contact.email ?? ""} ${contact.id}`}
                 >
-                  <ContactAvatar contact={contact} size="sm" />
+                  <ContactAvatar contact={contact} size={MARK_SIZE} />
                   <span className="truncate">{contactName(contact)}</span>
                   {contact.title ? (
                     <span className="ml-auto truncate text-muted-foreground">{contact.title}</span>
@@ -123,7 +123,7 @@ function Owner({ owner }: { owner: Member | null }) {
 
   return (
     <>
-      <MemberAvatar member={owner} />
+      <MemberAvatar member={owner} size={MARK_SIZE} />
       <span className="truncate text-foreground">{owner.name}</span>
     </>
   );
@@ -164,7 +164,7 @@ function contactColumns(
     width: role ? "24%" : "28%",
     cell: (row) => (
       <>
-        <ContactAvatar contact={row} />
+        <ContactAvatar contact={row} size={MARK_SIZE} />
         <span className="truncate font-medium text-foreground">{contactName(row)}</span>
       </>
     ),

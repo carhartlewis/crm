@@ -533,7 +533,8 @@ const GraphRelation = Schema.Literals(["updates", "extends", "derives"]);
 
 /**
  * The graph's core: the workspace (or the company, on its Knowledge tab) that every source links
- * back to, as in comp-neo. It is drawn, not stored, so it never opens as a source.
+ * back to, as in comp-neo. The record's website research is the core once it lands (ADR 0026);
+ * until then the core is drawn under this id, not stored, so it never opens as a source.
  */
 export const MEMORY_CORE_ID = "memory-core";
 

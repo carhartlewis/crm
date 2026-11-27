@@ -18,7 +18,7 @@ import {
   ProseDetail,
   TextDetail,
 } from "../records/detail-fields.tsx";
-import { MemberAvatar } from "../records/record-visuals.tsx";
+import { MemberAvatar, MARK_SIZE } from "../records/record-visuals.tsx";
 import { useMembers } from "../records/use-crm.ts";
 import { useEntityFields, useValuesByRecord } from "./use-fields.ts";
 
@@ -81,7 +81,7 @@ export function CustomFieldRows({ entity, recordId, userId, workspaceId }: Custo
             members={members.map((member) => ({
               value: member.id,
               label: member.name,
-              mark: <MemberAvatar member={member} size="xs" />,
+              mark: <MemberAvatar member={member} size={MARK_SIZE} />,
             }))}
             onSave={set}
           />

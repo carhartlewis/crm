@@ -9,10 +9,11 @@ import {
   TableRow,
 } from "@crm/ui/components/table";
 import { EmptyCellDash } from "@crm/ui/patterns/empty-cell";
-import { useLiveQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useRouteContext } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { type Company, companiesCollection } from "../../lib/companies.ts";
+import { contactsCollection } from "../../lib/contacts.ts";
 import { calendarDate } from "../../lib/record-format.ts";
 import { type RecordKind, useOpenRecord } from "../../lib/records.ts";
 import type {
@@ -21,7 +22,14 @@ import type {
   DealResultRow,
   ListResult,
 } from "../../lib/tool-results.ts";
-import { CompanyCell, MoneyCell, PersonAvatar, StageLabel } from "../records/record-visuals.tsx";
+import {
+  CompanyCell,
+  MoneyCell,
+  NameWithMark,
+  PersonAvatar,
+  StageLabel,
+  MARK_SIZE,
+} from "../records/record-visuals.tsx";
 
 /** At most this many rows show; the footer says how many there are. */
 const MAX_ROWS = 25;
@@ -99,10 +107,11 @@ const CONTACT_COLUMNS: readonly Column<ContactResultRow>[] = [
   {
     header: "Name",
     cell: (contact) => (
-      <span className="flex min-w-0 items-center gap-2">
-        <PersonAvatar name={contact.name} size="xs" />
-        <span className="truncate font-medium">{contact.name}</span>
-      </span>
+      <NameWithMark
+        mark={<ContactPhoto id={contact.id} name={contact.name} />}
+        name={contact.name}
+        strong
+      />
     ),
   },
   { header: "Title", cell: (contact) => <Quiet>{contact.title}</Quiet> },
@@ -114,6 +123,18 @@ const CONTACT_COLUMNS: readonly Column<ContactResultRow>[] = [
   },
   { header: "Email", cell: (contact) => <Quiet>{contact.email}</Quiet> },
 ];
+
+/** A contact's photo from the synced contacts, or their initials, at the table size. */
+function ContactPhoto({ id, name }: { id: string; name: string }) {
+  const { session } = useRouteContext({ from: "/_authed/_workspace" });
+  const collection = contactsCollection(session.session.activeOrganizationId ?? "");
+
+  const synced = useLiveQuery({
+    query: (q) => q.from({ row: collection }).where(({ row }) => eq(row.id, id)),
+  }).data?.[0];
+
+  return <PersonAvatar name={name} size={MARK_SIZE} src={synced?.image_url ?? null} />;
+}
 
 /** The synced companies by id, for logos. */
 function useCompaniesById(): CompaniesById {

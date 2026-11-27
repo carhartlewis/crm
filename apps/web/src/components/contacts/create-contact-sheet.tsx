@@ -20,7 +20,7 @@ import {
 import { parseCreateFor, useCreateFor } from "../../lib/create-sheet.ts";
 import { useOpenRecord } from "../../lib/records.ts";
 import { SearchDetail } from "../records/detail-fields.tsx";
-import { CompanyLogo } from "../records/record-visuals.tsx";
+import { CompanyLogo, MARK_SIZE } from "../records/record-visuals.tsx";
 import { useCompanies } from "../records/use-crm.ts";
 import { TextField } from "../text-field.tsx";
 
@@ -192,7 +192,7 @@ function ContactForm({
                     .map((company) => ({
                       value: company.id,
                       label: company.name,
-                      mark: <CompanyLogo company={company} size="xs" />,
+                      mark: <CompanyLogo company={company} size={MARK_SIZE} />,
                     }))}
                   placeholder="Search companies…"
                   value={field.state.value || null}

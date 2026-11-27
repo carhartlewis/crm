@@ -31,7 +31,7 @@ import {
 } from "../../lib/deals.ts";
 import { useOpenRecord } from "../../lib/records.ts";
 import { ChoiceDetail, SearchDetail } from "../records/detail-fields.tsx";
-import { CompanyLogo } from "../records/record-visuals.tsx";
+import { CompanyLogo, MARK_SIZE } from "../records/record-visuals.tsx";
 import { useCompanies, useContacts } from "../records/use-crm.ts";
 import { DateField } from "../date-field.tsx";
 import { TextField } from "../text-field.tsx";
@@ -202,7 +202,7 @@ function DealForm({
                         .map((company) => ({
                           value: company.id,
                           label: company.name,
-                          mark: <CompanyLogo company={company} size="xs" />,
+                          mark: <CompanyLogo company={company} size={MARK_SIZE} />,
                         }))}
                       placeholder="Search companies…"
                       value={field.state.value || null}

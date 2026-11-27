@@ -11,6 +11,9 @@ export interface ImageCacheDependencies {
   /** Per-download limit, so a slow host can't hold up sign-in. */
   timeoutMs?: number;
   maxBytes?: number;
+  /** Contact photos are kept at full size, so they get their own, larger limits. */
+  photoTimeoutMs?: number;
+  photoMaxBytes?: number;
 }
 
 export interface ImageCache {
@@ -48,9 +51,14 @@ export function createImageCache({
   logoSources,
   timeoutMs = 5000,
   maxBytes = 1024 * 1024,
+  photoTimeoutMs = 20_000,
+  photoMaxBytes = 30 * 1024 * 1024,
 }: ImageCacheDependencies): ImageCache {
-  async function store(key: string, bytes: Uint8Array) {
-    const contentType = bytes.byteLength <= maxBytes ? sniffImageType(bytes) : null;
+  const defaults = { timeoutMs, maxBytes };
+  const photo = { timeoutMs: photoTimeoutMs, maxBytes: photoMaxBytes };
+
+  async function store(key: string, bytes: Uint8Array, limit = maxBytes) {
+    const contentType = bytes.byteLength <= limit ? sniffImageType(bytes) : null;
 
     if (!contentType) return null;
 
@@ -60,16 +68,16 @@ export function createImageCache({
     return `${stored.url}?v=${shortHash(bytes)}`;
   }
 
-  async function copy(key: string, source: string | null) {
+  async function copy(key: string, source: string | null, limits = defaults) {
     if (!source) return null;
 
-    const response = await fetchImpl(source, { signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetchImpl(source, { signal: AbortSignal.timeout(limits.timeoutMs) });
 
     if (!response.ok || !response.body) return null;
 
-    const bytes = await readAtMost(response.body, maxBytes);
+    const bytes = await readAtMost(response.body, limits.maxBytes);
 
-    return bytes ? store(key, bytes) : null;
+    return bytes ? store(key, bytes, limits.maxBytes) : null;
   }
 
   return {
@@ -77,7 +85,7 @@ export function createImageCache({
     avatar: (userId, source) => copy(`users/${userId}/avatar`, avatarSource(source)),
     uploadAvatar: (userId, bytes) => store(`users/${userId}/avatar`, bytes),
     contactPhoto: (contactId, source) =>
-      copy(`contacts/${contactId}/photo`, contactPhotoSource(source)),
+      copy(`contacts/${contactId}/photo`, contactPhotoSource(source), photo),
     favicon: (website) => {
       const host = websiteHost(website);
 

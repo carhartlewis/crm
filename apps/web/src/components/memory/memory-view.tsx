@@ -151,7 +151,7 @@ export function MemoryView({
           loading={graph.isPending}
           highlightIds={highlighted}
           onOpenMemory={(id) => {
-            // The core is drawn, not stored: there is no source to open.
+            // A drawn core (before research lands) is not stored: there is no source to open.
             if (id === MEMORY_CORE_ID) return;
 
             void SourceSheet.preload();

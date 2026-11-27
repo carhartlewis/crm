@@ -29,3 +29,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0023](0023-contacts-deals-and-activity.md)        | Contacts, deals, deal contacts and activity; one field rule set in `@crm/core/records`; logos copied per company                     |
 | [0024](0024-fields-money-views-intel-tracking.md)  | Custom fields as rows; reporting currency with stored base amounts; saved views; agent-written contact intel; opt-in tracking        |
 | [0025](0025-records-fill-themselves.md)            | New records research themselves in the background; sure facts apply at once, Jev guards members' values; photos from context.dev     |
+| [0026](0026-research-is-the-graph-core.md)         | The record's website research is the memory graph's core, so the record sits at the centre; a drawn core only until it lands         |

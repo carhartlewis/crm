@@ -45,7 +45,7 @@ import {
   StaticDetail,
   TextDetail,
 } from "../records/detail-fields.tsx";
-import { CompanyLogo, MemberAvatar } from "../records/record-visuals.tsx";
+import { CompanyLogo, MemberAvatar, MARK_SIZE } from "../records/record-visuals.tsx";
 import { AddContactRow, ContactsList, ListTab } from "../records/related-lists.tsx";
 import { type StageChange, StageMenu } from "../records/stage-menu.tsx";
 import {
@@ -213,7 +213,7 @@ export default function DealSheet({
           <>
             <EntityHeader
               actions={<StageMenu onChange={stageChange} stage={current.stage} />}
-              leading={company ? <CompanyLogo company={company} size="default" /> : null}
+              leading={company ? <CompanyLogo company={company} size="lg" /> : null}
               menu={menu}
               status={current.archived_at ? "Archived" : null}
               title={current.name}
@@ -249,7 +249,7 @@ export default function DealSheet({
                 label: "Owner",
                 value: owner ? (
                   <>
-                    <MemberAvatar member={owner} />
+                    <MemberAvatar member={owner} size={MARK_SIZE} />
                     <span className="truncate">{owner.name}</span>
                   </>
                 ) : (
@@ -315,7 +315,7 @@ export default function DealSheet({
                         .map((entry) => ({
                           value: entry.id,
                           label: entry.name,
-                          mark: <CompanyLogo company={entry} size="xs" />,
+                          mark: <CompanyLogo company={entry} size={MARK_SIZE} />,
                         }))}
                       placeholder="Search companies…"
                       value={current.company_id}
@@ -329,7 +329,7 @@ export default function DealSheet({
                       options={members.map((member) => ({
                         value: member.id,
                         label: member.name,
-                        mark: <MemberAvatar member={member} size="xs" />,
+                        mark: <MemberAvatar member={member} size={MARK_SIZE} />,
                       }))}
                       value={current.owner_id}
                     />

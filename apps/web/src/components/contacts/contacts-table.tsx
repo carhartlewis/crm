@@ -17,7 +17,13 @@ import {
   CompanyPickerDialog,
   SetCompanyItem,
 } from "../records/bulk-edit.tsx";
-import { CompanyCell, ContactAvatar, OwnerCell } from "../records/record-visuals.tsx";
+import {
+  CompanyCell,
+  ContactAvatar,
+  NameWithMark,
+  OwnerCell,
+  MARK_SIZE,
+} from "../records/record-visuals.tsx";
 import {
   activityAt,
   ownerFacet,
@@ -55,10 +61,11 @@ function contactColumns({
       sortable: true,
       hideable: false,
       cell: (row) => (
-        <span className="flex min-w-0 items-center gap-2">
-          <ContactAvatar contact={row} size="default" />
-          <span className="block min-w-0 truncate font-medium">{contactName(row)}</span>
-        </span>
+        <NameWithMark
+          mark={<ContactAvatar contact={row} size={MARK_SIZE} />}
+          name={contactName(row)}
+          strong
+        />
       ),
     },
     {

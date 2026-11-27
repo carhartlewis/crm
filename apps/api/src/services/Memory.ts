@@ -225,26 +225,27 @@ function withRelations(
 }
 
 /**
- * Links every source to the core, as comp-neo does. The graph draws edges only from facts, so a
- * source's anchor fact carries its link. A source with no facts yet (a note still being read)
- * hangs off the first linked fact instead, so it still joins the cluster.
+ * Links every other source to the core, as comp-neo does. The graph draws edges only from facts, so
+ * a source's anchor fact carries its link. A source with no facts yet (a note still being read)
+ * hangs off the core's anchor fact instead, or the first linked fact when the core has none.
  */
-function linkToCore(documents: readonly GraphDocument[]): GraphDocument[] {
-  const linked = documents.map((document) => {
+function linkToCore(core: GraphDocument, others: readonly GraphDocument[]): GraphDocument[] {
+  const linked = others.map((document) => {
     const anchor = anchorOf(document.memories);
 
-    return anchor ? withRelations(document, anchor.id, { [MEMORY_CORE_ID]: "derives" }) : document;
+    return anchor ? withRelations(document, anchor.id, { [core.id]: "derives" }) : document;
   });
 
   const empty = linked.flatMap((document) => (document.memories.length === 0 ? [document.id] : []));
-  const carrier = linked.find((document) => document.memories.length > 0);
+  const documents = [core, ...linked];
+  const carrier = documents.find((document) => document.memories.length > 0);
   const anchor = carrier && anchorOf(carrier.memories);
 
-  if (!carrier || !anchor || empty.length === 0) return linked;
+  if (!carrier || !anchor || empty.length === 0) return documents;
 
   const links = Object.fromEntries(empty.map((id) => [id, "extends" as const]));
 
-  return linked.map((document) =>
+  return documents.map((document) =>
     document.id === carrier.id ? withRelations(document, anchor.id, links) : document,
   );
 }
@@ -253,7 +254,7 @@ function linkToCore(documents: readonly GraphDocument[]): GraphDocument[] {
 export function toMemoryGraph(
   spaceId: string,
   sources: readonly GraphSource[],
-  core: GraphCore,
+  subject: GraphCore,
 ): MemoryGraph {
   const documents: GraphDocument[] = sources.map((source) => ({
     id: source.sourceId,
@@ -296,21 +297,40 @@ export function toMemoryGraph(
   // An empty memory stays empty, so the page shows its empty state.
   if (documents.length === 0) return { documents, totals };
 
+  // The record's website research is its profile, so it is the core: the record's name at the
+  // centre, its own facts around it, and every other source linked to it. It still opens.
+  const research = documents.find(
+    (document) => document.id === RESEARCH_SOURCE && document.memories.length > 0,
+  );
+
+  if (research) {
+    const core = { ...research, title: subject.title, documentType: subject.kind };
+
+    return {
+      documents: linkToCore(
+        core,
+        documents.filter((document) => document !== research),
+      ),
+      totals,
+    };
+  }
+
+  // Before research lands (or with no website), the core is drawn: it has no facts and never opens.
   const since = documents.map((document) => document.createdAt).toSorted()[0] ?? "";
 
   return {
-    documents: [
+    documents: linkToCore(
       {
         id: MEMORY_CORE_ID,
-        title: core.title,
+        title: subject.title,
         summary: null,
-        documentType: core.kind,
+        documentType: subject.kind,
         createdAt: since,
         updatedAt: since,
         memories: [],
       },
-      ...linkToCore(documents),
-    ],
+      documents,
+    ),
     totals,
   };
 }

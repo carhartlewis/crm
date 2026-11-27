@@ -13,10 +13,11 @@ const entityLogoVariants = cva(
         lg: "size-8 rounded-md text-[11px] after:rounded-md",
         xl: "size-12 rounded-lg text-sm after:rounded-lg",
       },
-      /** A company's mark keeps its square; a person's picture is round. */
+      /** Every mark is the same rounded square: a company's logo, a contact's or a member's photo. */
       kind: {
         company: "",
-        person: "rounded-full after:rounded-full",
+        contact: "",
+        person: "",
       },
     },
     defaultVariants: { size: "default", kind: "company" },
@@ -40,7 +41,7 @@ export function entityInitials(name: string) {
 export type LogoTone = "opaque" | "dark" | "light";
 
 /**
- * A company's logo, or a person's picture with `kind="person"`, falling back to initials while
+ * A company's logo, a contact's photo (`kind="contact"`) or a member's photo (`kind="person"`), falling back to initials while
  * the image loads or when it fails. A mark drawn in one colour (`tone`) is inverted in the other
  * theme when there is no dark copy, so a black logo stays visible on a dark background.
  */
@@ -77,7 +78,15 @@ export function EntityLogo({
       {src ? (
         <AvatarPrimitive.Image
           alt=""
-          className={cn("size-full object-contain", darkSrc && "dark:hidden", invert)}
+          className={cn(
+            // A photo fills its frame, cropped a little above centre where a headshot's face
+            // sits (square photos are not cropped); a logo keeps its whole mark.
+            kind === "person" || kind === "contact"
+              ? "size-full object-cover object-[50%_30%]"
+              : "size-full object-contain",
+            darkSrc && "dark:hidden",
+            invert,
+          )}
           src={src}
         />
       ) : null}

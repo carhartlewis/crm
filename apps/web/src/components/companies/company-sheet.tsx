@@ -36,7 +36,7 @@ import {
   ProseDetail,
   TextDetail,
 } from "../records/detail-fields.tsx";
-import { CompanyLogo, MemberAvatar } from "../records/record-visuals.tsx";
+import { CompanyLogo, MemberAvatar, MARK_SIZE } from "../records/record-visuals.tsx";
 import {
   AddButton,
   AddContactRow,
@@ -149,7 +149,7 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
   const ownerOptions = members.map((member) => ({
     value: member.id,
     label: member.name,
-    mark: <MemberAvatar member={member} size="xs" />,
+    mark: <MemberAvatar member={member} size={MARK_SIZE} />,
   }));
 
   const set = (patch: Partial<Company>) => current && save.mutate({ id: current.id, patch });
@@ -222,7 +222,7 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
                   </EntityAction>
                 </>
               }
-              leading={<CompanyLogo company={current} size="default" />}
+              leading={<CompanyLogo company={current} size="lg" />}
               menu={menu}
               status={
                 current.archived_at
@@ -278,7 +278,7 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
                 label: "Owner",
                 value: owner ? (
                   <>
-                    <MemberAvatar member={owner} />
+                    <MemberAvatar member={owner} size={MARK_SIZE} />
                     <span className="truncate">{owner.name}</span>
                   </>
                 ) : (

@@ -9,10 +9,22 @@ import type { Member } from "./use-crm.ts";
 
 type LogoSize = "xs" | "sm" | "default" | "lg" | "xl";
 
+/**
+ * The one size for every logo and photo in a row: table cells, sheet fields and stats, related
+ * lists and pickers. Only a sheet's header mark is larger (`lg`).
+ */
+export const MARK_SIZE = "sm" satisfies LogoSize;
+
 type CompanyMark = Pick<Company, "name" | "icon_url" | "logo_url" | "icon_dark_url" | "icon_tone">;
 
 /** A company's square logo from our storage, or its initials. */
-export function CompanyLogo({ company, size = "sm" }: { company: CompanyMark; size?: LogoSize }) {
+export function CompanyLogo({
+  company,
+  size = MARK_SIZE,
+}: {
+  company: CompanyMark;
+  size?: LogoSize;
+}) {
   return (
     <EntityLogo
       darkSrc={company.icon_dark_url}
@@ -28,7 +40,7 @@ export function CompanyLogo({ company, size = "sm" }: { company: CompanyMark; si
 export function PersonAvatar({
   name,
   src = null,
-  size = "default",
+  size = MARK_SIZE,
 }: {
   name: string;
   src?: string | null;
@@ -42,12 +54,29 @@ export function MemberAvatar({ member, size }: { member: Member; size?: LogoSize
   return <PersonAvatar name={member.name} size={size} src={member.image} />;
 }
 
-export function ContactAvatar({ contact, size }: { contact: Contact; size?: LogoSize }) {
-  return <PersonAvatar name={contactName(contact)} size={size} src={contact.image_url} />;
+/** A CRM contact's photo, or their initials, in the same rounded square as a company logo. */
+export function ContactAvatar({
+  contact,
+  size = "default",
+}: {
+  contact: Contact;
+  size?: LogoSize;
+}) {
+  return (
+    <EntityLogo kind="contact" name={contactName(contact)} size={size} src={contact.image_url} />
+  );
 }
 
 /** A logo (or avatar) and a name on one line that truncates. */
-function NameWithMark({ mark, name, strong }: { mark: ReactNode; name: string; strong?: boolean }) {
+export function NameWithMark({
+  mark,
+  name,
+  strong,
+}: {
+  mark: ReactNode;
+  name: string;
+  strong?: boolean;
+}) {
   return (
     <span className="flex min-w-0 items-center gap-2">
       <span className="flex shrink-0">{mark}</span>
@@ -60,14 +89,16 @@ function NameWithMark({ mark, name, strong }: { mark: ReactNode; name: string; s
 export function CompanyCell({ company }: { company: CompanyMark | null | undefined }) {
   if (!company) return <EmptyCellDash />;
 
-  return <NameWithMark mark={<CompanyLogo company={company} size="xs" />} name={company.name} />;
+  return (
+    <NameWithMark mark={<CompanyLogo company={company} size={MARK_SIZE} />} name={company.name} />
+  );
 }
 
 /** A workspace member in a table cell: picture and name, or a dash when unassigned. */
 export function OwnerCell({ owner }: { owner: Member | null | undefined }) {
   if (!owner) return <EmptyCellDash />;
 
-  return <NameWithMark mark={<MemberAvatar member={owner} size="sm" />} name={owner.name} />;
+  return <NameWithMark mark={<MemberAvatar member={owner} size={MARK_SIZE} />} name={owner.name} />;
 }
 
 /** A deal stage: its colour and label. */

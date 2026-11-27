@@ -10,7 +10,7 @@ import { localDay, momentDate, relativeTime } from "../../lib/record-format.ts";
 import { deleteRecords } from "../../lib/synced-records.ts";
 import { useCustomColumns } from "../records/use-custom-columns.ts";
 import { AssignOwnerMenu } from "../records/bulk-edit.tsx";
-import { CompanyLogo, OwnerCell } from "../records/record-visuals.tsx";
+import { CompanyLogo, NameWithMark, OwnerCell, MARK_SIZE } from "../records/record-visuals.tsx";
 import {
   activityAt,
   ownerFacet,
@@ -66,10 +66,11 @@ function companyColumns({
       sortable: true,
       hideable: false,
       cell: (row) => (
-        <span className="flex min-w-0 items-center gap-2">
-          <CompanyLogo company={row} size="sm" />
-          <span className="block min-w-0 truncate font-medium">{row.name}</span>
-        </span>
+        <NameWithMark
+          mark={<CompanyLogo company={row} size={MARK_SIZE} />}
+          name={row.name}
+          strong
+        />
       ),
     },
     {

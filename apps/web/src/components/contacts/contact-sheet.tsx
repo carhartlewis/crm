@@ -42,7 +42,7 @@ import {
   StaticDetail,
   TextDetail,
 } from "../records/detail-fields.tsx";
-import { CompanyLogo, ContactAvatar, MemberAvatar } from "../records/record-visuals.tsx";
+import { CompanyLogo, ContactAvatar, MemberAvatar, MARK_SIZE } from "../records/record-visuals.tsx";
 import { AddButton, DealsList, ListTab } from "../records/related-lists.tsx";
 import { WebsiteActivity } from "../records/website-activity.tsx";
 import {
@@ -255,7 +255,7 @@ export default function ContactSheet({
                   ) : null}
                 </>
               }
-              leading={<ContactAvatar contact={current} size="default" />}
+              leading={<ContactAvatar contact={current} size="lg" />}
               menu={menu}
               status={
                 isPrimary ? (
@@ -301,7 +301,7 @@ export default function ContactSheet({
                     onClick={() => openRecord("company", company.id)}
                     type="button"
                   >
-                    <CompanyLogo company={company} size="xs" />
+                    <CompanyLogo company={company} size={MARK_SIZE} />
                     <span className="truncate">{company.name}</span>
                   </button>
                 ) : (
@@ -338,7 +338,7 @@ export default function ContactSheet({
                 label: "Owner",
                 value: owner ? (
                   <>
-                    <MemberAvatar member={owner} />
+                    <MemberAvatar member={owner} size={MARK_SIZE} />
                     <span className="truncate">{owner.name}</span>
                   </>
                 ) : (
@@ -378,7 +378,7 @@ export default function ContactSheet({
                         .map((entry) => ({
                           value: entry.id,
                           label: entry.name,
-                          mark: <CompanyLogo company={entry} size="xs" />,
+                          mark: <CompanyLogo company={entry} size={MARK_SIZE} />,
                         }))}
                       placeholder="Search companies…"
                       value={current.company_id}
@@ -392,7 +392,7 @@ export default function ContactSheet({
                       options={members.map((member) => ({
                         value: member.id,
                         label: member.name,
-                        mark: <MemberAvatar member={member} size="xs" />,
+                        mark: <MemberAvatar member={member} size={MARK_SIZE} />,
                       }))}
                       value={current.owner_id}
                     />

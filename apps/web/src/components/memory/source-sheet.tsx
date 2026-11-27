@@ -152,7 +152,8 @@ export default function SourceSheet({
       header={
         source ? (
           <RecordHeader
-            title={source.title ?? "Untitled source"}
+            // The graph's core shows the record's name; the sheet names the source itself.
+            title={detail.data?.title ?? source.title ?? "Untitled source"}
             menu={[
               {
                 id: "delete",
@@ -198,7 +199,11 @@ export default function SourceSheet({
         source ? (
           <RailFacts
             facts={[
-              { kind: "property", label: "Type", value: sourceKindLabel(source.documentType) },
+              {
+                kind: "property",
+                label: "Type",
+                value: sourceKindLabel(detail.data?.kind ?? source.documentType),
+              },
               {
                 kind: "status",
                 label: "Status",

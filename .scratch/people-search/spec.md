@@ -53,6 +53,32 @@ Useful headers:
 **Second smoke test.** `linkedin.user.profile` for the same person: served by Bright Data
 for $0.0015. `raw.avatar` holds the profile photo (a `media.licdn.com` 200×200 URL).
 
+**Photo trial on the workspace's 4 contacts (2026-11-27, $0.085 in total).** None of them had a
+LinkedIn URL. `people.enrich` from the email (Ocean.io, $0.0081 each) found all 4 LinkedIn URLs
+and titles. Then `linkedin.user.profile`:
+
+| Contact | Served by | Cost | Photo |
+| --- | --- | --- | --- |
+| Nate DaPore | Bright Data | $0.0015 | `raw.avatar`, media.licdn.com JPEG |
+| Varun Sridhar | Bright Data | $0.0015 | `raw.avatar`, media.licdn.com JPEG |
+| Nathan Owen | Bright Data | $0.0015 | LinkedIn's blank default avatar (static.licdn.com SVG), so context.dev was used: media.brand.dev PNG |
+| Joaquin Lopez May | Fiber AI (Bright Data missed) | $0.047 | `raw.profile_pic`, img.imagecdn.dev JPEG |
+
+What this changes:
+
+- Read these photo keys: `avatar`, `profile_pic`, `profile_pic_url`, `profile_picture`,
+  `photo_url`.
+- Reject LinkedIn's default avatar: accept only raster images (the existing `sniffImageType`
+  already drops SVG). Hosts allowed for the copy: media.licdn.com, img.imagecdn.dev and
+  media.brand.dev.
+- **Photos are kept at full size.** The context.dev photo was a 4.9 MB PNG, and the old 1 MB
+  cap dropped it without a sign. Contact photos now have their own limits in `ImageCache`: 30 MB
+  and a 20 s download (done 2026-11-27). There is no resize.
+- Fiber AI costs 30× more than Bright Data for a profile. If only the photo is wanted, try
+  context.dev first when Bright Data misses, or send `X-Treg-Route-Prefer: brightdata`.
+- The 4 photos are now on the contacts (copied to local storage under
+  `contacts/<id>/photo`). Titles and LinkedIn URLs were found but not written.
+
 **Smoke test (2026-11-27, team `trycomp`).** `people.email.find` {Patrick Collison, stripe.com}
 with Verify returned `patrick@stripe.com`, verdict `valid`. It cost $0.00495: $0.00095 find plus
 $0.004 BounceBan check. `_treg.dropped` lists the 15 providers skipped because they need a
@@ -89,8 +115,8 @@ treg's integration rules, which this plan follows:
    - **First, treg's LinkedIn profile.** `treg.linkedin.user.profile` returns the photo in
      `raw` (Bright Data: `avatar`, a `media.licdn.com` URL). We call it anyway for headline and
      location, and it cost $0.0015 in the smoke test. The field name differs per provider, so
-     the client reads a known list (`avatar`, `profile_pic_url`, `profile_picture`,
-     `photo_url`, ...). These are signed URLs that expire, so the API **copies** the image into
+     the client reads a known list (`avatar`, `profile_pic`, `profile_pic_url`,
+     `profile_picture`, `photo_url`). These are signed URLs that expire, so the API **copies** the image into
      our storage at once (`users`-style key `contacts/<id>/photo`). It never hotlinks.
    - **Then context.dev.** When there is no LinkedIn URL or no photo, the API asks context.dev
      people enrich for the photo only (`WebReader.findPerson`, which stays as a server-side
