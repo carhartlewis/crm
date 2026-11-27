@@ -29,6 +29,9 @@ export const connectionsQuery = (userId: string, workspaceId: string) =>
   queryOptions({
     queryKey: connectionKeys.list(userId, workspaceId),
     queryFn: () => request<readonly Connection[]>("/api/connections"),
+    // A sign-in finishes in another window (the system browser, for the desktop app), often
+    // within the default 30 s freshness: refetch on every return to this window.
+    refetchOnWindowFocus: "always",
   });
 
 const refresh = (client: QueryClient) => client.invalidateQueries({ queryKey: connectionKeys.all });

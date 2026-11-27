@@ -136,11 +136,11 @@ function IntegrationCard({
   return (
     <Card>
       <div className="flex items-start gap-4 px-5 py-1">
-        <div className="size-10 shrink-0 overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10">
+        <div className="size-10 shrink-0 overflow-hidden rounded-lg">
           {logo ? (
             <img src={logo} alt="" width={40} height={40} className="size-full object-cover" />
           ) : (
-            <span className="flex size-full items-center justify-center font-medium text-muted-foreground">
+            <span className="flex size-full items-center justify-center bg-muted font-medium text-muted-foreground">
               {integration.name.slice(0, 1)}
             </span>
           )}
