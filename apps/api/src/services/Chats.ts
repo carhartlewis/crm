@@ -123,6 +123,9 @@ type Failure = NotFound | NoActiveWorkspace | Invalid | Forbidden | AgentUnavail
 
 type Outcome<A> = { ok: true; value: A } | { ok: false; error: Failure };
 
+/** How long creating a chat waits to confirm its prewarmed session still exists. */
+export const PREWARM_CHECK_MS = 1000;
+
 /** How long a prewarmed session waits for its chat. */
 export const PREWARM_TTL_SECONDS = 10 * 60;
 
@@ -331,11 +334,22 @@ export function makeChats(
   const createSession = async (actor: ChatActor, workspaceId: string) => {
     if (!agent) return null;
 
+    const caller = callerIn(actor, actor.activeWorkspaceId);
     const prewarmed = await kv.take(prewarmKey(workspaceId, actor.id));
 
-    return (
-      prewarmed ?? agent.createSession(callerIn(actor, actor.activeWorkspaceId)).catch(() => null)
-    );
+    // A session made before the agent restarted (a deploy, a dev reload) is gone, and the first
+    // message would fail with "The session is no longer active". A quick read proves it lives.
+    const alive =
+      prewarmed !== null &&
+      (await Promise.race([
+        agent.readEvents(caller, prewarmed, 0).then(
+          () => true,
+          () => false,
+        ),
+        Bun.sleep(PREWARM_CHECK_MS).then(() => false),
+      ]));
+
+    return alive ? prewarmed : agent.createSession(caller).catch(() => null);
   };
 
   return {

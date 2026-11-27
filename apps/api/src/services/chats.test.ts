@@ -40,7 +40,10 @@ function fakeAgent() {
     },
     readEvents: async (_caller, sessionId, startIndex) => {
       calls.push(`read ${sessionId} from ${startIndex}`);
-      const log = logs.get(sessionId) ?? [];
+      const log = logs.get(sessionId);
+
+      // As eve after a restart: a session it no longer knows can't be read.
+      if (!log) throw new Error("session not found");
 
       return { events: log.slice(startIndex), streamIndex: log.length };
     },
@@ -60,6 +63,8 @@ function fakeAgent() {
     calls,
     modes,
     append: (sessionId: string, event: FakeEvent) => logs.get(sessionId)?.push(event),
+    /** Eve restarted: every session it had is gone. */
+    restart: () => logs.clear(),
   };
 }
 
@@ -109,7 +114,21 @@ describe("starting a chat", () => {
     const created = await run(chats.create(alice, { id: chatId(), title: "Hi", spaceId: null }));
 
     expect(created.sessionId).toBe("ses_1");
-    expect(calls).toEqual(["create alice"]);
+    // One session made, then a quick read to prove it still exists.
+    expect(calls).toEqual(["create alice", "read ses_1 from 0"]);
+  });
+
+  test("a prewarmed session lost in an agent restart is replaced, not handed out", async () => {
+    const memory = createMemoryChatStore(["ws_a:alice"]);
+    const eve = fakeAgent();
+    const chats = makeChats(memory.store, eve.agent, createMemoryKv());
+
+    await run(chats.prewarm(alice));
+    eve.restart();
+
+    const created = await run(chats.create(alice, { id: chatId(), title: "Hi", spaceId: null }));
+
+    expect(created.sessionId).toBe("ses_2");
   });
 
   test("creates a session when none is prewarmed, and a prewarmed one is used once", async () => {
