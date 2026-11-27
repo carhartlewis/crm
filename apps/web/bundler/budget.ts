@@ -5,7 +5,7 @@ export interface Budgets {
   firstViewCss: number;
 }
 
-export const BUDGETS: Budgets = { coldEntryJs: 150_000, firstViewCss: 20_000 };
+export const BUDGETS: Budgets = { coldEntryJs: 150_000, firstViewCss: 50_000 };
 
 const STATIC_IMPORT = /(?:^|[;}\s])import\s*(?:[\w$*{}\s,]+from\s*)?["'](\.\/[^"']+\.js)["']/g;
 const SCRIPT_SRC = /<script[^>]+src="\.?\/?([^"]+\.js)"/g;

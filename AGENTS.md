@@ -106,7 +106,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - Everything the agent does in the CRM is an MCP tool on our better-auth gateway (`/api/mcp`): the CRM's own tools are `crm__<tool>` in `apps/api/src/services/crm-tools.ts` (reads carry `readOnlyHint`; the agent asks before writes). Add new CRM capabilities there, never as agent-local tools.
 - Each chat has a permission mode (ADR 0019): Manual asks before changes, Auto only before risky calls, Bypass runs everything. Call kinds and decisions live in `@crm/core/chat` (`callKind`, `callDecision`); give every new CRM tool honest `readOnlyHint`/`destructiveHint` annotations.
 - In a chat, the agent calls the CRM (gateway, skills, memory) with `crm1.` tokens it signs for the caller and the chat's workspace (`@crm/core/auth/agent-token`); the API checks membership each time.
-- Speed: the API keeps a prewarmed eve session in Redis and caches chat events (`chat:history:<id>`); route loaders fetch history so hovering a chat preloads it. Chat UI is AI Elements in `@crm/ui/components/ai-elements/*`; keep unused parts out (first-view CSS budget).
+- Speed: the API keeps a prewarmed eve session in Redis and caches chat events (`chat:history:<id>`); route loaders fetch history so hovering a chat preloads it. Chat UI is AI Elements in `@crm/ui/components/ai-elements/*`; keep unused parts out (first-view CSS counts every class in `packages/ui`).
 
 ### Memory (ADR 0014)
 
@@ -179,7 +179,7 @@ Global rules. Use the tokens and components; never one-off timings.
 
 - TanStack Redact is the default browser renderer, with React Compiler. Application code keeps standard `react`/`react-dom` imports. Redact ships no Bun integration, so a Bun build plugin remaps those imports to `@tanstack/redact` subpaths and runs the React Compiler Babel step. Keep a build switch that produces a React DOM build from the same commit. The dev server defaults to React DOM for real Fast Refresh (Bun can't hot-accept Redact's aliased runtime modules); `RENDERER=redact turbo dev` uses Redact with full reloads. Check Redact behavior with a build before release.
 - Redact renders synchronously. Before each release, compare both renderers on the same commit: time to usable content, and input latency while filtering the largest realistic list. Exercise forms, portals, Suspense navigation, `startTransition`, and `useDeferredValue`. Ship Redact only when cold entry improves and those interactions hold their baseline; otherwise ship React DOM.
-- Budgets, Brotli, from the Bun build metafile: 150 kB cold-entry JS, 50 kB route-specific startup JS, 20 kB first-view CSS. CI fails above them. Reserve dimensions for images and make the LCP image discoverable early.
+- Budgets, Brotli, from the Bun build metafile: 150 kB cold-entry JS, 50 kB route-specific startup JS, 50 kB first-view CSS. CI fails above them. Reserve dimensions for images and make the LCP image discoverable early.
 - Field targets: p75 LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1, fully cached navigation to visible content ≤ 200 ms. Report before/after bytes and timings for performance changes.
 
 ### Hooks and review

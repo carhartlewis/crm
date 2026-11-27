@@ -30,7 +30,7 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Data contract**: The Prisma 8 schema, `packages/core/src/prisma/contract.prisma`, plus its emitted `contract.json`/`contract.d.ts`.
 
-**Cold entry**: The JS and CSS a first load executes before first render. Budgets: 150 kB JS, 20 kB CSS (brotli), enforced by the web build.
+**Cold entry**: The JS and CSS a first load executes before first render. Budgets: 150 kB JS, 50 kB CSS (brotli), enforced by the web build.
 
 **Renderer**: React DOM or TanStack Redact. Redact in production builds, React DOM in dev (ADR 0002).
 

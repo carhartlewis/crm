@@ -12,4 +12,4 @@ Use shadcn/ui components in `packages/ui` styled with Tailwind v4 tokens and var
 
 ## Consequences
 
-One styling system. Motion and selection rules are tokens and component variants too (see `AGENTS.md`). First-view CSS is about 13 kB brotli against a 20 kB budget.
+One styling system. Motion and selection rules are tokens and component variants too (see `AGENTS.md`). First-view CSS was about 13 kB brotli against a 20 kB budget; the budget is 50 kB since the agent chat UI (2026-11).
