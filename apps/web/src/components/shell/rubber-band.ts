@@ -2,6 +2,9 @@ import { rubberBand } from "@crm/ui/lib/rubber-band";
 
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** How far the content can stretch past an edge, in px: a hint of give, not a second page. */
+const MAX_STRETCH = 48;
+
 /**
  * Callback ref for a scroll container: pulling past either end (wheel or trackpad) stretches
  * all of its content with resistance, and letting go springs it back. Every child moves as one;
@@ -52,7 +55,7 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
 
     // Pushing back through the resting point hands control back to normal scrolling.
     overscroll = Math.sign(next) !== Math.sign(overscroll) && overscroll !== 0 ? 0 : next;
-    move(`translate3d(0, ${rubberBand(overscroll, scroller.clientHeight)}px, 0)`, "none");
+    move(`translate3d(0, ${rubberBand(overscroll, MAX_STRETCH)}px, 0)`, "none");
 
     clearTimeout(release);
     // Wheel events have no "finger lifted": a short gap in them is the release.
