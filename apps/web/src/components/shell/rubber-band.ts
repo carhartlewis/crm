@@ -5,6 +5,12 @@ const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matche
 /** How far the content can stretch past an edge, in px: a hint of give, not a second page. */
 const MAX_STRETCH = 48;
 
+/** A pause this long in wheel events counts as letting go. */
+const RELEASE_GAP_MS = 50;
+
+/** How long the content takes to spring back once let go. */
+const SPRING_BACK_MS = 180;
+
 /**
  * Callback ref for a scroll container: pulling past either end (wheel or trackpad) stretches
  * all of its content with resistance, and letting go springs it back. Every child moves as one;
@@ -31,7 +37,7 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
 
   const settle = () => {
     overscroll = 0;
-    move("", "transform 300ms var(--ease-out)");
+    move("", `transform ${SPRING_BACK_MS}ms var(--ease-out)`);
   };
 
   const onWheel = (event: WheelEvent) => {
@@ -59,7 +65,7 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
 
     clearTimeout(release);
     // Wheel events have no "finger lifted": a short gap in them is the release.
-    release = setTimeout(settle, 90);
+    release = setTimeout(settle, RELEASE_GAP_MS);
   };
 
   scroller.addEventListener("wheel", onWheel, { passive: false });
