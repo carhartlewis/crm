@@ -22,7 +22,9 @@ import { Button } from "@crm/ui/components/button";
 import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { chatAgentBase, type ChatHistory } from "@crm/core/api";
 import type { EveMessage, EveMessagePart, SessionStreamEvent } from "eve/client";
+import { useMutation } from "@tanstack/react-query";
 import { useEveAgent } from "eve/react";
+import { toast } from "sonner";
 import { takeFirstMessage } from "../../lib/chat-api.ts";
 import { Composer } from "./composer.tsx";
 
@@ -71,18 +73,35 @@ export function ChatView({ chatId, history, firstMessage }: ChatViewProps) {
     resume: true,
   });
 
+  // Sends, answers and stops resolve when the server accepts them; a refusal (such as a session
+  // the agent can no longer run) shows as a toast, and the optimistic message stays marked failed.
+  const send = useMutation({
+    mutationFn: (text: string) => agent.send(text),
+    onError: (error) => toast.error(error.message),
+  });
+
+  const respond = useMutation({
+    mutationFn: (answer: { interactionId: string; optionId: string }) => agent.respond([answer]),
+    onError: (error) => toast.error(error.message),
+  });
+
+  const stop = useMutation({
+    mutationFn: () => agent.cancel(),
+    onError: (error) => toast.error(error.message),
+  });
+
   // The first message was typed on New chat, before this chat existed; send it once the session
   // is bound. Later messages go through the composer's handler.
   useMountEffect(() => {
     const text = takeFirstMessage(chatId);
 
-    if (text) void agent.send(text);
+    if (text) send.mutate(text);
   });
 
   const working = agent.status === "busy";
 
   const answer = (interactionId: string, optionId: string) =>
-    void agent.respond([{ interactionId, optionId }]);
+    respond.mutate({ interactionId, optionId });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -111,8 +130,8 @@ export function ChatView({ chatId, history, firstMessage }: ChatViewProps) {
           focusOnMount
           status={working ? "streaming" : "ready"}
           disabled={agent.status === "resuming"}
-          onSend={(text) => void agent.send(text)}
-          onStop={() => void agent.cancel()}
+          onSend={(text) => send.mutate(text)}
+          onStop={() => stop.mutate()}
         />
       </div>
     </div>

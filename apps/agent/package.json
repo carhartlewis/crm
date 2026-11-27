@@ -21,7 +21,7 @@
     "just-bash": "^3.6.1"
   },
   "scripts": {
-    "dev": "eve dev --no-ui",
+    "dev": "eve dev --no-ui --resume",
     "build": "eve build",
     "start": "eve start",
     "check-types": "bun check --no-script --project tsconfig.json"
