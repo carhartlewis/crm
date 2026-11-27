@@ -5,15 +5,23 @@ const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matche
 /** How far the content can stretch past an edge, in px: a hint of give, not a second page. */
 const MAX_STRETCH = 48;
 
-/** A pause this long in wheel events counts as letting go. */
+/** A pause this long in wheel events ends a gesture. */
 const RELEASE_GAP_MS = 50;
+
+/**
+ * Momentum fades: each wheel step is a fixed share of the one before. A step this much smaller
+ * than the largest one in the pull means the finger is off the trackpad.
+ */
+const MOMENTUM_SHARE = 0.7;
 
 /** How long the content takes to spring back once let go. */
 const SPRING_BACK_MS = 100;
 
 /**
  * Callback ref for a scroll container: pulling past either end (wheel or trackpad) stretches
- * all of its content with resistance, and letting go springs it back. Every child moves as one;
+ * all of its content with resistance, and letting go springs it back. On a trackpad, wheel
+ * events go on for a second or two after the finger lifts (momentum); the first fading step
+ * counts as letting go, and the rest of that momentum is swallowed. Every child moves as one;
  * moving only the first would slide it over the rest. Only when the content
  * overflows: a list that fits stays still. Native overscroll is off
  * (`overscroll-none` on the container) so the two don't fight. Style writes only: no renders.
@@ -24,6 +32,9 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
 
   let overscroll = 0;
   let release: ReturnType<typeof setTimeout> | undefined;
+  // The largest step in the current pull, and whether the pull has let go (momentum continues).
+  let peak = 0;
+  let released = false;
 
   const content = () =>
     [...scroller.children].filter((child): child is HTMLElement => child instanceof HTMLElement);
@@ -37,7 +48,14 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
 
   const settle = () => {
     overscroll = 0;
+    peak = 0;
     move("", `transform ${SPRING_BACK_MS}ms var(--ease-out)`);
+  };
+
+  // A gap in wheel events ends the gesture: spring back, and listen afresh.
+  const endGesture = () => {
+    released = false;
+    settle();
   };
 
   const onWheel = (event: WheelEvent) => {
@@ -53,19 +71,31 @@ export function rubberBandScroll(scroller: HTMLElement | null) {
     const pulling =
       overscroll !== 0 || (event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom);
 
-    if (!pulling || content().length === 0) return;
+    if ((!pulling && !released) || content().length === 0) return;
 
     event.preventDefault();
+    clearTimeout(release);
+    // Wheel events have no "finger lifted": a short gap in them ends the gesture.
+    release = setTimeout(endGesture, RELEASE_GAP_MS);
+
+    if (released) return;
+
+    const step = Math.abs(event.deltaY);
+
+    if (peak > 0 && step < peak * MOMENTUM_SHARE) {
+      released = true;
+      settle();
+
+      return;
+    }
+
+    peak = Math.max(peak, step);
 
     const next = overscroll - event.deltaY;
 
     // Pushing back through the resting point hands control back to normal scrolling.
     overscroll = Math.sign(next) !== Math.sign(overscroll) && overscroll !== 0 ? 0 : next;
     move(`translate3d(0, ${rubberBand(overscroll, MAX_STRETCH)}px, 0)`, "none");
-
-    clearTimeout(release);
-    // Wheel events have no "finger lifted": a short gap in them is the release.
-    release = setTimeout(settle, RELEASE_GAP_MS);
   };
 
   scroller.addEventListener("wheel", onWheel, { passive: false });
