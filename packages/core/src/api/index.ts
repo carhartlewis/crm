@@ -485,6 +485,14 @@ export class MemoryApi extends HttpApiGroup.make("memory")
       success: HttpApiSchema.NoContent,
       error: MemoryErrors,
     }),
+    /**
+     * Starts refreshing the workspace's stale fact copies (`MEMORY_FACTS_SYNC_PATH`) and returns
+     * at once; the copies arrive through sync. ⌘K calls it when it opens.
+     */
+    HttpApiEndpoint.post("refresh", "/refresh", {
+      success: HttpApiSchema.NoContent,
+      error: MemoryErrors,
+    }),
   )
   .middleware(Authentication)
   .prefix("/memory") {}
@@ -519,3 +527,9 @@ export const CUSTOM_CONNECTORS_SYNC_PATH = "/api/shapes/custom-connectors";
  * they can reach 1 MB per skill, so the skill sheet loads them on demand (`GET /api/skills/:id`).
  */
 export const SKILLS_SYNC_PATH = "/api/shapes/skills";
+
+/**
+ * The active workspace's copied memory facts (same `?workspace=` rule): the workspace's own and
+ * every company's, so ⌘K searches them locally (ADR 0017).
+ */
+export const MEMORY_FACTS_SYNC_PATH = "/api/shapes/memory-facts";

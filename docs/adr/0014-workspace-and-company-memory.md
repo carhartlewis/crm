@@ -50,7 +50,7 @@ notes, chats with the assistant and the emails members send.
 
 ## Alternatives
 
-- **comp-neo's Postgres source ledger and fact mirror.** It gives retries and offline reads, but
+- **comp-neo's Postgres source ledger and fact mirror.** _(The fact copy was later added for ⌘K search: [0017](0017-memory-fact-copy-for-search.md).)_ It gives retries and offline reads, but
   needs a job runner this repo does not have. Sources here have stable ids and replacing deletes
   first, so retries are safe; we add a ledger when we add background jobs.
 - **Supermemory's eve provider in the agent.** Simpler, but it puts the key in the agent and skips

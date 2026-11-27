@@ -1,4 +1,5 @@
 import add from "@carbon/icons/es/add/16.js";
+import book from "@carbon/icons/es/book/16.js";
 import home from "@carbon/icons/es/home/16.js";
 import link from "@carbon/icons/es/link/16.js";
 import logout from "@carbon/icons/es/logout/16.js";
@@ -25,6 +26,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import { rankCommands, type Searchable } from "../../lib/command-search.ts";
+import { useMemoryFacts } from "../../lib/memory-facts.ts";
 import { pageById, pageForPath, type Page } from "../../lib/pages.ts";
 import { useRecordHits } from "../../lib/record-search.ts";
 import { useOpenRecord, type RecordKind } from "../../lib/records.ts";
@@ -36,6 +38,7 @@ import { switchWorkspaceMutation } from "../../lib/workspaces.ts";
 import type { FileRoutesByTo } from "../../routeTree.gen.ts";
 
 const AddIcon = carbonIcon(add);
+const KnowledgeIcon = carbonIcon(book);
 const HomeIcon = carbonIcon(home);
 const LinkIcon = carbonIcon(link);
 const LogoutIcon = carbonIcon(logout);
@@ -71,6 +74,9 @@ const recordPages = {
 
 /** At most this many results render while typing; the rest are a narrower query away. */
 const RESULT_LIMIT = 50;
+
+/** Facts are sentences that match many queries: at most this many show among the results. */
+const FACT_RESULTS = 8;
 
 /** One row of ⌘K. `id` is unique and is cmdk's value for it. */
 interface PaletteCommand extends Searchable {
@@ -142,8 +148,14 @@ export default function CommandPalette({
   const activeId = session?.session.activeOrganizationId;
   const openRecord = useOpenRecord();
 
+  const hits = useRecordHits(workspaceId);
+
+  const companyNames = new Map(
+    hits.filter((hit) => hit.kind === "company").map((hit) => [hit.id, hit.label]),
+  );
+
   // Records are searched, never listed: a workspace can hold thousands.
-  const records: PaletteCommand[] = useRecordHits(workspaceId).map((hit) => ({
+  const records: PaletteCommand[] = hits.map((hit) => ({
     id: `${hit.kind}:${hit.id}`,
     label: hit.label,
     section: recordPages[hit.kind].label,
@@ -151,6 +163,24 @@ export default function CommandPalette({
     icon: recordPages[hit.kind].icon,
     run: () => void openRecord(hit.kind, hit.id),
   }));
+
+  // Copied memory facts (ADR 0017). A company's fact opens its Knowledge tab; the workspace's
+  // own facts open Workspace Memory.
+  const facts: PaletteCommand[] = useMemoryFacts(workspaceId).map((fact) => {
+    const companyId = fact.company_id;
+    const company = companyId ? companyNames.get(companyId) : undefined;
+
+    return {
+      id: `fact:${fact.id}`,
+      label: fact.text,
+      section: `Knowledge · ${company ?? "Workspace"}`,
+      keywords: company ? [company] : [],
+      icon: KnowledgeIcon,
+      run: companyId
+        ? () => void openRecord("company", companyId, "knowledge")
+        : () => void navigate({ to: "/settings/memory" }),
+    };
+  });
 
   const commands: PaletteCommand[] = [
     ...(current
@@ -253,7 +283,7 @@ export default function CommandPalette({
     >
       <PaletteSearch
         commands={commands}
-        records={records}
+        records={[...records, ...facts]}
         select={select}
         placeholder={
           current ? `Search ${current.label.toLowerCase()} and commands…` : "Search or jump to…"
@@ -280,7 +310,19 @@ function PaletteSearch({
   placeholder: string;
 }) {
   const [query, setQuery] = useState("");
-  const results = rankCommands([...commands, ...records], query).slice(0, RESULT_LIMIT);
+  const ranked = rankCommands([...commands, ...records], query);
+  const isFact = (command: PaletteCommand) => command.id.startsWith("fact:");
+
+  const shownFacts = new Set(
+    ranked
+      .filter(({ item }) => isFact(item))
+      .slice(0, FACT_RESULTS)
+      .map(({ item }) => item.id),
+  );
+
+  const results = ranked
+    .filter(({ item }) => !isFact(item) || shownFacts.has(item.id))
+    .slice(0, RESULT_LIMIT);
 
   const row = (command: PaletteCommand, ranges: readonly number[] | null, hint: boolean) => {
     const Icon = command.icon;

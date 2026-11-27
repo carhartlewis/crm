@@ -8,6 +8,7 @@ import {
   Invalid,
   NoActiveWorkspace,
   SKILLS_SYNC_PATH,
+  MEMORY_FACTS_SYNC_PATH,
   Unauthorized,
 } from "@crm/core/api";
 import { createGateway } from "@crm/integrations/gateway";
@@ -30,6 +31,7 @@ import {
   connectionsSync,
   customConnectorsSync,
   skillsSync,
+  memoryFactsSync,
   type SyncSpec,
 } from "./sync-proxy.ts";
 
@@ -170,7 +172,8 @@ const MemoryHandlers = HttpApiBuilder.group(CrmApi, "memory", (handlers) =>
       )
       .handle("forget", ({ payload }) =>
         Effect.flatMap(actor, (who) => memory.forget(who, payload)),
-      );
+      )
+      .handle("refresh", () => Effect.flatMap(actor, memory.refresh));
   }),
 );
 
@@ -250,6 +253,7 @@ const synced: ReadonlyArray<
   [CONNECTIONS_SYNC_PATH, (workspaceId, userId) => connectionsSync(workspaceId, userId)],
   [CUSTOM_CONNECTORS_SYNC_PATH, (workspaceId) => customConnectorsSync(workspaceId)],
   [SKILLS_SYNC_PATH, (workspaceId) => skillsSync(workspaceId)],
+  [MEMORY_FACTS_SYNC_PATH, (workspaceId) => memoryFactsSync(workspaceId)],
 ];
 
 /**

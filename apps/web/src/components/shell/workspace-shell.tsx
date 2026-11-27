@@ -4,7 +4,9 @@ import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { preloadable } from "@crm/ui/lib/preloadable";
 import { Outlet } from "@tanstack/react-router";
 import { NuqsAdapter } from "nuqs/adapters/tanstack-router";
+import { useMutation } from "@tanstack/react-query";
 import { Suspense, useState } from "react";
+import { refreshMemoryFactsMutation } from "../../lib/memory.ts";
 import { AppSidebar } from "./app-sidebar.tsx";
 import { CreateSheets } from "./create-sheets.tsx";
 import { RecordSheets } from "./record-sheets.tsx";
@@ -21,6 +23,16 @@ export interface WorkspaceShellProps {
 /** The signed-in frame: sidebar, the page, ⌘K and the global shortcuts. */
 export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const refreshFacts = useMutation(refreshMemoryFactsMutation);
+
+  // Opening ⌘K asks the API to refresh stale fact copies; they arrive through sync while you type.
+  const openPalette = () => {
+    setPaletteOpen(true);
+
+    if (!refreshFacts.isPending) refreshFacts.mutate();
+  };
+
+  const togglePalette = () => (paletteOpen ? setPaletteOpen(false) : openPalette());
 
   // The palette is keyboard-first: have its chunk ready before anyone presses ⌘K.
   useMountEffect(() => {
@@ -38,13 +50,13 @@ export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
           <AppSidebar
             userId={userId}
             workspaceId={workspaceId}
-            onSearch={() => setPaletteOpen(true)}
+            onSearch={openPalette}
             onSearchIntent={() => void CommandPalette.preload()}
           />
           <SidebarInset className="min-w-0">
             <TitleBarContext
               value={{
-                onSearch: () => setPaletteOpen(true),
+                onSearch: openPalette,
                 onSearchIntent: () => void CommandPalette.preload(),
               }}
             >
@@ -53,7 +65,7 @@ export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
           </SidebarInset>
           <CreateSheets userId={userId} workspaceId={workspaceId} />
           <RecordSheets userId={userId} workspaceId={workspaceId} />
-          <Shortcuts userId={userId} setPaletteOpen={setPaletteOpen} />
+          <Shortcuts userId={userId} togglePalette={togglePalette} />
           {paletteOpen && (
             <Suspense fallback={null}>
               <CommandPalette

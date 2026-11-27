@@ -32,6 +32,10 @@
       "model": "Member",
       "namespace": "public"
     },
+    "memory_fact": {
+      "model": "MemoryFact",
+      "namespace": "public"
+    },
     "oauthAccessToken": {
       "model": "OauthAccessToken",
       "namespace": "public"
@@ -314,6 +318,21 @@
               }
             },
             "relations": {
+              "memoryFacts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "companyId"
+                  ]
+                },
+                "to": {
+                  "model": "MemoryFact",
+                  "namespace": "public"
+                }
+              },
               "owner": {
                 "cardinality": "N:1",
                 "nullable": true,
@@ -934,6 +953,126 @@
               },
               "namespaceId": "public",
               "table": "member"
+            }
+          },
+          "MemoryFact": {
+            "fields": {
+              "companyId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "isStatic": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "syncedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "text": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "workspaceId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "company": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "workspace": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "workspaceId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Workspace",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "isStatic": {
+                  "column": "is_static"
+                },
+                "syncedAt": {
+                  "column": "synced_at"
+                },
+                "text": {
+                  "column": "text"
+                },
+                "workspaceId": {
+                  "column": "workspace_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "memory_fact"
             }
           },
           "OauthAccessToken": {
@@ -3128,6 +3267,21 @@
                   "namespace": "public"
                 }
               },
+              "memoryFacts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "workspaceId"
+                  ]
+                },
+                "to": {
+                  "model": "MemoryFact",
+                  "namespace": "public"
+                }
+              },
               "skills": {
                 "cardinality": "1:N",
                 "on": {
@@ -3954,6 +4108,117 @@
                   ]
                 }
               ]
+            },
+            "memory_fact": {
+              "columns": {
+                "company_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "nullable": false,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "is_static": {
+                  "codecId": "pg/bool@1",
+                  "dataType": "pg/bool",
+                  "nullable": false
+                },
+                "synced_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "nullable": false,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
+                "text": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "workspace_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "index": {
+                    "name": "memory_fact_workspace_id_idx_90a9f461"
+                  },
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "workspace_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memory_fact"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "workspace"
+                  }
+                },
+                {
+                  "index": {
+                    "name": "memory_fact_company_id_idx_1303a718"
+                  },
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memory_fact"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "company"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "memory_fact_company_id_idx_1303a718",
+                  "prefix": "memory_fact_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "workspace_id"
+                  ],
+                  "name": "memory_fact_workspace_id_idx_90a9f461",
+                  "prefix": "memory_fact_workspace_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             },
             "oauthAccessToken": {
               "columns": {
@@ -5409,7 +5674,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "235cb9f74bdb9ea4a51e2bcdcc9fb60b42e4a79fcb1aca5da591f9f12c7c874f"
+    "storageHash": "18682aa2d79bb82fa133363231cdd4880f953f7a02f2bba4d26e9eace753f775"
   },
   "execution": {
     "executionHash": "bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f",

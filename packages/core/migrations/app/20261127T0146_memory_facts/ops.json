@@ -1,0 +1,251 @@
+[
+  {
+    "id": "table.memory_fact",
+    "label": "Create table \"memory_fact\"",
+    "summary": "Creates table \"memory_fact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "memory_fact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"memory_fact\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memory_fact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"memory_fact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"memory_fact\"",
+        "sql": "CREATE TABLE \"public\".\"memory_fact\" (\n  \"company_id\" text,\n  \"created_at\" timestamptz(3) NOT NULL,\n  \"id\" text NOT NULL,\n  \"is_static\" bool NOT NULL,\n  \"synced_at\" timestamptz(3) NOT NULL,\n  \"text\" text NOT NULL,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"memory_fact\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"memory_fact\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"memory_fact\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "index.memory_fact.memory_fact_company_id_idx_1303a718",
+    "label": "Create index \"memory_fact_company_id_idx_1303a718\" on \"memory_fact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "memory_fact_company_id_idx_1303a718",
+        "table": "memory_fact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"memory_fact_company_id_idx_1303a718\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memory_fact_company_id_idx_1303a718\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"memory_fact_company_id_idx_1303a718\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"memory_fact_company_id_idx_1303a718\"",
+        "sql": "CREATE INDEX \"memory_fact_company_id_idx_1303a718\" ON \"public\".\"memory_fact\" (\"company_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"memory_fact_company_id_idx_1303a718\" exists on \"memory_fact\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"memory_fact_company_id_idx_1303a718\"",
+          "i",
+          "I",
+          "\"public\".\"memory_fact\"",
+          "btree",
+          "[\"company_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.memory_fact.memory_fact_workspace_id_idx_90a9f461",
+    "label": "Create index \"memory_fact_workspace_id_idx_90a9f461\" on \"memory_fact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "memory_fact_workspace_id_idx_90a9f461",
+        "table": "memory_fact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"memory_fact_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memory_fact_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"memory_fact_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"memory_fact_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"memory_fact_workspace_id_idx_90a9f461\" ON \"public\".\"memory_fact\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"memory_fact_workspace_id_idx_90a9f461\" exists on \"memory_fact\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"memory_fact_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"memory_fact\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.memory_fact.memory_fact_workspace_id_fkey",
+    "label": "Add foreign key \"memory_fact_workspace_id_fkey\" on \"memory_fact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "memory_fact_workspace_id_fkey",
+        "table": "memory_fact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"memory_fact_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memory_fact_workspace_id_fkey",
+          "public",
+          "\"public\".\"memory_fact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"memory_fact_workspace_id_fkey\" on \"memory_fact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"memory_fact_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"memory_fact\"\nADD CONSTRAINT \"memory_fact_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"memory_fact_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "memory_fact_workspace_id_fkey",
+          "public",
+          "\"public\".\"memory_fact\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.memory_fact.memory_fact_company_id_fkey",
+    "label": "Add foreign key \"memory_fact_company_id_fkey\" on \"memory_fact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "memory_fact_company_id_fkey",
+        "table": "memory_fact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"memory_fact_company_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memory_fact_company_id_fkey",
+          "public",
+          "\"public\".\"memory_fact\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"memory_fact_company_id_fkey\" on \"memory_fact\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"memory_fact_company_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"memory_fact\"\nADD CONSTRAINT \"memory_fact_company_id_fkey\"\nFOREIGN KEY (\"company_id\")\nREFERENCES \"public\".\"company\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"memory_fact_company_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "memory_fact_company_id_fkey",
+          "public",
+          "\"public\".\"memory_fact\"",
+          "f",
+          "[\"company_id\"]",
+          "\"public\".\"company\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  }
+]

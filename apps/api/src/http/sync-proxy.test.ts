@@ -9,6 +9,7 @@ import {
   proxyResponse,
   proxyResponseHeaders,
   skillsSync,
+  memoryFactsSync,
 } from "./sync-proxy.ts";
 
 const electric = new URL("http://127.0.0.1:53000");
@@ -184,5 +185,23 @@ describe("synced tables", () => {
       "params[1]": "ws_a",
     });
     expect(skills["columns"]?.split(",")).not.toContain("files");
+  });
+
+  test("memory facts are per workspace, without the server's sync time", () => {
+    const facts = upstream(memoryFactsSync("ws_a"));
+
+    expect(facts).toMatchObject({
+      table: "memory_fact",
+      where: "workspace_id = $1",
+      "params[1]": "ws_a",
+    });
+    expect(facts["columns"]?.split(",")).toEqual([
+      "id",
+      "workspace_id",
+      "company_id",
+      "text",
+      "is_static",
+      "created_at",
+    ]);
   });
 });

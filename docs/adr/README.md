@@ -20,3 +20,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0014](0014-workspace-and-company-memory.md)       | Workspace and company memory in Supermemory; Jev in the agent decides what chats add                                                 |
 | [0015](0015-skills-start-enabled.md)               | Workspace skills start enabled; any member can disable one                                                                           |
 | [0016](0016-prefixed-record-ids.md)                | Record ids are a registered prefix plus 24 base62 characters; older UUIDs stay valid                                                 |
+| [0017](0017-memory-fact-copy-for-search.md)        | Memory facts are copied into a synced table so ⌘K searches them locally; refreshed on demand                                         |

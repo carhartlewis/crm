@@ -1,3 +1,4 @@
+import { RECORD_TAB_PARAM } from "@crm/ui/patterns/record-sheet/sheet-params";
 import { parseAsString, useQueryStates } from "nuqs";
 
 /**
@@ -20,9 +21,19 @@ const idParsers = {
   company: parseAsString,
 } satisfies { [K in RecordKind]: typeof parseAsString };
 
-/** Opens a record's sheet over the current page, as a new history entry (Back closes it). */
+/**
+ * Opens a record's sheet over the current page, as a new history entry (Back closes it), on
+ * `tab` when given (one of `RECORD_TABS[kind]`), else its first tab.
+ */
 export function useOpenRecord() {
-  const [, setRecords] = useQueryStates(idParsers, { history: "push" });
+  const [, setRecords] = useQueryStates(
+    { ...idParsers, [RECORD_TAB_PARAM]: parseAsString },
+    { history: "push" },
+  );
 
-  return (kind: RecordKind, id: string) => setRecords({ [kind]: id });
+  return <K extends RecordKind>(kind: K, id: string, tab?: (typeof RECORD_TABS)[K][number]) =>
+    setRecords({
+      [kind]: id,
+      [RECORD_TAB_PARAM]: tab === undefined || tab === RECORD_TABS[kind][0] ? null : tab,
+    });
 }

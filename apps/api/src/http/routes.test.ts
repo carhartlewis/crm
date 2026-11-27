@@ -1,3 +1,4 @@
+import { createMemoryFactMirror } from "../services/memory-mirror-memory.ts";
 import { createImageCache, createMemoryStorage } from "@crm/core/storage";
 import { SessionUser } from "@crm/core/api";
 import { createMemoryKv } from "@crm/core/kv";
@@ -160,6 +161,8 @@ const app = HttpRouter.toWebHandler(
         makeMemory({
           store: null,
           researcher: null,
+          mirror: createMemoryFactMirror().mirror,
+          kv: createMemoryKv(),
           directory: createMemoryDirectory({}),
           prefix: "test",
           now: () => new Date(),

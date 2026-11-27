@@ -116,3 +116,12 @@ export const deleteSourceMutation = mutationOptions({
   },
   onSettled: (_data, _error, _variables, _result, { client }) => refresh(client),
 });
+
+/**
+ * Asks the API to refresh the workspace's stale fact copies (ADR 0017). It answers at once; new
+ * facts arrive through sync. ⌘K sends it when it opens.
+ */
+export const refreshMemoryFactsMutation = mutationOptions({
+  mutationKey: [...memoryKeys.all, "refresh-facts"],
+  mutationFn: () => send("/api/memory/refresh", { method: "POST" }).then(() => undefined),
+});

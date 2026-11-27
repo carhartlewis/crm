@@ -1,6 +1,5 @@
 import { useSidebar } from "@crm/ui/components/sidebar";
 import { useRouter } from "@tanstack/react-router";
-import type { Dispatch, SetStateAction } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { pageById } from "../../lib/pages.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
@@ -15,10 +14,10 @@ const OUTSIDE_TEXT = { preventDefault: true };
 /** The shell's global keys. Never animated. */
 export function Shortcuts({
   userId,
-  setPaletteOpen,
+  togglePalette,
 }: {
   userId: string;
-  setPaletteOpen: Dispatch<SetStateAction<boolean>>;
+  togglePalette: () => void;
 }) {
   const router = useRouter();
   const { toggleSidebar } = useSidebar();
@@ -31,9 +30,7 @@ export function Shortcuts({
     return shortcut ? [toHotkey(shortcut)] : [];
   });
 
-  useHotkeys(toHotkey(shortcuts.palette), () => setPaletteOpen((open) => !open), EVERYWHERE, [
-    setPaletteOpen,
-  ]);
+  useHotkeys(toHotkey(shortcuts.palette), togglePalette, EVERYWHERE, [togglePalette]);
   useHotkeys(toHotkey(shortcuts.sidebar), toggleSidebar, EVERYWHERE, [toggleSidebar]);
   useHotkeys(toHotkey(shortcuts.back), () => router.history.back(), EVERYWHERE, [router]);
   useHotkeys(toHotkey(shortcuts.forward), () => router.history.forward(), EVERYWHERE, [router]);

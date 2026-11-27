@@ -174,3 +174,16 @@ export function skillsSync(workspaceId: string): SyncSpec {
     ],
   };
 }
+
+/**
+ * The copied memory facts of one workspace: its own and every company's (ADR 0017). Only what
+ * ⌘K shows and ranks; `synced_at` stays on the server.
+ */
+export function memoryFactsSync(workspaceId: string): SyncSpec {
+  return {
+    table: "memory_fact",
+    where: "workspace_id = $1",
+    params: [workspaceId],
+    columns: ["id", "workspace_id", "company_id", "text", "is_static", "created_at"],
+  };
+}

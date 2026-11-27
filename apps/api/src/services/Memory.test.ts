@@ -3,9 +3,11 @@ import { Invalid, NoActiveWorkspace, NotFound, UpstreamUnavailable } from "@crm/
 import type { BrandResearch } from "@crm/core/brand";
 import { memoryNamespace } from "@crm/memory";
 import { createInMemoryStore } from "@crm/memory/testing";
+import { createMemoryKv } from "@crm/core/kv";
 import { Effect } from "effect";
 import { makeMemory } from "./Memory.ts";
 import { createMemoryDirectory } from "./memory-directory-memory.ts";
+import { createMemoryFactMirror } from "./memory-mirror-memory.ts";
 
 const now = () => new Date("2026-11-26T12:00:00Z");
 
@@ -35,9 +37,13 @@ function ns(workspaceId: string, companyId?: string) {
 function setup(options: { store?: boolean } = {}) {
   const store = createInMemoryStore({ now });
   const researched: string[] = [];
+  const copy = createMemoryFactMirror();
+  const kv = createMemoryKv();
 
   const memory = makeMemory({
     store: options.store === false ? null : store,
+    mirror: copy.mirror,
+    kv,
     researcher: {
       research: async (website) => {
         researched.push(website);
@@ -73,10 +79,24 @@ function setup(options: { store?: boolean } = {}) {
     log: () => {},
   });
 
-  return { memory, store, researched };
+  return { memory, store, researched, copy, kv };
 }
 
 const alice = { userId: "alice", activeWorkspaceId: "ws1" };
+
+const ACME = "com_acme00000000000000000000";
+
+/** Copies run off the request path: wait (a bounded number of ticks) until `done` holds. */
+async function eventually(done: () => boolean, ticks = 50): Promise<void> {
+  if (done() || ticks === 0) {
+    expect(done()).toBe(true);
+
+    return;
+  }
+
+  await Bun.sleep(1);
+  await eventually(done, ticks - 1);
+}
 
 describe("website research", () => {
   test("a new workspace's website becomes one research source in its memory", async () => {
@@ -352,5 +372,91 @@ describe("a source", () => {
     const missing = await Effect.runPromise(Effect.flip(memory.source(alice, { id: source.id })));
 
     expect(missing).toBeInstanceOf(NotFound);
+  });
+});
+
+describe("the fact copy ⌘K searches", () => {
+  test("reading a company's memory copies its facts, and a forgotten fact leaves at once", async () => {
+    const { memory, copy } = setup();
+
+    await Effect.runPromise(
+      memory.addNote(alice, { companyId: ACME, text: "Uses Postgres.\nBudget is 10k." }),
+    );
+    await Effect.runPromise(memory.company(alice, ACME));
+    await eventually(() => copy.rows().length === 2);
+
+    expect(
+      copy
+        .rows()
+        .map((row) => [row.workspaceId, row.companyId, row.text])
+        .toSorted(),
+    ).toEqual([
+      ["ws1", ACME, "Budget is 10k."],
+      ["ws1", ACME, "Uses Postgres."],
+    ]);
+
+    const postgres = copy.rows().find((row) => row.text === "Uses Postgres.");
+
+    await Effect.runPromise(memory.forget(alice, { companyId: ACME, factId: postgres?.id ?? "" }));
+
+    expect(copy.rows().map((row) => row.text)).toEqual(["Budget is 10k."]);
+  });
+
+  test("a write makes the copy stale, so the next look copies the new facts", async () => {
+    const { memory, copy } = setup();
+
+    await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
+    await Effect.runPromise(memory.workspace(alice));
+    await eventually(() => copy.rows().length === 1);
+
+    await Effect.runPromise(memory.addNote(alice, { text: "Our CFO is Dana." }));
+    await Effect.runPromise(memory.workspace(alice));
+    await eventually(() => copy.rows().length === 2);
+
+    expect(copy.rows().every((row) => row.companyId === null)).toBe(true);
+  });
+
+  test("a fresh copy is not read again until it goes stale", async () => {
+    const { memory, copy, store } = setup();
+
+    await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
+    await Effect.runPromise(memory.workspace(alice));
+    await eventually(() => copy.rows().length === 1);
+
+    // Written behind the service's back: nothing marks the copy stale.
+    await store.putSource(ns("ws1"), {
+      sourceId: "outside",
+      workspaceId: "ws1",
+      kind: "member_note",
+      title: "Outside",
+      content: "Not copied yet.",
+      supportingContext: "",
+    });
+    await Effect.runPromise(memory.workspace(alice));
+    await Bun.sleep(5);
+
+    expect(copy.rows()).toHaveLength(1);
+  });
+
+  test("refresh copies the workspace's memories; a non-member is refused", async () => {
+    const { memory, copy } = setup();
+
+    await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
+    await Effect.runPromise(memory.addNote(alice, { companyId: ACME, text: "Uses Postgres." }));
+    await Effect.runPromise(memory.refresh(alice));
+    await eventually(() => copy.rows().length === 2);
+
+    expect(
+      copy
+        .rows()
+        .map((row) => row.companyId)
+        .toSorted(),
+    ).toEqual([ACME, null]);
+
+    const outsider = await Effect.runPromise(
+      Effect.flip(memory.refresh({ userId: "mallory", activeWorkspaceId: "ws1" })),
+    );
+
+    expect(outsider).toBeInstanceOf(NoActiveWorkspace);
   });
 });

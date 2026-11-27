@@ -12,9 +12,11 @@ import { isCompanyId } from "@crm/core/company";
 import { MAX_NOTE_CHARACTERS, memoryNoteError } from "@crm/core/memory";
 import { createContextDev, type CompanyResearcher } from "@crm/core/brand";
 import type { Db } from "@crm/core/db";
+import type { Kv as KvStore } from "@crm/core/kv";
 import {
   EMPTY_PROFILE,
   type GraphSource,
+  type MemoryFact,
   type MemorySource,
   type MemoryStore,
   type MemorySubject,
@@ -29,6 +31,8 @@ import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { AppConfig } from "../config.ts";
 import type { Actor } from "./Companies.ts";
 import { Database } from "./Database.ts";
+import { Kv } from "./Kv.ts";
+import { type FactMirror, prismaFactMirror } from "./memory-mirror.ts";
 
 /**
  * Workspace and company memory (ADR 0014). Supermemory stores the sources and extracts the
@@ -63,6 +67,10 @@ export interface MemoryDependencies {
   readonly store: MemoryStore | null;
   readonly researcher: CompanyResearcher | null;
   readonly directory: MemoryDirectory;
+  /** The local copy of facts that ⌘K searches (ADR 0017). */
+  readonly mirror: FactMirror;
+  /** Marks which memories' copies are fresh, with a TTL. */
+  readonly kv: KvStore;
   readonly prefix: string;
   readonly now: () => Date;
   readonly log: (message: string, cause?: unknown) => void;
@@ -113,6 +121,11 @@ export interface MemoryService {
     actor: Actor,
     input: Target & { factId: string },
   ) => Effect.Effect<void, MemoryError>;
+  /**
+   * Starts refreshing the copied facts of the workspace's stale memories (its own first, then
+   * its companies'), a few per call, off the request path. ⌘K calls it when it opens.
+   */
+  readonly refresh: (actor: Actor) => Effect.Effect<void, MemoryError>;
 
   /** Background work after a write elsewhere. Never throws; failures are logged. */
   readonly researchWorkspace: (workspaceId: string) => Promise<void>;
@@ -147,6 +160,41 @@ const FACT_LIMIT = 100;
 const SOURCE_LIMIT = 20;
 const RECALL_COMPANIES = 3;
 const GRAPH_SOURCES = 60;
+
+/** Most facts copied per memory; a page is FACT_LIMIT facts. */
+const MIRROR_LIMIT = 500;
+
+/** A copy refreshed this recently is left alone, unless a write marked it stale. */
+const FRESH_SECONDS = 15 * 60;
+
+/** Memories one `refresh` call copies, and how many at once. */
+const REFRESH_BATCH = 8;
+const REFRESH_CONCURRENCY = 2;
+
+const freshKey = (ns: string) => `memory:fresh:${ns}`;
+
+/** Every fact of a memory, newest first, up to MIRROR_LIMIT: one page after another. */
+async function allFacts(
+  memory: MemoryStore,
+  ns: string,
+  cursor: string | null = null,
+  found: readonly MemoryFact[] = [],
+): Promise<readonly MemoryFact[]> {
+  const page = await memory.listFacts(ns, { cursor, limit: FACT_LIMIT });
+  const facts = [...found, ...page.facts];
+
+  return page.nextCursor !== null && facts.length < MIRROR_LIMIT
+    ? allFacts(memory, ns, page.nextCursor, facts)
+    : facts.slice(0, MIRROR_LIMIT);
+}
+
+/** Runs `work` on each item, `size` at a time, one batch after another. */
+async function inBatches<T>(items: readonly T[], size: number, work: (item: T) => Promise<void>) {
+  if (items.length === 0) return;
+
+  await Promise.all(items.slice(0, size).map(work));
+  await inBatches(items.slice(size), size, work);
+}
 
 /** Sources and facts in the shape `@supermemory/memory-graph` draws. */
 export function toMemoryGraph(spaceId: string, sources: readonly GraphSource[]): MemoryGraph {
@@ -233,9 +281,99 @@ function toCompany(row: { id: string; name: string; domain: string | null }): Co
 export function makeMemory(deps: MemoryDependencies): MemoryService {
   const { store, directory } = deps;
   const researching = new Set<string>();
+  const refreshing = new Set<string>();
 
   const namespace = (workspaceId: string, subject: MemorySubject) =>
     memoryNamespace(deps.prefix, workspaceId, subject);
+
+  const namespaceOf = (workspaceId: string, companyId: string | null) =>
+    namespace(workspaceId, companyId ? { type: "company", companyId } : { type: "workspace" });
+
+  /** After a write: the copy is out of date, so the next look refreshes it. */
+  const markStale = async (ns: string) => {
+    try {
+      await deps.kv.delete(freshKey(ns));
+    } catch (cause) {
+      deps.log("memory: marking a copy stale failed", cause);
+    }
+  };
+
+  /** Writes a source, then marks its memory's copy stale. */
+  const write = async (memory: MemoryStore, ns: string, source: MemorySource) => {
+    await put(memory, ns, source);
+    await markStale(ns);
+  };
+
+  /**
+   * Copies a memory's facts from the store. While a source is still being read, the copy stays
+   * stale, so the next look copies the facts that arrive. Never throws.
+   */
+  const refreshCopy = async (workspaceId: string, companyId: string | null) => {
+    if (!store) return;
+
+    const ns = namespaceOf(workspaceId, companyId);
+
+    if (refreshing.has(ns)) return;
+
+    refreshing.add(ns);
+
+    try {
+      const [sources, facts] = await Promise.all([
+        store.listSources(ns, SOURCE_LIMIT),
+        allFacts(store, ns),
+      ]);
+
+      await deps.mirror.replace(
+        workspaceId,
+        companyId,
+        facts.map((fact) => ({
+          id: fact.id,
+          text: fact.text,
+          isStatic: fact.isStatic,
+          createdAt: fact.createdAt,
+        })),
+        deps.now(),
+      );
+
+      if (!sources.some((source) => source.status === "processing")) {
+        await deps.kv.set(freshKey(ns), "1", FRESH_SECONDS);
+      }
+    } catch (cause) {
+      deps.log("memory: copying facts failed", cause);
+    } finally {
+      refreshing.delete(ns);
+    }
+  };
+
+  const isFresh = async (workspaceId: string, companyId: string | null) => {
+    try {
+      return (await deps.kv.get(freshKey(namespaceOf(workspaceId, companyId)))) !== null;
+    } catch {
+      return false;
+    }
+  };
+
+  const refreshIfStale = async (workspaceId: string, companyId: string | null) => {
+    if (store && !(await isFresh(workspaceId, companyId))) {
+      await refreshCopy(workspaceId, companyId);
+    }
+  };
+
+  /** Refreshes up to REFRESH_BATCH stale copies: the workspace's own, then its companies'. */
+  const refreshWorkspace = async (workspaceId: string) => {
+    try {
+      const companies = await directory.companies(workspaceId);
+      const memories = [null, ...companies.map((company) => company.id)];
+      const fresh = await Promise.all(memories.map((companyId) => isFresh(workspaceId, companyId)));
+      const stale = memories.filter((_, index) => !fresh[index]).slice(0, REFRESH_BATCH);
+
+      await inBatches(stale, REFRESH_CONCURRENCY, (companyId) =>
+        refreshCopy(workspaceId, companyId),
+      );
+    } catch (cause) {
+      deps.log("memory: refreshing the workspace's copies failed", cause);
+    }
+  };
 
   /** The membership check every call starts with. */
   const member = (actor: Actor) =>
@@ -337,7 +475,7 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
         return;
       }
 
-      await put(store, ns, {
+      await write(store, ns, {
         sourceId: RESEARCH_SOURCE,
         workspaceId,
         kind: "website_research",
@@ -406,7 +544,7 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
   ) => {
     const ns = namespace(workspaceId, subjectOf(input));
 
-    await put(memory, ns, {
+    await write(memory, ns, {
       sourceId: `${input.kind === "member_note" ? "note" : input.kind}-${crypto.randomUUID()}`,
       workspaceId,
       kind: input.kind,
@@ -458,9 +596,11 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
   return {
     workspace: (actor) =>
-      Effect.flatMap(member(actor), (workspaceId) =>
-        knowledge(namespace(workspaceId, { type: "workspace" })),
-      ),
+      Effect.flatMap(member(actor), (workspaceId) => {
+        void refreshIfStale(workspaceId, null);
+
+        return knowledge(namespace(workspaceId, { type: "workspace" }));
+      }),
 
     graph: (actor, input) =>
       Effect.gen(function* () {
@@ -468,6 +608,9 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
         const ns = yield* target(workspaceId, input);
 
         if (!store) return { documents: [], totals: { sources: 0, facts: 0 } };
+
+        // The page polls this while a source is read, so the copy follows along.
+        void refreshIfStale(workspaceId, input.companyId ?? null);
 
         const sources = yield* stored("graph", (memory) => memory.graph(ns, GRAPH_SOURCES));
 
@@ -499,6 +642,8 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
         const ns = yield* target(workspaceId, input);
 
         yield* stored("delete source", (memory) => memory.deleteSource(ns, input.id));
+        yield* Effect.promise(() => markStale(ns));
+        void refreshCopy(workspaceId, input.companyId ?? null);
       }),
 
     search: (actor, input) =>
@@ -520,6 +665,8 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
       Effect.gen(function* () {
         const workspaceId = yield* member(actor);
         const ns = yield* target(workspaceId, { companyId: id });
+
+        void refreshIfStale(workspaceId, id);
 
         return yield* knowledge(ns);
       }),
@@ -576,6 +723,16 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
         const ns = yield* target(workspaceId, input);
 
         yield* stored("forget", (memory) => memory.forgetFacts(ns, [input.factId]));
+        yield* Effect.promise(() => deps.mirror.remove(workspaceId, [input.factId]));
+      }),
+
+    refresh: (actor) =>
+      Effect.gen(function* () {
+        const workspaceId = yield* member(actor);
+
+        if (!store) return;
+
+        void refreshWorkspace(workspaceId);
       }),
 
     researchWorkspace,
@@ -689,7 +846,10 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
           const ns = namespace(caller.workspaceId, subjectOf(input));
 
-          if (input.replaces) await memory.forgetFacts(ns, [input.replaces]);
+          if (input.replaces) {
+            await memory.forgetFacts(ns, [input.replaces]);
+            await deps.mirror.remove(caller.workspaceId, [input.replaces]);
+          }
 
           await writeNote(memory, caller.workspaceId, {
             ...input,
@@ -707,6 +867,7 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
           }
 
           await memory.forgetFacts(namespace(caller.workspaceId, subjectOf(input)), [input.factId]);
+          await deps.mirror.remove(caller.workspaceId, [input.factId]);
 
           return { ok: true, value: null };
         }),
@@ -727,7 +888,7 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
             directory.workspace(caller.workspaceId),
           ]);
 
-          await put(memory, namespace(caller.workspaceId, { type: "workspace" }), {
+          await write(memory, namespace(caller.workspaceId, { type: "workspace" }), {
             sourceId: `chat-${input.sessionId}`,
             workspaceId: caller.workspaceId,
             kind: "chat",
@@ -771,6 +932,7 @@ export class Memory extends Context.Service<Memory, MemoryService>()("@crm/api/s
     Effect.gen(function* () {
       const config = yield* AppConfig;
       const db = yield* Database;
+      const kv = yield* Kv;
 
       const key = Option.filter(config.supermemoryApiKey, (value) => Redacted.value(value) !== "");
 
@@ -798,6 +960,8 @@ export class Memory extends Context.Service<Memory, MemoryService>()("@crm/api/s
           onNone: () => null,
         }),
         directory: prismaMemoryDirectory(db),
+        mirror: prismaFactMirror(db),
+        kv,
         prefix,
         now: () => new Date(),
         log: (message, cause) => {
@@ -807,5 +971,5 @@ export class Memory extends Context.Service<Memory, MemoryService>()("@crm/api/s
         },
       });
     }),
-  ).pipe(Layer.provide(Database.layer));
+  ).pipe(Layer.provide([Database.layer, Kv.layer]));
 }

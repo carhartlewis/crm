@@ -94,6 +94,7 @@ model Workspace {
   connections Connection[]
   skills      Skill[]
   customConnectors CustomConnector[]
+  memoryFacts MemoryFact[]
 
   @@map("workspace")
 }
@@ -133,7 +134,8 @@ model Invitation {
 // workspace), so columns are snake_case: shape rows reach the browser with these keys.
 
 model Company {
-  // Client-generated UUID: the web app inserts the row optimistically before the API call.
+  // Client-generated (`createId("com")`, or a UUID from before prefixes): the web app inserts
+  // the row optimistically before the API call.
   id          String    @id
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -143,9 +145,35 @@ model Company {
   owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+  memoryFacts MemoryFact[]
 
   @@index([workspaceId])
   @@map("company")
+}
+
+// A copy of one fact Supermemory read from a workspace's or company's memory (ADR 0017), so
+// ⌘K searches facts locally. The API refreshes it from Supermemory; nothing else writes it.
+// Synced to members of the workspace through Electric.
+
+model MemoryFact {
+  // Supermemory's fact id: the copy's natural key.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Null for the workspace's own memory.
+  companyId   String?   @map("company_id")
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  text        String
+  // A lasting fact rather than a current one.
+  isStatic    Boolean   @map("is_static")
+  // When Supermemory read the fact.
+  createdAt   DateTime  @map("created_at")
+  // When the API last copied it.
+  syncedAt    DateTime  @map("synced_at")
+
+  @@index([workspaceId])
+  @@index([companyId])
+  @@map("memory_fact")
 }
 
 // better-auth `jwt` plugin: signing keys for MCP access tokens (served at /api/auth/jwks).
