@@ -281,6 +281,10 @@ const EMPTY_DIRECTORY: CrmDirectory = {
 };
 
 const NO_MEMORY = {
+  knowledge: async () => ({
+    ok: true as const,
+    value: { enabled: true, profile: [], facts: [], sources: [] },
+  }),
   search: async () => ({ ok: true as const, value: [] }),
   remember: async () => ({ ok: true as const, value: null }),
   forget: async () => ({ ok: true as const, value: null }),

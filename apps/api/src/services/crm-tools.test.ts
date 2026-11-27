@@ -37,6 +37,10 @@ const directory: CrmDirectory = {
 const memoryCalls: string[] = [];
 
 const memory: CrmToolDeps["memory"] = {
+  knowledge: async () => ({
+    ok: true,
+    value: { enabled: true, profile: [], facts: [], sources: [] },
+  }),
   search: async (who, input) => {
     memoryCalls.push(`search ${who.workspaceId} ${input.query}`);
 
@@ -51,7 +55,7 @@ const memory: CrmToolDeps["memory"] = {
   research: async () => ({ ok: true, value: null }),
 };
 
-function setup() {
+function setup(overrides: Partial<CrmToolDeps> = {}) {
   const store = createMemoryCompanyStore(["ws_a:user_ana"]);
 
   return {
@@ -64,6 +68,7 @@ function setup() {
         memory,
         web: null,
         jev: null,
+        ...overrides,
       },
       caller,
     ),
@@ -144,6 +149,85 @@ describe("CRM tools", () => {
     expect(memoryCalls).toContain("search ws_a renewal");
     expect(text(await byName(tools, "forget").call({ factId: "f1" }))).toBe("No such fact");
   });
+
+  test.each(["contact", "deal"] as const)(
+    "reading a %s includes its own saved knowledge and preserves memory failures",
+    async (kind) => {
+      const record = {
+        id: kind === "contact" ? "ctc_1" : "del_1",
+        name: "Acme record",
+        title: null,
+        email: null,
+        phone: null,
+        companyId: "com_1",
+        companyName: "Acme",
+        ownerName: "Ana",
+        lastActivityAt: null,
+        stage: "new",
+        amount: null,
+        currency: "USD",
+        expectedCloseDate: null,
+        description: null,
+        closedReason: null,
+      };
+
+      const knowledge = {
+        ok: true as const,
+        value: {
+          enabled: true,
+          profile: [{ id: "f1", text: "Prefers email." }],
+          facts: [],
+          sources: [],
+        },
+      };
+
+      const failure = { ok: false as const, status: 502 as const, message: "Memory unavailable." };
+      const requests: unknown[] = [];
+
+      await Promise.all(
+        [knowledge, failure].map(async (result) => {
+          const { tools } = setup({
+            directory: {
+              ...directory,
+              contact: async () => record,
+              deal: async () => record,
+            },
+            memory: {
+              ...memory,
+              knowledge: async (who, target) => {
+                requests.push({ who, target });
+
+                return result;
+              },
+            },
+          });
+
+          const response = await byName(tools, `get_${kind}`).call({ id: record.id });
+
+          expect(response.isError).toBeUndefined();
+          expect(JSON.parse(text(response))).toMatchObject({ id: record.id, memory: result });
+        }),
+      );
+
+      expect(requests).toEqual(
+        [knowledge, failure].map(() => ({
+          who: caller,
+          target: kind === "contact" ? { contactId: record.id } : { dealId: record.id },
+        })),
+      );
+
+      const { tools } = setup({
+        memory: {
+          ...memory,
+          knowledge: async () => {
+            throw new Error("A missing record must not read memory");
+          },
+        },
+      });
+
+      expect((await byName(tools, `get_${kind}`).call({ id: record.id })).isError).toBe(true);
+    },
+  );
 
   test("a fact the agent saves without a company goes to the company it names", async () => {
     const remember = byName(setup().tools, "remember");

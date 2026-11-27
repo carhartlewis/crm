@@ -157,6 +157,8 @@ export interface MemoryService {
   readonly companyRemoved: (workspaceId: string, companyId: string) => Promise<void>;
 
   readonly agent: {
+    /** Saved knowledge for a record read, without a relevance filter. */
+    readonly knowledge: (caller: AgentCaller, input: Target) => Promise<AgentResult<Knowledge>>;
     readonly recall: (caller: AgentCaller, query: string) => Promise<AgentResult<Recall>>;
     readonly companies: (caller: AgentCaller) => Promise<AgentResult<readonly CompanyRow[]>>;
     readonly search: (
@@ -336,19 +338,25 @@ export function toMemoryGraph(
   // An empty memory stays empty, so the page shows its empty state.
   if (documents.length === 0) return { documents, totals };
 
-  // The record's website research is its profile, so it is the core: the record's name at the
-  // centre, its own facts around it, and every other source linked to it. It still opens.
-  const research = documents.find(
-    (document) => document.id === RESEARCH_SOURCE && document.memories.length > 0,
-  );
+  // Research is the core even while its facts are being extracted. Contacts and deals may
+  // only have notes or remembered facts: use their oldest source until research arrives.
+  const research = documents.find((document) => document.id === RESEARCH_SOURCE);
 
-  if (research) {
-    const core = { ...research, title: subject.title, documentType: subject.kind };
+  const coreSource =
+    research ??
+    (subject.kind === "contact" || subject.kind === "deal"
+      ? documents.toSorted(
+          (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+        )[0]
+      : undefined);
+
+  if (coreSource) {
+    const core = { ...coreSource, title: subject.title, documentType: subject.kind };
 
     return {
       documents: linkToCore(
         core,
-        documents.filter((document) => document !== research),
+        documents.filter((document) => document !== coreSource),
       ),
       totals,
     };
@@ -993,6 +1001,18 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
     },
 
     agent: {
+      knowledge: (caller, input) =>
+        agentCall(caller, async () => {
+          const subject = await agentTarget(caller, input);
+
+          if (!subject) return noRecord;
+
+          return {
+            ok: true,
+            value: await Effect.runPromise(knowledge(namespace(caller.workspaceId, subject))),
+          };
+        }),
+
       recall: (caller, query) =>
         agentCall(caller, async (memory) => {
           const [workspace, companies] = await Promise.all([

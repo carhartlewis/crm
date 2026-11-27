@@ -435,6 +435,63 @@ describe("the memory graph", () => {
     );
   });
 
+  test.each(["contact", "deal"] as const)(
+    "%s uses a stable saved source as its core until research arrives",
+    (kind) => {
+      const oldest = { ...graphSource("oldest", []), createdAt: "2026-11-01T00:00:00Z" };
+      const note = graphSource("note", [graphFact("f1")]);
+      const subject = { kind, title: "Acme record" };
+
+      const graph = toMemoryGraph("ns", [note, oldest], subject);
+
+      expect(graph.documents.map((document) => document.id)).toEqual(["oldest", "note"]);
+      expect(graph.documents[0]).toMatchObject({ title: subject.title, documentType: kind });
+      expect(graph.documents[1]?.memories[0]?.memoryRelations).toEqual({ oldest: "derives" });
+      expect(graph.totals).toEqual({ sources: 2, facts: 1 });
+      expect(toMemoryGraph("ns", [oldest, note], subject)).toEqual(graph);
+      expect(toMemoryGraph("ns", [], subject)).toEqual({
+        documents: [],
+        totals: { sources: 0, facts: 0 },
+      });
+
+      const researched = toMemoryGraph(
+        "ns",
+        [note, oldest, graphSource("website-research", [])],
+        subject,
+      );
+
+      expect(researched.documents.map((document) => document.id)).toEqual([
+        "website-research",
+        "note",
+        "oldest",
+      ]);
+      expect(researched.documents[1]?.memories[0]?.memoryRelations).toEqual({
+        "website-research": "derives",
+        oldest: "extends",
+      });
+      expect(researched.totals).toEqual({ sources: 3, facts: 1 });
+    },
+  );
+
+  test.each(["workspace", "company", "contact", "deal"] as const)(
+    "%s research is the only core before any facts have been extracted",
+    (kind) => {
+      const graph = toMemoryGraph("ns", [graphSource("website-research", [])], {
+        kind,
+        title: "Acme record",
+      });
+
+      expect(graph.documents).toHaveLength(1);
+      expect(graph.documents[0]).toMatchObject({
+        id: "website-research",
+        title: "Acme record",
+        documentType: kind,
+        memories: [],
+      });
+      expect(graph.totals).toEqual({ sources: 1, facts: 0 });
+    },
+  );
+
   test("is refused for a company outside the workspace", async () => {
     const { memory } = setup();
 
@@ -472,6 +529,39 @@ describe("a source", () => {
 });
 
 describe("contact and deal memory", () => {
+  test.each([{ contactId: CONTACT }, { dealId: DEAL }])(
+    "the agent reads saved record knowledge without needing a matching query: %j",
+    async (target) => {
+      const { memory } = setup();
+
+      await Effect.runPromise(memory.addNote(alice, { ...target, text: "Prefers email." }));
+      await Effect.runPromise(memory.addNote(alice, { text: "Workspace-only fact." }));
+
+      const result = await memory.agent.knowledge({ userId: "alice", workspaceId: "ws1" }, target);
+
+      expect(result.ok).toBe(true);
+
+      if (!result.ok) throw new Error(result.message);
+
+      expect(result.value.facts.map((fact) => fact.text)).toEqual(["Prefers email."]);
+      expect(result.value.sources).toHaveLength(1);
+      expect(
+        await memory.agent.knowledge({ userId: "mallory", workspaceId: "ws2" }, target),
+      ).toMatchObject({ ok: false, status: 404 });
+      expect(
+        await memory.agent.knowledge({ userId: "mallory", workspaceId: "ws1" }, target),
+      ).toMatchObject({ ok: false, status: 403 });
+    },
+  );
+
+  test("an unavailable memory is reported to the agent, not returned as empty knowledge", async () => {
+    const { memory } = setup({ store: false });
+
+    expect(
+      await memory.agent.knowledge({ userId: "alice", workspaceId: "ws1" }, { contactId: CONTACT }),
+    ).toMatchObject({ ok: false, status: 502 });
+  });
+
   test("a note on a contact or a deal stays in that record's own memory", async () => {
     const { memory, store } = setup();
 
@@ -492,18 +582,27 @@ describe("contact and deal memory", () => {
     );
   });
 
-  test("the graph's core is the record", async () => {
+  test.each([
+    { target: { contactId: CONTACT }, kind: "contact", title: "Wile Coyote" },
+    { target: { dealId: DEAL }, kind: "deal", title: "Acme rockets" },
+  ])("a $kind's first note is an openable core source", async ({ target, kind, title }) => {
     const { memory } = setup();
 
-    await Effect.runPromise(memory.addNote(alice, { dealId: DEAL, text: "Budget is 40k." }));
+    await Effect.runPromise(memory.addNote(alice, { ...target, text: "Budget is 40k." }));
 
-    const graph = await Effect.runPromise(memory.graph(alice, { dealId: DEAL }));
+    const graph = await Effect.runPromise(memory.graph(alice, target));
 
+    expect(graph.documents).toHaveLength(1);
     expect(graph.documents[0]).toMatchObject({
-      id: MEMORY_CORE_ID,
-      title: "Acme rockets",
-      documentType: "deal",
+      title,
+      documentType: kind,
     });
+    expect(graph.documents[0]?.memories.map((fact) => fact.memory)).toEqual(["Budget is 40k."]);
+    expect(
+      await Effect.runPromise(
+        memory.source(alice, { ...target, id: graph.documents[0]?.id ?? "" }),
+      ),
+    ).toMatchObject({ kind: "member_note", content: "Budget is 40k." });
   });
 
   test("an unknown record, or more than one record, is refused", async () => {

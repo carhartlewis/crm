@@ -15,11 +15,14 @@ comp-neo's core is the workspace's own profile source, so it holds facts and sit
 ## Decision
 
 - **The website research is the core.** When the workspace (or company) has a
-  `website-research` source with facts, `GET /api/memory/graph` draws it as the core: the
+  `website-research` source, `GET /api/memory/graph` draws it as the core, including while its
+  facts are still being extracted: the
   record's name and kind, its own facts around it, and every other source's first current fact
   linked to it (`derives`). A source with no facts yet hangs off the core's first fact
   (`extends`). The core opens as that source; its sheet shows the source's own title and kind.
-- **Until research lands**, or for a record with no website, the drawn core of 0021 stays.
+- **Until research lands**, or for a workspace or company with no website, the drawn core of
+  0021 stays. Contacts and deals use their oldest saved source as the core until research
+  arrives (0029).
 
 ## Consequences
 

@@ -110,7 +110,10 @@ export interface CrmToolDeps {
   readonly directory: CrmDirectory;
   readonly companies: CompaniesService;
   readonly records: RecordsService;
-  readonly memory: Pick<MemoryService["agent"], "search" | "remember" | "forget" | "research">;
+  readonly memory: Pick<
+    MemoryService["agent"],
+    "knowledge" | "search" | "remember" | "forget" | "research"
+  >;
   /** context.dev, when the API has a key; without it the web tools aren't listed. */
   readonly web: WebReader | null;
   /** Jev, to file a fact under the company it is about; without it facts the agent gives no
@@ -394,14 +397,20 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
     tool(
       {
         name: "get_contact",
-        description: "One contact: name, title, email, phone, company and owner.",
+        description:
+          "One contact: name, title, email, phone, company, owner and saved memory (profile, facts and source status). Read this before answering who someone is or what we know about them. A memory error means unavailable, not empty.",
         readOnly: true,
         input: Schema.Struct({ id: ContactId }),
       },
       async (input) => {
         const contact = await deps.directory.contact(caller.workspaceId, input.id);
 
-        return contact ? answer(contact) : refuse("No contact with that id in this workspace.");
+        if (!contact) return refuse("No contact with that id in this workspace.");
+
+        return answer({
+          ...contact,
+          memory: await deps.memory.knowledge(caller, { contactId: contact.id }),
+        });
       },
     ),
     tool(
@@ -487,14 +496,19 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "get_deal",
         description:
-          "One deal: stage, amount, currency, close date, company, owner and description.",
+          "One deal: stage, amount, currency, close date, company, owner, description and saved memory (profile, facts and source status). Read this before answering what we know about a deal. A memory error means unavailable, not empty.",
         readOnly: true,
         input: Schema.Struct({ id: DealId }),
       },
       async (input) => {
         const deal = await deps.directory.deal(caller.workspaceId, input.id);
 
-        return deal ? answer(deal) : refuse("No deal with that id in this workspace.");
+        if (!deal) return refuse("No deal with that id in this workspace.");
+
+        return answer({
+          ...deal,
+          memory: await deps.memory.knowledge(caller, { dealId: deal.id }),
+        });
       },
     ),
     tool(
@@ -596,7 +610,7 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "search_memory",
         description:
-          "Search what the CRM remembers: website research, members' notes, past chats and sent emails. Search one company, person or deal, or the workspace's own company.",
+          "Search what the CRM remembers: research, members' notes, past chats and sent emails. Pass contactId, dealId or companyId to search that record. Without an id this searches only workspace memory, not all records; a name in the query does not choose a record. No matches does not mean the record has no facts: get_contact and get_deal include saved knowledge without a relevance filter.",
         readOnly: true,
         input: Schema.Struct({ query: Schema.String, ...MemoryTarget }),
       },

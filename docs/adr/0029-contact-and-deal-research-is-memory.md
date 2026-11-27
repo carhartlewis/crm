@@ -32,6 +32,18 @@ memory is lost to both.
   change, with a new source kind `research` ("Research" in the graph). Facts read from it are
   static, as website research's are. Companies and the workspace keep website research;
   `Memory.agent.research` refuses them.
+- **The core always opens a saved source.** Research becomes the core as soon as the source
+  exists, even before facts are extracted. Without research, a contact or deal uses its oldest
+  saved source (creation time, then source id to break ties). Later sources link to it; when
+  research arrives it takes over as the core, keeping the earlier sources and their facts.
+  An empty record still shows the empty state. No extra `memory-core` placeholder is drawn for
+  contacts or deals, and selecting the core opens the original source.
+- **Record reads include memory.** `crm__get_contact` and `crm__get_deal` return the record's
+  saved profile, facts and source status alongside its fields, using the same bounded knowledge
+  read as the UI. This does not depend on semantic search matching the person's or deal's name.
+  Memory failures are explicit in the result; they never mean the record has no knowledge.
+  `crm__search_memory` remains scoped to the supplied record id, or only the workspace when
+  none is supplied.
 - **No research cap.** 0025 let each workspace start 30 runs per 10 minutes. The number had no
   basis and silently left records unresearched, so it is gone: every created record, every sweep
   retry and every "Fill the rest" starts its session. The sweep still starts its retries one at a
