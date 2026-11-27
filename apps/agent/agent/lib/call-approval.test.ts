@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decideCall } from "./call-approval.ts";
+import { decideCall, PLAN_REASON } from "./call-approval.ts";
 
 function decide(
   toolName: string,
@@ -40,6 +40,15 @@ describe("call approval", () => {
       type: "approved",
       reason: "risky",
     });
+  });
+
+  test("Plan runs reads and refuses every change with a reason the model acts on", () => {
+    expect(decide("crm__list_companies", { readOnlyHint: true }, "plan")).toBe("not-applicable");
+    expect(decide("crm__create_company", create, "plan")).toEqual({
+      type: "denied",
+      reason: PLAN_REASON,
+    });
+    expect(decide("crm__forget", forget, "plan")).toMatchObject({ type: "denied" });
   });
 
   test("an unknown mode is Manual, and a caller who isn't a CRM user is refused", () => {

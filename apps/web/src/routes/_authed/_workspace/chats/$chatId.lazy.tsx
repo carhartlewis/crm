@@ -102,7 +102,8 @@ function ChatPage() {
         onPermissionModeChange={(mode) => {
           // The mode picked last is also where the next new chat starts.
           rememberPermissionMode(userId, mode);
-          rename.mutate({ workspaceId, id: chatId, permissionMode: mode });
+
+          return rename.mutateAsync({ workspaceId, id: chatId, permissionMode: mode });
         }}
         history={history}
         firstMessage={peekFirstMessage(chatId)?.text}

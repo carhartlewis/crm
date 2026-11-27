@@ -268,7 +268,8 @@ export function folderNameError(value: string) {
  * before every change, `auto` asks only before risky calls, `bypass` runs everything and marks
  * risky calls. Reads always run.
  */
-export const PERMISSION_MODES = ["manual", "auto", "bypass"] as const;
+/** `plan` reads and proposes a plan; it changes nothing until the person runs the plan. */
+export const PERMISSION_MODES = ["plan", "manual", "auto", "bypass"] as const;
 
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 
@@ -312,11 +313,16 @@ export function callKind(toolName: string, hints: CallHints | undefined): CallKi
   return "risky";
 }
 
-/** What happens to a call: it runs, it waits for the person, or it runs marked as risky. */
-export type CallDecision = "run" | "ask" | "run_flagged";
+/**
+ * What happens to a call: it runs, it waits for the person, it runs marked as risky, or (in
+ * Plan) it is refused, so the agent puts it in the plan instead.
+ */
+export type CallDecision = "run" | "ask" | "run_flagged" | "refuse";
 
 export function callDecision(mode: PermissionMode, kind: CallKind): CallDecision {
   if (kind === "read") return "run";
+
+  if (mode === "plan") return "refuse";
 
   if (kind === "risky") return mode === "bypass" ? "run_flagged" : "ask";
 

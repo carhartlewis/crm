@@ -6,6 +6,7 @@ export const PERMISSION_MODE_OPTIONS: readonly {
   readonly label: string;
   readonly description: string;
 }[] = [
+  { value: "plan", label: "Plan", description: "Research and propose a plan; change nothing" },
   { value: "manual", label: "Manual", description: "Always ask before making changes" },
   { value: "auto", label: "Auto", description: "Ask only before risky actions" },
   {
@@ -32,7 +33,13 @@ export function lastPermissionMode(userId: string): PermissionMode {
   }
 }
 
+/** The mode a plan runs in, and the mode a new chat starts in instead of Plan. */
+export const RUN_PLAN_MODE: PermissionMode = "auto";
+
 export function rememberPermissionMode(userId: string, mode: PermissionMode) {
+  // Plan is for one task at a time: the next new chat starts ready to work.
+  if (mode === "plan") return;
+
   try {
     localStorage.setItem(storageKey(userId), mode);
   } catch {

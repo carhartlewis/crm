@@ -23,7 +23,7 @@ export interface PermissionModeMenuProps {
 
 /**
  * How much the agent may do without asking (ADR 0019), beside Send as in comp-neo. The trigger
- * names the mode; the menu lists each with what it does. Pressing 1–3 while it is open picks one.
+ * names the mode; the menu lists each with what it does. Pressing 1–4 while it is open picks one.
  * Picking closes the menu and puts the caret back in the composer it sits in: the next thing
  * is typing.
  */

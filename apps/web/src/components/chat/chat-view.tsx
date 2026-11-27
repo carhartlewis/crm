@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { branchOf, chatKeys, followUpMode, takeFirstMessage } from "../../lib/chat-api.ts";
 import { type ImageAttachment, messageContent } from "../../lib/attachments.ts";
 import { askToNotify, chatNotice, newQuestion, notifyChat } from "../../lib/chat-notify.ts";
+import { RUN_PLAN_MODE } from "../../lib/permission-mode.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { ReplyResponse } from "./reply-islands.tsx";
 import { Composer } from "./composer.tsx";
@@ -117,7 +118,7 @@ export interface ChatViewProps {
   readonly title: string;
   /** The chat's permission mode, and how to change it (ADR 0019). */
   readonly permissionMode: string;
-  readonly onPermissionModeChange: (mode: PermissionMode) => void;
+  readonly onPermissionModeChange: (mode: PermissionMode) => Promise<void>;
   readonly history: ChatHistory;
   /** Typed on New chat: sent once, as soon as the view mounts. */
   readonly firstMessage?: string;
@@ -279,6 +280,22 @@ export function ChatView({
   const [question] = pending;
   const questionNumber = questions.length - pending.length + 1;
 
+  // In Plan, a finished reply ends with the plan; running it switches the chat to Auto first, so
+  // the API forwards the new mode with the message that starts the work.
+  const runPlan = useMutation({
+    mutationFn: async () => {
+      await onPermissionModeChange(RUN_PLAN_MODE);
+      await send.mutateAsync({ text: "Run the plan." });
+    },
+  });
+
+  const planReady =
+    permissionMode === "plan" &&
+    !working &&
+    agent.messages.at(-1)?.role === "assistant" &&
+    lastReply !== undefined &&
+    messageText(lastReply) !== "";
+
   // Every call waiting on the person, in one card: approving ten is one click (as in comp-neo).
   const waiting = waitingApprovals(agent.messages);
 
@@ -323,6 +340,13 @@ export function ChatView({
         <ConversationScrollButton />
       </Conversation>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 pb-4">
+        {planReady && !question && (
+          <div className="flex justify-end">
+            <Button size="sm" loading={runPlan.isPending} onClick={() => runPlan.mutate()}>
+              Run plan
+            </Button>
+          </div>
+        )}
         {question && (
           <QuestionPrompt
             key={question.interactionId}
@@ -357,7 +381,12 @@ export function ChatView({
           disabled={agent.status === "resuming"}
           onSend={(text, images) => send.mutate({ text, images })}
           onStop={() => stop.mutate()}
-          tools={<PermissionModeMenu value={permissionMode} onChange={onPermissionModeChange} />}
+          tools={
+            <PermissionModeMenu
+              value={permissionMode}
+              onChange={(mode) => void onPermissionModeChange(mode).catch(() => undefined)}
+            />
+          }
         />
       </div>
     </div>

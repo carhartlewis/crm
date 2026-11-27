@@ -6,6 +6,10 @@ import { crmCaller } from "./crm-caller.ts";
 /** The reason on a risky call that ran without asking, in Bypass permissions. */
 export const RISKY_REASON = "risky";
 
+/** Why a change is refused in Plan mode: the model reads it and adds the step to its plan. */
+export const PLAN_REASON =
+  "The chat is in Plan mode, so nothing may change yet. Add this step to your plan instead; it runs when the person runs the plan.";
+
 /** The bare tool name of eve's qualified `<connection>__<tool>`. */
 export function bareToolName(connection: string, toolName: string) {
   const prefix = `${connection}__`;
@@ -44,6 +48,8 @@ export function decideCall(
   if (decision === "run") return "not-applicable";
 
   if (decision === "ask") return "user-approval";
+
+  if (decision === "refuse") return { type: "denied", reason: PLAN_REASON };
 
   return { type: "approved", reason: RISKY_REASON };
 }

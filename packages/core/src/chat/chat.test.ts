@@ -93,7 +93,7 @@ describe("sidebar layout", () => {
 
 describe("permission modes", () => {
   test("reads run in every mode", () => {
-    for (const mode of ["manual", "auto", "bypass"] as const) {
+    for (const mode of ["plan", "manual", "auto", "bypass"] as const) {
       expect(callDecision(mode, callKind("list_companies", { readOnlyHint: true }))).toBe("run");
     }
   });
@@ -105,6 +105,11 @@ describe("permission modes", () => {
     expect(callDecision("manual", kind)).toBe("ask");
     expect(callDecision("auto", kind)).toBe("run");
     expect(callDecision("bypass", kind)).toBe("run");
+  });
+
+  test("Plan refuses every change, so the agent proposes it instead", () => {
+    expect(callDecision("plan", "change")).toBe("refuse");
+    expect(callDecision("plan", "risky")).toBe("refuse");
   });
 
   test("a risky call asks unless the chat bypasses, where it runs marked", () => {

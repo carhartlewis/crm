@@ -298,7 +298,7 @@ const callerIn = (
 
 const notMember = () => new Forbidden({ message: "Join the space first" });
 
-const badMode = () => new Invalid({ message: "Choose Manual, Auto or Bypass permissions" });
+const badMode = () => new Invalid({ message: "Choose Plan, Manual, Auto or Bypass permissions" });
 
 /** The chats use cases over an injected store, agent and KV (Redis in production). */
 export function makeChats(

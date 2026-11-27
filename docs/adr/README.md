@@ -25,3 +25,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0019](0019-chat-permission-modes.md)              | Agent chats have a permission mode: Manual, Auto or Bypass permissions; each tool call is a read, change or risky call               |
 | [0020](0020-space-membership.md)                   | People join and leave spaces; a space's chats are its members'; Spaces is a page with pin and join                                   |
 | [0021](0021-jev-alone-decides-chat-memory.md)      | Jev alone decides what a chat adds, and chats are not saved; the memory graph links every source to one core                         |
+| [0022](0022-plan-mode.md)                          | Plan mode: the agent reads and proposes a plan, changes nothing; Run plan switches the chat to Auto                                  |
