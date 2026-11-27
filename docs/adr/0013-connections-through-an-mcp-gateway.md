@@ -30,3 +30,10 @@ Users connect their own apps (Granola, Superhuman, and more later) so the agent 
 - **skills.sh is the catalog.** `@crm/integrations/skills-sh` searches it and fetches a skill's package. The API stores a pinned copy (SKILL.md body plus its other text files, at most 1 MB and 200 files, paths kept inside the skill folder). Updates on skills.sh do not change the copy.
 - **A new skill starts disabled.** Someone reads it in the CRM, then enables it. A skill is third-party text that steers the agent, so nobody turns one on without seeing it.
 - **The agent loads enabled skills each turn** (`agent/skills/workspace.ts`, eve `defineDynamic`) from `GET /api/agent/skills`, with the same better-auth MCP token as the gateway. Skills appear after the user has signed the agent in to the CRM once.
+
+## Addendum: custom connectors (2026-11)
+
+- **A workspace can add any remote MCP server by URL** (table `custom_connector`). Any member can add or remove one; each person still connects on their own. It joins the catalog for that workspace, so OAuth, the gateway and the read/write policy treat it like a built-in app.
+- **The server must offer MCP OAuth.** The API checks for RFC 9728 metadata and an authorization server before it saves the connector.
+- **Requests to app servers reach public addresses only.** URLs must be https on a public hostname, and every request resolves the host first and refuses loopback, private, link-local and other non-public addresses; redirects are not followed. A short DNS-rebinding window remains.
+- **Removing a custom connector removes everyone's connection to it.**

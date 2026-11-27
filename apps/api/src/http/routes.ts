@@ -67,6 +67,13 @@ const ConnectionsHandlers = HttpApiBuilder.group(CrmApi, "connections", (handler
     return handlers
       .handle("list", () => Effect.flatMap(actor, connections.list))
       .handle("logos", () => Effect.flatMap(actor, connections.logos))
+      .handle("catalog", () => Effect.flatMap(actor, connections.catalog))
+      .handle("addCustom", ({ payload }) =>
+        Effect.flatMap(actor, (who) => connections.addCustom(who, payload)),
+      )
+      .handle("removeCustom", ({ params }) =>
+        Effect.flatMap(actor, (who) => connections.removeCustom(who, params.id)),
+      )
       .handle("authorize", ({ params, payload }) =>
         Effect.flatMap(actor, (who) =>
           connections.authorize(who, params.integration, payload.access),

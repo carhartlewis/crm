@@ -18,7 +18,7 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'c05e9d2feb8084e9753562aa965efc96db2fef284064a54bbc9efecb8de0177d'>;
+  StorageHashBase<'235cb9f74bdb9ea4a51e2bcdcc9fb60b42e4a79fcb1aca5da591f9f12c7c874f'>;
 export type ExecutionHash =
   ExecutionHashBase<'bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f'>;
 export type ProfileHash =
@@ -346,6 +346,18 @@ export namespace Models {
     workspace: public_Workspace;
     readonly [RelationKeys]?: 'user' | 'workspace';
   };
+  export type public_CustomConnector = {
+    addedById: FieldOutputTypes['public']['CustomConnector']['addedById'];
+    createdAt: FieldOutputTypes['public']['CustomConnector']['createdAt'];
+    id: FieldOutputTypes['public']['CustomConnector']['id'];
+    key: FieldOutputTypes['public']['CustomConnector']['key'];
+    mcpUrl: FieldOutputTypes['public']['CustomConnector']['mcpUrl'];
+    name: FieldOutputTypes['public']['CustomConnector']['name'];
+    workspaceId: FieldOutputTypes['public']['CustomConnector']['workspaceId'];
+    addedBy: public_User | null;
+    workspace: public_Workspace;
+    readonly [RelationKeys]?: 'addedBy' | 'workspace';
+  };
   export type public_Invitation = {
     createdAt: FieldOutputTypes['public']['Invitation']['createdAt'];
     email: FieldOutputTypes['public']['Invitation']['email'];
@@ -560,6 +572,7 @@ export namespace Models {
     updatedAt: FieldOutputTypes['public']['User']['updatedAt'];
     accounts: public_Account[];
     connections: public_Connection[];
+    customConnectors: public_CustomConnector[];
     invitations: public_Invitation[];
     memberships: public_Member[];
     oauthAccessTokens: public_OauthAccessToken[];
@@ -571,6 +584,7 @@ export namespace Models {
     readonly [RelationKeys]?:
       | 'accounts'
       | 'connections'
+      | 'customConnectors'
       | 'invitations'
       | 'memberships'
       | 'oauthAccessTokens'
@@ -598,10 +612,12 @@ export namespace Models {
     slug: FieldOutputTypes['public']['Workspace']['slug'];
     website: FieldOutputTypes['public']['Workspace']['website'];
     connections: public_Connection[];
+    customConnectors: public_CustomConnector[];
     invitations: public_Invitation[];
     members: public_Member[];
     skills: public_Skill[];
-    readonly [RelationKeys]?: 'connections' | 'invitations' | 'members' | 'skills';
+    readonly [RelationKeys]?:
+      'connections' | 'customConnectors' | 'invitations' | 'members' | 'skills';
   };
 }
 
@@ -610,6 +626,7 @@ export declare const models: {
     Account: Models.public_Account;
     Company: Models.public_Company;
     Connection: Models.public_Connection;
+    CustomConnector: Models.public_CustomConnector;
     Invitation: Models.public_Invitation;
     Jwks: Models.public_Jwks;
     Member: Models.public_Member;
@@ -937,6 +954,95 @@ type ContractBase = Omit<
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'connection';
                     readonly columns: readonly ['user_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'user';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly custom_connector: {
+              columns: {
+                readonly added_by_id: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
+                readonly created_at: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly id: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly key: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly mcp_url: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly name: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly workspace_id: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['workspace_id', 'key'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'custom_connector_added_by_id_idx_3003bad1';
+                  readonly prefix: 'custom_connector_added_by_id_idx';
+                  readonly columns: readonly ['added_by_id'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'custom_connector_workspace_id_idx_90a9f461';
+                  readonly prefix: 'custom_connector_workspace_id_idx';
+                  readonly columns: readonly ['workspace_id'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'custom_connector';
+                    readonly columns: readonly ['workspace_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'workspace';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'custom_connector';
+                    readonly columns: readonly ['added_by_id'];
                   };
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
@@ -2475,6 +2581,10 @@ type ContractBase = Omit<
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'Connection';
     };
+    readonly custom_connector: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'CustomConnector';
+    };
     readonly invitation: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'Invitation';
@@ -2777,6 +2887,78 @@ type ContractBase = Omit<
                 readonly integration: { readonly column: 'integration' };
                 readonly updatedAt: { readonly column: 'updated_at' };
                 readonly userId: { readonly column: 'user_id' };
+                readonly workspaceId: { readonly column: 'workspace_id' };
+              };
+            };
+          };
+          readonly CustomConnector: {
+            readonly fields: {
+              readonly addedById: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly typeParams: { readonly precision: 3 };
+                };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly key: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly mcpUrl: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly workspaceId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly addedBy: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['addedById'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly workspace: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Workspace';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['workspaceId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'custom_connector';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly addedById: { readonly column: 'added_by_id' };
+                readonly createdAt: { readonly column: 'created_at' };
+                readonly id: { readonly column: 'id' };
+                readonly key: { readonly column: 'key' };
+                readonly mcpUrl: { readonly column: 'mcp_url' };
+                readonly name: { readonly column: 'name' };
                 readonly workspaceId: { readonly column: 'workspace_id' };
               };
             };
@@ -4094,6 +4276,17 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
+              readonly customConnectors: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'CustomConnector';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['addedById'];
+                };
+              };
               readonly invitations: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -4290,6 +4483,17 @@ type ContractBase = Omit<
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
                   readonly model: 'Connection';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['workspaceId'];
+                };
+              };
+              readonly customConnectors: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'CustomConnector';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {

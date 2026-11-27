@@ -1,9 +1,19 @@
-import { type Connection, NoActiveWorkspace, NotFound, UpstreamUnavailable } from "@crm/core/api";
+import {
+  type CatalogEntry,
+  type Connection,
+  Invalid,
+  NoActiveWorkspace,
+  NotFound,
+  UpstreamUnavailable,
+} from "@crm/core/api";
 import type { Db } from "@crm/core/db";
 import type { Kv as KvStore } from "@crm/core/kv";
 import {
   type Access,
-  integrationById,
+  connectorKey,
+  connectorNameError,
+  connectorUrlError,
+  customIntegration,
   integrations,
   isAccess,
   type Integration,
@@ -15,8 +25,10 @@ import {
   connectionAuth,
   type Credentials,
   type OAuthClientConfig,
+  offersMcpOAuth,
   startAuthorization,
 } from "@crm/integrations/oauth";
+import { publicFetch } from "@crm/integrations/public-fetch";
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { AppConfig } from "../config.ts";
@@ -62,6 +74,18 @@ export interface ConnectionStore {
   ): Promise<ConnectionRecord | null>;
   setCredentials(id: string, credentials: string, now: Date): Promise<void>;
   remove(owner: Owner, integration: string): Promise<boolean>;
+  /** The workspace's custom connectors. */
+  customConnectors(workspaceId: string): Promise<readonly CustomConnectorRecord[]>;
+  /** False when the workspace already has a connector with this key. */
+  addCustom(owner: Owner, connector: CustomConnectorRecord, now: Date): Promise<boolean>;
+  /** Removes the connector and every connection to it in the workspace. */
+  removeCustom(workspaceId: string, key: string): Promise<boolean>;
+}
+
+export interface CustomConnectorRecord {
+  readonly key: string;
+  readonly name: string;
+  readonly mcpUrl: string;
 }
 
 /** Encrypts credentials at rest. */
@@ -84,6 +108,15 @@ export interface CallbackParams {
 
 export interface ConnectionsService {
   readonly list: (actor: Actor) => Effect.Effect<readonly Connection[], NoActiveWorkspace>;
+  readonly catalog: (actor: Actor) => Effect.Effect<readonly CatalogEntry[], NoActiveWorkspace>;
+  readonly addCustom: (
+    actor: Actor,
+    input: { name: string; url: string },
+  ) => Effect.Effect<CatalogEntry, NoActiveWorkspace | Invalid | UpstreamUnavailable>;
+  readonly removeCustom: (
+    actor: Actor,
+    id: string,
+  ) => Effect.Effect<void, NoActiveWorkspace | NotFound>;
   /** Each catalog app's stored logo, by app id; null when there is none. */
   readonly logos: (
     actor: Actor,
@@ -124,6 +157,8 @@ export interface ConnectionsDependencies {
   readonly page: URL;
   readonly now: () => Date;
   readonly state: () => string;
+  /** Whether a URL is an MCP server with MCP OAuth (`offersMcpOAuth`). */
+  readonly checkServer: (mcpUrl: string) => Promise<boolean>;
   /** Copies a domain's logo into our storage (`ImageCache.logo`). */
   readonly logo: (website: string) => Promise<string | null>;
 }
@@ -171,11 +206,15 @@ const run = <A>(label: string, fn: () => Promise<A>) =>
     Effect.orDie,
   );
 
-function findIntegration(id: string) {
-  return Option.match(Option.fromNullishOr(integrationById(id)), {
-    onNone: () => Effect.fail(unknownIntegration()),
-    onSome: Effect.succeed,
-  });
+function toEntry(app: Integration): CatalogEntry {
+  return {
+    id: app.id,
+    name: app.name,
+    vendor: app.vendor,
+    domain: app.domain,
+    summary: app.summary,
+    custom: !integrations.some((builtIn) => builtIn.id === app.id),
+  };
 }
 
 function toConnection(record: ConnectionRecord): Connection {
@@ -189,6 +228,24 @@ function toConnection(record: ConnectionRecord): Connection {
 
 export function makeConnections(deps: ConnectionsDependencies): ConnectionsService {
   const { store, kv, cipher } = deps;
+
+  /** The built-in apps plus this workspace's custom connectors. */
+  const catalogFor = async (workspaceId: string): Promise<readonly Integration[]> => [
+    ...integrations,
+    ...(await store.customConnectors(workspaceId)).map(customIntegration),
+  ];
+
+  const findIntegration = Effect.fn("Connections.findIntegration")(function* (
+    workspaceId: string,
+    id: string,
+  ) {
+    const apps = yield* run("catalog", () => catalogFor(workspaceId));
+    const app = apps.find((entry) => entry.id === id);
+
+    if (!app) return yield* unknownIntegration();
+
+    return app;
+  });
 
   const owner = Effect.fn("Connections.owner")(function* (actor: Actor) {
     const workspaceId = actor.activeWorkspaceId;
@@ -249,17 +306,66 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
 
     list: Effect.fn("Connections.list")(function* (actor) {
       const scope = yield* owner(actor);
-      const rows = yield* run("list", () => store.list(scope));
 
-      return rows.filter((row) => integrationById(row.integration)).map(toConnection);
+      const [rows, apps] = yield* Effect.all([
+        run("list", () => store.list(scope)),
+        run("catalog", () => catalogFor(scope.workspaceId)),
+      ]);
+
+      const known = new Set(apps.map((app) => app.id));
+
+      return rows.filter((row) => known.has(row.integration)).map(toConnection);
+    }),
+
+    catalog: Effect.fn("Connections.catalog")(function* (actor) {
+      const scope = yield* owner(actor);
+
+      return (yield* run("catalog", () => catalogFor(scope.workspaceId))).map(toEntry);
+    }),
+
+    addCustom: Effect.fn("Connections.addCustom")(function* (actor, input) {
+      const scope = yield* owner(actor);
+      const error = connectorNameError(input.name) ?? connectorUrlError(input.url);
+
+      if (error) return yield* new Invalid({ message: error });
+
+      const connector = {
+        key: connectorKey(input.name),
+        name: input.name.trim(),
+        mcpUrl: new URL(input.url.trim()).href,
+      };
+
+      const ok = yield* Effect.promise(() => deps.checkServer(connector.mcpUrl));
+
+      if (!ok) {
+        return yield* new UpstreamUnavailable({
+          message: "That URL isn't an MCP server with sign-in (MCP OAuth). Check the URL.",
+        });
+      }
+
+      const added = yield* run("add custom", () => store.addCustom(scope, connector, deps.now()));
+
+      if (!added) {
+        return yield* new Invalid({ message: "There is already a connector with this name" });
+      }
+
+      return toEntry(customIntegration(connector));
+    }),
+
+    removeCustom: Effect.fn("Connections.removeCustom")(function* (actor, id) {
+      const scope = yield* owner(actor);
+      const removed = yield* run("remove custom", () => store.removeCustom(scope.workspaceId, id));
+
+      if (!removed) return yield* new NotFound({ message: "No such connector" });
     }),
 
     logos: Effect.fn("Connections.logos")(function* (actor) {
-      yield* owner(actor);
+      const scope = yield* owner(actor);
+      const apps = yield* run("catalog", () => catalogFor(scope.workspaceId));
 
       const entries = yield* run("logos", () =>
         Promise.all(
-          integrations.map(async (app): Promise<[string, string | null]> => {
+          apps.map(async (app): Promise<[string, string | null]> => {
             const cached = await kv.get(logoKey(app.domain));
 
             if (cached !== null) return [app.id, cached === "" ? null : cached];
@@ -282,7 +388,7 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
 
     authorize: Effect.fn("Connections.authorize")(function* (actor, id, access) {
       const scope = yield* owner(actor);
-      const app = yield* findIntegration(id);
+      const app = yield* findIntegration(scope.workspaceId, id);
       const state = deps.state();
 
       const pending = yield* Effect.tryPromise({
@@ -316,7 +422,7 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
 
     update: Effect.fn("Connections.update")(function* (actor, id, access) {
       const scope = yield* owner(actor);
-      const app = yield* findIntegration(id);
+      const app = yield* findIntegration(scope.workspaceId, id);
       const row = yield* run("update", () => store.setAccess(scope, app.id, access, deps.now()));
 
       if (!row) return yield* notConnected();
@@ -326,7 +432,7 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
 
     remove: Effect.fn("Connections.remove")(function* (actor, id) {
       const scope = yield* owner(actor);
-      const app = yield* findIntegration(id);
+      const app = yield* findIntegration(scope.workspaceId, id);
       const removed = yield* run("remove", () => store.remove(scope, app.id));
 
       if (!removed) return yield* notConnected();
@@ -344,7 +450,8 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
       // A different signed-in user can't finish someone else's sign-in.
       if (userId !== null && pending.userId !== userId) return page({ error: "wrong_user" });
 
-      const app = integrationById(pending.integration);
+      const apps = yield* run("catalog", () => catalogFor(pending.workspaceId));
+      const app = apps.find((entry) => entry.id === pending.integration);
 
       if (!app) return page({ error: "invalid" });
 
@@ -372,10 +479,10 @@ export function makeConnections(deps: ConnectionsDependencies): ConnectionsServi
     gatewayConnections: async (scope) => {
       if (!(await store.isMember(scope))) return [];
 
-      const rows = await store.list(scope);
+      const [rows, apps] = await Promise.all([store.list(scope), catalogFor(scope.workspaceId)]);
 
       const usable = rows.flatMap((row) => {
-        const app = integrationById(row.integration);
+        const app = apps.find((entry) => entry.id === row.integration);
 
         if (!app || !isAccess(row.access)) return [];
 
@@ -440,6 +547,40 @@ export function prismaConnectionStore(db: Db): ConnectionStore {
     },
     remove: async ({ workspaceId, userId }, integration) =>
       (await connections.where({ workspaceId, userId, integration }).delete()) !== null,
+    customConnectors: async (workspaceId) =>
+      (await db.orm.public.CustomConnector.where({ workspaceId }).all()).map(
+        ({ key, name, mcpUrl }) => ({ key, name, mcpUrl }),
+      ),
+    addCustom: async ({ workspaceId, userId }, connector, now) => {
+      const custom = db.orm.public.CustomConnector;
+
+      if (await custom.where({ workspaceId, key: connector.key }).first()) return false;
+
+      await custom.create({
+        id: crypto.randomUUID(),
+        workspaceId,
+        key: connector.key,
+        name: connector.name,
+        mcpUrl: connector.mcpUrl,
+        addedById: userId,
+        createdAt: now,
+      });
+
+      return true;
+    },
+    removeCustom: async (workspaceId, key) => {
+      const removed = await db.orm.public.CustomConnector.where({ workspaceId, key }).delete();
+
+      if (removed === null) return false;
+
+      // Everyone's connection to it goes too; the agent stops seeing its tools.
+      for (;;) {
+        // oxlint-disable-next-line no-await-in-loop -- one row per member at most.
+        const gone = await connections.where({ workspaceId, integration: key }).delete();
+
+        if (gone === null) return true;
+      }
+    },
   };
 }
 
@@ -455,7 +596,12 @@ export class Connections extends Context.Service<Connections, ConnectionsService
       const images = yield* Images;
       const api = config.authUrl;
 
+      // Every request to an app's servers resolves the host first and refuses non-public
+      // addresses: custom connectors are URLs people type.
+      const oauthFetch = publicFetch();
+
       const oauth: OAuthClientConfig = {
+        fetch: oauthFetch,
         clientName: "CRM",
         clientUri: config.webOrigin.origin,
         redirectUrl: new URL("/api/connections/callback", api).href,
@@ -475,6 +621,7 @@ export class Connections extends Context.Service<Connections, ConnectionsService
         now: () => new Date(),
         state: () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"),
         logo: (website) => images.logo(website),
+        checkServer: (mcpUrl) => offersMcpOAuth(mcpUrl, oauthFetch),
       });
     }),
   ).pipe(Layer.provide([Database.layer, Kv.layer, Images.layer]));

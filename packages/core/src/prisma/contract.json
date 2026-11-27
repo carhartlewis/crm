@@ -16,6 +16,10 @@
       "model": "Connection",
       "namespace": "public"
     },
+    "custom_connector": {
+      "model": "CustomConnector",
+      "namespace": "public"
+    },
     "invitation": {
       "model": "Invitation",
       "namespace": "public"
@@ -499,6 +503,123 @@
               },
               "namespaceId": "public",
               "table": "connection"
+            }
+          },
+          "CustomConnector": {
+            "fields": {
+              "addedById": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "key": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "mcpUrl": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "workspaceId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "addedBy": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "addedById"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "workspace": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "workspaceId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Workspace",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "addedById": {
+                  "column": "added_by_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "key": {
+                  "column": "key"
+                },
+                "mcpUrl": {
+                  "column": "mcp_url"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "workspaceId": {
+                  "column": "workspace_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "custom_connector"
             }
           },
           "Invitation": {
@@ -2647,6 +2768,21 @@
                   "namespace": "public"
                 }
               },
+              "customConnectors": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "addedById"
+                  ]
+                },
+                "to": {
+                  "model": "CustomConnector",
+                  "namespace": "public"
+                }
+              },
               "invitations": {
                 "cardinality": "1:N",
                 "on": {
@@ -2944,6 +3080,21 @@
                 },
                 "to": {
                   "model": "Connection",
+                  "namespace": "public"
+                }
+              },
+              "customConnectors": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "workspaceId"
+                  ]
+                },
+                "to": {
+                  "model": "CustomConnector",
                   "namespace": "public"
                 }
               },
@@ -3395,6 +3546,121 @@
                     "workspace_id",
                     "user_id",
                     "integration"
+                  ]
+                }
+              ]
+            },
+            "custom_connector": {
+              "columns": {
+                "added_by_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "nullable": false,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "key": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "mcp_url": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "workspace_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "index": {
+                    "name": "custom_connector_workspace_id_idx_90a9f461"
+                  },
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "workspace_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "custom_connector"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "workspace"
+                  }
+                },
+                {
+                  "index": {
+                    "name": "custom_connector_added_by_id_idx_3003bad1"
+                  },
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "added_by_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "custom_connector"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "added_by_id"
+                  ],
+                  "name": "custom_connector_added_by_id_idx_3003bad1",
+                  "prefix": "custom_connector_added_by_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "workspace_id"
+                  ],
+                  "name": "custom_connector_workspace_id_idx_90a9f461",
+                  "prefix": "custom_connector_workspace_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "workspace_id",
+                    "key"
                   ]
                 }
               ]
@@ -5143,7 +5409,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "c05e9d2feb8084e9753562aa965efc96db2fef284064a54bbc9efecb8de0177d"
+    "storageHash": "235cb9f74bdb9ea4a51e2bcdcc9fb60b42e4a79fcb1aca5da591f9f12c7c874f"
   },
   "execution": {
     "executionHash": "bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f",

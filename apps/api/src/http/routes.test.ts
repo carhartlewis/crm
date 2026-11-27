@@ -119,6 +119,9 @@ const FakeConnections = Layer.succeed(
       setAccess: async () => null,
       setCredentials: async () => {},
       remove: async () => false,
+      customConnectors: async () => [],
+      addCustom: async () => false,
+      removeCustom: async () => false,
     },
     kv: createMemoryKv(),
     cipher: { seal: async (data) => data, open: async (data) => data },
@@ -127,6 +130,7 @@ const FakeConnections = Layer.succeed(
     now: () => new Date(),
     state: () => "state",
     logo: async () => null,
+    checkServer: async () => false,
   }),
 );
 

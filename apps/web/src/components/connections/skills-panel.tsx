@@ -152,7 +152,7 @@ function SkillRow({ skill, onOpen }: { skill: SkillSummary; onOpen: (id: string)
         >
           <MoreIcon />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => onOpen(skill.id)}>Read</DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => setEnabled.mutate({ id: skill.id, enabled: !skill.enabled })}

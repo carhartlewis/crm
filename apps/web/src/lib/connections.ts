@@ -1,3 +1,4 @@
+import type { CatalogEntry } from "@crm/core/api";
 import type { Access } from "@crm/integrations";
 import { mutationOptions, queryOptions, type QueryClient } from "@tanstack/react-query";
 import { request, send } from "./api-fetch.ts";
@@ -24,6 +25,31 @@ export const connectionLogosQuery = (userId: string, workspaceId: string) =>
     queryFn: () => request<Readonly<Record<string, string | null>>>("/api/connections/logos"),
     staleTime: 60 * 60 * 1000,
   });
+
+/** The apps this workspace can connect: the built-in catalog plus its custom connectors. */
+export const catalogQuery = (userId: string, workspaceId: string) =>
+  queryOptions({
+    queryKey: [...connectionKeys.list(userId, workspaceId), "catalog"] as const,
+    queryFn: () => request<readonly CatalogEntry[]>("/api/connections/catalog"),
+  });
+
+export const addConnectorMutation = mutationOptions({
+  mutationKey: [...connectionKeys.all, "add-custom"],
+  mutationFn: (input: { name: string; url: string }) =>
+    request<CatalogEntry>("/api/connections/custom", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  onSettled: (_data, _error, _variables, _result, { client }) => refresh(client),
+});
+
+export const removeConnectorMutation = mutationOptions({
+  mutationKey: [...connectionKeys.all, "remove-custom"],
+  mutationFn: async (id: string) => {
+    await send(`/api/connections/custom/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+  onSettled: (_data, _error, _variables, _result, { client }) => refresh(client),
+});
 
 export const connectionsQuery = (userId: string, workspaceId: string) =>
   queryOptions({

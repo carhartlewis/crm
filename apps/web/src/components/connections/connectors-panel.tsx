@@ -1,7 +1,8 @@
 import add from "@carbon/icons/es/add/16.js";
 import checkmarkOutline from "@carbon/icons/es/checkmark--outline/16.js";
 import checkmark from "@carbon/icons/es/checkmark/16.js";
-import { type Access, integrations, type Integration } from "@crm/integrations";
+import type { CatalogEntry } from "@crm/core/api";
+import type { Access } from "@crm/integrations";
 import { desktopBridge } from "@crm/core/desktop";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
@@ -25,6 +26,7 @@ import {
   connectionLogosQuery,
   connectMutation,
   disconnectMutation,
+  removeConnectorMutation,
   setAccessMutation,
 } from "../../lib/connections.ts";
 
@@ -42,7 +44,7 @@ const accessHints: Record<Access, string> = {
 const onError = (error: Error) => toast.error(error.message);
 
 /** Lowercased name, summary, vendor and domain, for search. */
-function haystack(integration: Integration) {
+function haystack(integration: CatalogEntry) {
   return [integration.name, integration.summary, integration.vendor, integration.domain]
     .join(" ")
     .toLowerCase();
@@ -53,12 +55,14 @@ function haystack(integration: Integration) {
  * shows every app. `query` filters both as you type.
  */
 export function ConnectorsPanel({
+  catalog,
   connections,
   userId,
   workspaceId,
   view,
   query,
 }: {
+  catalog: readonly CatalogEntry[];
   connections: readonly Connection[];
   userId: string;
   workspaceId: string;
@@ -69,7 +73,7 @@ export function ConnectorsPanel({
   const { data: logos } = useQuery(connectionLogosQuery(userId, workspaceId));
   const needle = query.trim().toLowerCase();
 
-  const shown = integrations.filter(
+  const shown = catalog.filter(
     (integration) =>
       (view === "discover" || byIntegration.has(integration.id)) &&
       haystack(integration).includes(needle),
@@ -117,7 +121,7 @@ function IntegrationCard({
   logo,
   connection,
 }: {
-  integration: Integration;
+  integration: CatalogEntry;
   logo: string | null;
   connection: Connection | undefined;
 }) {
@@ -129,6 +133,25 @@ function IntegrationCard({
     onError,
     onSuccess: () => toast(`${integration.name} is disconnected.`),
   });
+
+  const removeConnector = useMutation({
+    ...removeConnectorMutation,
+    onError,
+    onSuccess: () => toast(`${integration.name} is removed from the workspace.`),
+  });
+
+  // Custom connectors can be removed for the whole workspace, from either menu.
+  const removeItem = integration.custom ? (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        variant="destructive"
+        onClick={() => removeConnector.mutate(integration.id)}
+      >
+        Remove from workspace
+      </DropdownMenuItem>
+    </>
+  ) : null;
 
   // While a change is in flight, show the level being saved.
   const access = setAccess.isPending ? setAccess.variables.access : connection?.access;
@@ -148,7 +171,9 @@ function IntegrationCard({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 className="flex items-center gap-1.5 text-base font-medium">
             {integration.name}
-            <VerifiedIcon aria-label="Verified" className="text-muted-foreground" />
+            {integration.custom ? null : (
+              <VerifiedIcon aria-label="Verified" className="text-muted-foreground" />
+            )}
           </h2>
           <p className="text-muted-foreground">{integration.summary}</p>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
@@ -180,7 +205,7 @@ function IntegrationCard({
             >
               <CheckIcon />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuContent align="end">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Access</DropdownMenuLabel>
                 <DropdownMenuRadioGroup
@@ -204,6 +229,7 @@ function IntegrationCard({
               >
                 Disconnect
               </DropdownMenuItem>
+              {removeItem}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
@@ -216,13 +242,17 @@ function IntegrationCard({
                   variant="secondary"
                   size="icon"
                   aria-label={`Connect ${integration.name}`}
-                  loading={connect.isPending || (connect.isSuccess && !desktopBridge())}
+                  loading={
+                    connect.isPending ||
+                    removeConnector.isPending ||
+                    (connect.isSuccess && !desktopBridge())
+                  }
                 />
               }
             >
               <AddIcon />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuContent align="end">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Connect {integration.name}</DropdownMenuLabel>
                 {(["read", "write"] as const).map((option) => (
@@ -234,6 +264,7 @@ function IntegrationCard({
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuGroup>
+              {removeItem}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

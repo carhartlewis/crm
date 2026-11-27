@@ -15,6 +15,7 @@ import { makeSkills, Skills } from "../services/Skills.ts";
 import {
   type ConnectionRecord,
   type ConnectionStore,
+  type CustomConnectorRecord,
   Connections,
   makeConnections,
 } from "../services/Connections.ts";
@@ -99,6 +100,7 @@ const FakeAuth = Layer.succeed(
 // Alice is a member of ws_1 only. Connected apps are the in-process fake from @crm/integrations.
 const upstream = fakeUpstream(integrations[0].mcpUrl);
 const rows: ConnectionRecord[] = [];
+const customs: (CustomConnectorRecord & { workspaceId: string })[] = [];
 
 const memoryStore: ConnectionStore = {
   isMember: async ({ workspaceId, userId }) => workspaceId === "ws_1" && userId === "user_1",
@@ -153,6 +155,29 @@ const memoryStore: ConnectionStore = {
 
     return true;
   },
+  customConnectors: async (workspaceId) =>
+    customs.filter((connector) => connector.workspaceId === workspaceId),
+  addCustom: async ({ workspaceId }, connector) => {
+    if (customs.some((c) => c.workspaceId === workspaceId && c.key === connector.key)) return false;
+
+    customs.push({ ...connector, workspaceId });
+
+    return true;
+  },
+  removeCustom: async (workspaceId, key) => {
+    const index = customs.findIndex((c) => c.workspaceId === workspaceId && c.key === key);
+
+    if (index === -1) return false;
+
+    customs.splice(index, 1);
+
+    for (let at = rows.length - 1; at >= 0; at -= 1) {
+      if (rows[at]?.workspaceId === workspaceId && rows[at]?.integration === key)
+        rows.splice(at, 1);
+    }
+
+    return true;
+  },
 };
 
 let states = 0;
@@ -172,6 +197,8 @@ const FakeConnections = Layer.succeed(
     now: () => new Date("2026-11-26T12:00:00Z"),
     state: () => `state_${++states}`,
     logo: async (website) => `https://storage.test/logos/${new URL(website).hostname}`,
+    // Custom connectors are served by the same fake, at a second URL.
+    checkServer: async (mcpUrl) => mcpUrl.startsWith("https://mcp.notes.example/"),
   }),
 );
 
@@ -215,18 +242,19 @@ afterAll(() => app.dispose());
 const get = (path: string, cookie?: string) =>
   app.handler(new Request(`http://api.test${path}`, { headers: cookie ? { cookie } : {} }));
 
-interface AccessBody {
-  readonly access: "read" | "write";
-}
+type RequestBody =
+  | { readonly access: "read" | "write" }
+  | { readonly name: string; readonly url: string };
 
 const decodeAuthorize = Schema.decodeUnknownSync(Schema.Struct({ url: Schema.String }));
+const decodeCatalog = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ id: Schema.String })));
 const decodeAccess = Schema.decodeUnknownSync(Schema.Struct({ access: Schema.String }));
 
 const decodeClientMetadata = Schema.decodeUnknownSync(
   Schema.Struct({ redirect_uris: Schema.Array(Schema.String) }),
 );
 
-function send(method: string, path: string, cookie: string, body?: AccessBody) {
+function send(method: string, path: string, cookie: string, body?: RequestBody) {
   const headers = new Headers({ cookie });
   const init: RequestInit = { method, headers };
 
@@ -353,6 +381,41 @@ describe("connections", () => {
       superhuman: "https://storage.test/logos/superhuman.com",
     });
     expect((await get("/api/connections/logos", "session=valid")).status).toBe(403);
+  });
+
+  test("a member adds a custom connector; everyone sees it; removing drops connections", async () => {
+    const added = await send("POST", "/api/connections/custom", member, {
+      name: "Notes",
+      url: "https://mcp.notes.example/mcp",
+    });
+
+    expect(await added.json()).toEqual({
+      id: "notes",
+      name: "Notes",
+      vendor: "notes.example",
+      domain: "notes.example",
+      summary: "Custom connector",
+      custom: true,
+    });
+
+    const catalog = decodeCatalog(await (await get("/api/connections/catalog", member)).json());
+
+    expect(catalog.map(({ id }) => id)).toEqual(["granola", "superhuman", "notes"]);
+
+    const refused = await send("POST", "/api/connections/custom", member, {
+      name: "Elsewhere",
+      url: "https://not-mcp.example/mcp",
+    });
+
+    const internal = await send("POST", "/api/connections/custom", member, {
+      name: "Inside",
+      url: "https://localhost/mcp",
+    });
+
+    expect(refused.status).toBe(502);
+    expect(internal.status).toBe(400);
+    expect((await send("DELETE", "/api/connections/custom/notes", member)).status).toBe(204);
+    expect((await send("DELETE", "/api/connections/custom/notes", member)).status).toBe(404);
   });
 
   test("serves the Client ID Metadata Document", async () => {

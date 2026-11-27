@@ -7,6 +7,7 @@ import {
 } from "@crm/ui/components/empty";
 import {
   PageShell,
+  PageShellActions,
   PageShellContent,
   PageShellHeading,
   PageShellTitle,
@@ -15,14 +16,23 @@ import { WorkspacePageHeader } from "./page-header.tsx";
 import type { ReactNode } from "react";
 import type { Page } from "../../lib/pages.ts";
 
-/** A workspace page in the vms.dev page shell: title bar, then content. */
-export function PageLayout({ page, children }: { page: Page; children: ReactNode }) {
+/** A workspace page in the vms.dev page shell: title bar (with optional actions), then content. */
+export function PageLayout({
+  page,
+  actions,
+  children,
+}: {
+  page: Page;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <PageShell>
       <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>{page.label}</PageShellTitle>
         </PageShellHeading>
+        {actions ? <PageShellActions>{actions}</PageShellActions> : null}
       </WorkspacePageHeader>
       <PageShellContent>{children}</PageShellContent>
     </PageShell>

@@ -258,6 +258,26 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Headings balance their lines; running text avoids orphans and ragged last lines. Shared
+     components that render titles or descriptions as divs or spans opt in with the same
+     utilities (`text-balance`, `text-pretty`). */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  [data-slot$="title"] {
+    @apply text-balance;
+  }
+  p,
+  li,
+  dd,
+  figcaption,
+  blockquote,
+  [data-slot$="description"] {
+    @apply text-pretty;
+  }
 }
 
 /* Resizing the sidebar: one cursor everywhere, no text selection, no tooltips popping up. */

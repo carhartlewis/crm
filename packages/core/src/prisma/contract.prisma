@@ -22,6 +22,7 @@ model User {
   oauthConsents      OauthConsent[]
   connections        Connection[]
   skills             Skill[]
+  customConnectors   CustomConnector[]
 
   @@map("user")
 }
@@ -92,6 +93,7 @@ model Workspace {
   invitations Invitation[]
   connections Connection[]
   skills      Skill[]
+  customConnectors CustomConnector[]
 
   @@map("workspace")
 }
@@ -380,4 +382,23 @@ model Skill {
 
   @@unique([workspaceId, name])
   @@map("skill")
+}
+
+// A remote MCP server a workspace added by URL (`custom.ts` in @crm/integrations). Everyone in
+// the workspace sees it; each person connects to it on their own, as with catalog apps.
+
+model CustomConnector {
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Slug of the name; the connector's id, tool prefix and `connection.integration`.
+  key         String
+  name        String
+  mcpUrl      String    @map("mcp_url")
+  addedById   String?   @map("added_by_id")
+  addedBy     User?     @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @map("created_at")
+
+  @@unique([workspaceId, key])
+  @@map("custom_connector")
 }

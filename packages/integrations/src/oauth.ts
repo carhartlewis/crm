@@ -1,5 +1,6 @@
 import {
   auth,
+  discoverOAuthServerInfo,
   type AuthOptions,
   type FetchLike,
   type OAuthClientMetadata,
@@ -275,4 +276,20 @@ export async function refreshCredentials(
   if (!provider.credentials.tokens) throw new ReconnectRequired(integration.id);
 
   return provider.credentials;
+}
+
+/**
+ * Whether an MCP server offers MCP OAuth (RFC 9728 metadata pointing at an authorization server
+ * with an authorization endpoint). Checked before a workspace saves a custom connector.
+ */
+export async function offersMcpOAuth(mcpUrl: string, fetch?: FetchLike) {
+  try {
+    const info = await discoverOAuthServerInfo(mcpUrl, fetch ? { fetchFn: fetch } : {});
+
+    return Boolean(
+      info.resourceMetadata && info.authorizationServerMetadata?.authorization_endpoint,
+    );
+  } catch {
+    return false;
+  }
 }

@@ -153,11 +153,40 @@ export type Connection = typeof Connection.Type;
 
 const ConnectionErrors = [NotFound, NoActiveWorkspace];
 
+/** An app people can connect: from the built-in catalog, or added by the workspace (`custom`). */
+export const CatalogEntry = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  vendor: Schema.String,
+  domain: Schema.String,
+  summary: Schema.String,
+  custom: Schema.Boolean,
+});
+
+export type CatalogEntry = typeof CatalogEntry.Type;
+
 /** The caller's connections in their active workspace. */
 export class ConnectionsApi extends HttpApiGroup.make("connections")
   .add(
     HttpApiEndpoint.get("list", "/", {
       success: Schema.Array(Connection),
+      error: ConnectionErrors,
+    }),
+    /** The apps this workspace can connect: the built-in catalog plus its custom connectors. */
+    HttpApiEndpoint.get("catalog", "/catalog", {
+      success: Schema.Array(CatalogEntry),
+      error: ConnectionErrors,
+    }),
+    /** Adds a remote MCP server by URL for the whole workspace. It must offer MCP OAuth. */
+    HttpApiEndpoint.post("addCustom", "/custom", {
+      payload: Schema.Struct({ name: Schema.String, url: Schema.String }),
+      success: CatalogEntry,
+      error: [...ConnectionErrors, Invalid, UpstreamUnavailable],
+    }),
+    /** Removes a custom connector, and everyone's connection to it, from the workspace. */
+    HttpApiEndpoint.delete("removeCustom", "/custom/:id", {
+      params: { id: Schema.String },
+      success: HttpApiSchema.NoContent,
       error: ConnectionErrors,
     }),
     /** Each catalog app's logo in our storage (context.dev, else its favicon), by app id. */

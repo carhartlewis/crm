@@ -2,7 +2,8 @@ import add from "@carbon/icons/es/add/16.js";
 import chevronDown from "@carbon/icons/es/chevron--down/16.js";
 import edit from "@carbon/icons/es/edit/16.js";
 import upload from "@carbon/icons/es/upload/16.js";
-import { integrationById, parseSkillMarkdown, toSkillName } from "@crm/integrations";
+import link from "@carbon/icons/es/link/16.js";
+import { parseSkillMarkdown, toSkillName } from "@crm/integrations";
 import { Button } from "@crm/ui/components/button";
 import {
   DropdownMenu,
@@ -19,6 +20,7 @@ import { createLazyFileRoute, Link, useLocation } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
+import { AddConnectorSheet } from "../../../components/connections/add-connector-sheet.tsx";
 import { ConnectorsPanel } from "../../../components/connections/connectors-panel.tsx";
 import {
   CreateSkillSheet,
@@ -27,7 +29,7 @@ import {
 } from "../../../components/connections/create-skill-sheet.tsx";
 import { SkillsPanel } from "../../../components/connections/skills-panel.tsx";
 import { PageLayout } from "../../../components/shell/page.tsx";
-import { connectionsQuery, outcomeMessage } from "../../../lib/connections.ts";
+import { catalogQuery, connectionsQuery, outcomeMessage } from "../../../lib/connections.ts";
 import { pageById } from "../../../lib/pages.ts";
 import { skillsQuery } from "../../../lib/skills.ts";
 
@@ -39,10 +41,11 @@ const AddIcon = carbonIcon(add);
 const ChevronIcon = carbonIcon(chevronDown);
 const EditIcon = carbonIcon(edit);
 const UploadIcon = carbonIcon(upload);
+const LinkIcon = carbonIcon(link);
 
 const TABS = ["connectors", "skills"] as const;
 
-const ADD_KINDS = ["skill"] as const;
+const ADD_KINDS = ["skill", "connector"] as const;
 
 /** A SKILL.md, read into the new-skill form for review. */
 async function draftFromFile(file: File): Promise<SkillDraft> {
@@ -92,12 +95,50 @@ function Connections() {
 
   const { data: connections } = useSuspenseQuery(connectionsQuery(session.user.id, workspaceId));
   const { data: skills } = useSuspenseQuery(skillsQuery(session.user.id, workspaceId));
+  const { data: catalog } = useSuspenseQuery(catalogQuery(session.user.id, workspaceId));
 
-  const appName = integrationById(search.connected ?? search.app ?? "")?.name ?? "The app";
+  const returned = search.connected ?? search.app ?? "";
+  const appName = catalog.find((entry) => entry.id === returned)?.name ?? "The app";
+
+  // The page action: what Add does depends on the tab.
+  const actions = (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button size="sm" />}>
+        <AddIcon />
+        Add
+        <ChevronIcon />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {tab === "skills" ? (
+          <>
+            <DropdownMenuItem
+              onClick={() => {
+                setDraft(EMPTY_SKILL);
+                void setAdding("skill");
+              }}
+            >
+              <EditIcon />
+              Create a skill
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => fileInput.current?.click()}>
+              <UploadIcon />
+              Upload a SKILL.md
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <DropdownMenuItem onClick={() => void setAdding("connector")}>
+            <LinkIcon />
+            Add a custom connector
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   const outcome = outcomeMessage(search, appName);
 
   return (
-    <PageLayout page={pageById("connections")}>
+    <PageLayout page={pageById("connections")} actions={actions}>
       <div className="flex flex-col gap-6">
         {outcome ? (
           <output
@@ -128,30 +169,6 @@ function Connections() {
               placeholder={tab === "connectors" ? "Search connectors…" : "Search skills…"}
             />
           </div>
-          {tab === "skills" ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" className="ml-auto" />}>
-                <AddIcon />
-                Add
-                <ChevronIcon />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuItem
-                  onClick={() => {
-                    setDraft(EMPTY_SKILL);
-                    void setAdding("skill");
-                  }}
-                >
-                  <EditIcon />
-                  Create a skill
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => fileInput.current?.click()}>
-                  <UploadIcon />
-                  Upload a SKILL.md
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
           <input
             ref={fileInput}
             type="file"
@@ -171,6 +188,7 @@ function Connections() {
         </div>
         {tab === "connectors" ? (
           <ConnectorsPanel
+            catalog={catalog}
             connections={connections}
             userId={session.user.id}
             workspaceId={workspaceId}
@@ -188,6 +206,7 @@ function Connections() {
           />
         )}
       </div>
+      {adding === "connector" ? <AddConnectorSheet onClose={() => void setAdding(null)} /> : null}
       {adding === "skill" ? (
         <CreateSkillSheet
           key={`${draft.name}:${draft.content.length}`}

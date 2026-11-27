@@ -125,6 +125,11 @@ Global rules. Use the tokens and components; never one-off timings.
 - **Reduced motion** ships with every animation: opacity-only, never zero (`prefers-reduced-motion` rules in globals.css). Spinners keep spinning.
 - **Selection:** interface chrome is not selectable, through `select-none` in the component itself: buttons, labels, tabs, badges, kbd, cards, dialogs, sheets, menus, popovers, peeks, tooltips, the command palette, the sidebar, and onboarding screens. CRM content (names, emails, notes, values, record titles) stays copyable: mark it `select-text`, including inside cards. Inputs and textareas are always `select-text`.
 
+### Text wrapping
+
+- Headings and titles balance their lines (`text-wrap: balance`); running text uses `text-wrap: pretty`. `globals.css` applies both to `h1`–`h6`, `p`, `li` and the `*-title` / `*-description` slots of shared components. Text in a `div` or `span` that reads as a title or a paragraph adds `text-balance` or `text-pretty`.
+- Menus, popovers and tooltips fit their text: never give them a fixed width that wraps their items.
+
 ### Interaction rules
 
 - **Icons:** Carbon only, from per-icon modules: `import close from "@carbon/icons/es/close/16.js"` and `const CloseIcon = carbonIcon(close)` (`@crm/ui/components/icon`). Don't use `@carbon/icons-react`: its bucket modules defeat tree-shaking. The shadcn CLI emits `lucide-react`; convert after `shadcn add`. Lint rejects both.

@@ -1,0 +1,299 @@
+[
+  {
+    "id": "table.custom_connector",
+    "label": "Create table \"custom_connector\"",
+    "summary": "Creates table \"custom_connector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "custom_connector"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"custom_connector\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"custom_connector\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"custom_connector\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"custom_connector\"",
+        "sql": "CREATE TABLE \"public\".\"custom_connector\" (\n  \"added_by_id\" text,\n  \"created_at\" timestamptz(3) NOT NULL,\n  \"id\" text NOT NULL,\n  \"key\" text NOT NULL,\n  \"mcp_url\" text NOT NULL,\n  \"name\" text NOT NULL,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"custom_connector\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"custom_connector\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"custom_connector\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "unique.custom_connector.custom_connector_workspace_id_key_key",
+    "label": "Add unique constraint on \"custom_connector\" (workspace_id, key)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "custom_connector_workspace_id_key_key",
+        "table": "custom_connector"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"custom_connector_workspace_id_key_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "custom_connector_workspace_id_key_key",
+          "public",
+          "\"public\".\"custom_connector\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "constraint \"custom_connector_workspace_id_key_key\" on \"custom_connector\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"custom_connector_workspace_id_key_key\"",
+        "sql": "ALTER TABLE \"public\".\"custom_connector\" ADD CONSTRAINT \"custom_connector_workspace_id_key_key\" UNIQUE (\"workspace_id\", \"key\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify unique constraint \"custom_connector_workspace_id_key_key\" exists on (workspace_id, key)",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb)) AS \"result\"",
+        "params": [
+          "custom_connector_workspace_id_key_key",
+          "public",
+          "\"public\".\"custom_connector\"",
+          "u",
+          "[\"workspace_id\",\"key\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.custom_connector.custom_connector_added_by_id_idx_3003bad1",
+    "label": "Create index \"custom_connector_added_by_id_idx_3003bad1\" on \"custom_connector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "custom_connector_added_by_id_idx_3003bad1",
+        "table": "custom_connector"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"custom_connector_added_by_id_idx_3003bad1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"custom_connector_added_by_id_idx_3003bad1\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"custom_connector_added_by_id_idx_3003bad1\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"custom_connector_added_by_id_idx_3003bad1\"",
+        "sql": "CREATE INDEX \"custom_connector_added_by_id_idx_3003bad1\" ON \"public\".\"custom_connector\" (\"added_by_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"custom_connector_added_by_id_idx_3003bad1\" exists on \"custom_connector\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"custom_connector_added_by_id_idx_3003bad1\"",
+          "i",
+          "I",
+          "\"public\".\"custom_connector\"",
+          "btree",
+          "[\"added_by_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.custom_connector.custom_connector_workspace_id_idx_90a9f461",
+    "label": "Create index \"custom_connector_workspace_id_idx_90a9f461\" on \"custom_connector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "custom_connector_workspace_id_idx_90a9f461",
+        "table": "custom_connector"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"custom_connector_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"custom_connector_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"custom_connector_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"custom_connector_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"custom_connector_workspace_id_idx_90a9f461\" ON \"public\".\"custom_connector\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"custom_connector_workspace_id_idx_90a9f461\" exists on \"custom_connector\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"custom_connector_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"custom_connector\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.custom_connector.custom_connector_workspace_id_fkey",
+    "label": "Add foreign key \"custom_connector_workspace_id_fkey\" on \"custom_connector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "custom_connector_workspace_id_fkey",
+        "table": "custom_connector"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"custom_connector_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "custom_connector_workspace_id_fkey",
+          "public",
+          "\"public\".\"custom_connector\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"custom_connector_workspace_id_fkey\" on \"custom_connector\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"custom_connector_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"custom_connector\"\nADD CONSTRAINT \"custom_connector_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"custom_connector_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "custom_connector_workspace_id_fkey",
+          "public",
+          "\"public\".\"custom_connector\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.custom_connector.custom_connector_added_by_id_fkey",
+    "label": "Add foreign key \"custom_connector_added_by_id_fkey\" on \"custom_connector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "custom_connector_added_by_id_fkey",
+        "table": "custom_connector"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"custom_connector_added_by_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "custom_connector_added_by_id_fkey",
+          "public",
+          "\"public\".\"custom_connector\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"custom_connector_added_by_id_fkey\" on \"custom_connector\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"custom_connector_added_by_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"custom_connector\"\nADD CONSTRAINT \"custom_connector_added_by_id_fkey\"\nFOREIGN KEY (\"added_by_id\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"custom_connector_added_by_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "custom_connector_added_by_id_fkey",
+          "public",
+          "\"public\".\"custom_connector\"",
+          "f",
+          "[\"added_by_id\"]",
+          "\"public\".\"user\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  }
+]
