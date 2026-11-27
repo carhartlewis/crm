@@ -44,6 +44,7 @@
     "./patterns/empty-cell": "./src/patterns/empty-cell.tsx",
     "./patterns/formatted-date": "./src/patterns/formatted-date.tsx",
     "./patterns/page-shell": "./src/patterns/page-shell.tsx",
+    "./patterns/question-card": "./src/patterns/question-card.tsx",
     "./patterns/record-list": "./src/patterns/record-list.tsx",
     "./patterns/record-sheet/rail-fact-kinds": "./src/patterns/record-sheet/rail-fact-kinds.ts",
     "./patterns/record-sheet/record-rail": "./src/patterns/record-sheet/record-rail.tsx",

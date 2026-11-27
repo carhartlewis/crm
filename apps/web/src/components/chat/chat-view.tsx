@@ -11,6 +11,7 @@ import {
   ReasoningTrigger,
 } from "@crm/ui/components/ai-elements/reasoning";
 import { ApprovalCard, type ApprovalItem } from "@crm/ui/patterns/approval-card";
+import { QuestionCard, type QuestionOption } from "@crm/ui/patterns/question-card";
 import { ThinkingIndicator } from "@crm/ui/patterns/dot-matrix";
 import { ToolStep, ToolStepGroup } from "@crm/ui/patterns/tool-step";
 import { Button } from "@crm/ui/components/button";
@@ -20,6 +21,7 @@ import type { EveMessage, EveMessagePart, SessionStreamEvent } from "eve/client"
 import type { PermissionMode } from "@crm/core/chat";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEveAgent } from "eve/react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { chatKeys, takeFirstMessage } from "../../lib/chat-api.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
@@ -323,6 +325,18 @@ function InteractionPrompt({
     );
   }
 
+  // A question with choices (the agent's `ask_question`) is a card of answers, keys 1–9.
+  if (request.kind === "question" && request.options && request.options.length > 0) {
+    return (
+      <QuestionPrompt
+        question={request.prompt}
+        title={request.title}
+        options={request.options}
+        onAnswer={(optionId) => onAnswer(interaction.interactionId, optionId)}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-muted/50 p-3 select-none">
       {request.title && <p className="text-sm font-medium text-balance">{request.title}</p>}
@@ -360,4 +374,33 @@ function InteractionPrompt({
       </div>
     </div>
   );
+}
+
+/**
+ * A question's answers, also on the number keys 1–9 (as in T3 Code), except while typing in a
+ * field: the person can type their own answer in the composer instead.
+ */
+function QuestionPrompt({
+  question,
+  title,
+  options,
+  onAnswer,
+}: {
+  question: string;
+  title: string | undefined;
+  options: readonly QuestionOption[];
+  onAnswer: (optionId: string) => void;
+}) {
+  useHotkeys(
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    (event) => {
+      const option = options[Number(event.key) - 1];
+
+      if (option) onAnswer(option.id);
+    },
+    { enableOnFormTags: false, preventDefault: true },
+    [options, onAnswer],
+  );
+
+  return <QuestionCard question={question} title={title} options={options} onAnswer={onAnswer} />;
 }
