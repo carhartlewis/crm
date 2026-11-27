@@ -9,7 +9,7 @@ const MAX_STRETCH = 48;
 const RELEASE_GAP_MS = 50;
 
 /** How long the content takes to spring back once let go. */
-const SPRING_BACK_MS = 180;
+const SPRING_BACK_MS = 100;
 
 /**
  * Callback ref for a scroll container: pulling past either end (wheel or trackpad) stretches
