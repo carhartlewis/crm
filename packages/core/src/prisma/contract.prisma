@@ -456,6 +456,8 @@ model Chat {
   createdAt     DateTime   @map("created_at")
   updatedAt     DateTime   @map("updated_at")
   lastMessageAt DateTime   @map("last_message_at")
+  // `manual`, `auto` or `bypass` (ADR 0019): how much the agent may do without asking.
+  permissionMode String    @default("manual") @map("permission_mode")
 
   @@index([workspaceId])
   @@index([spaceId])

@@ -1,22 +1,13 @@
 import { defineDynamic, defineMcpClientConnection } from "eve/connections";
+import { callApproval } from "../lib/call-approval.ts";
 import { crmCaller, crmToken } from "../lib/crm-token.ts";
 import { gatewayAuthorization, gatewayUrl } from "../lib/gateway.ts";
 
 const description =
   "The CRM itself (crm__: companies, workspace members, memory) and the apps the user connected to it: Granola meeting notes and transcripts, Superhuman email, and others. Search here for companies, people, meetings, emails and what the CRM remembers.";
 
-// Read-only tools run freely, and so does saving a memory (as before); anything else (send,
-// delete, update, forget) asks the user first.
-const approval = ({
-  toolName,
-  toolAnnotations,
-}: {
-  toolName: string;
-  toolAnnotations?: { readOnlyHint?: boolean };
-}) =>
-  toolAnnotations?.readOnlyHint === true || toolName.endsWith("crm__remember")
-    ? "not-applicable"
-    : "user-approval";
+// The chat's permission mode decides each call (ADR 0019).
+const approval = callApproval("connections");
 
 /**
  * The apps the user connected in Personal settings → Connections (Granola, Superhuman, …),

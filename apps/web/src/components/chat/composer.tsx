@@ -20,6 +20,8 @@ export interface ComposerProps {
   readonly header?: ReactNode;
   /** Puts the caret in the composer when it appears: chat is keyboard-first. */
   readonly focusOnMount?: boolean;
+  /** Controls beside Send, such as the permission mode. */
+  readonly tools?: ReactNode;
   /** Runs once when the person starts typing, such as prewarming a session. */
   readonly onTypingStart?: () => void;
 }
@@ -37,6 +39,7 @@ export function Composer({
   disabled = false,
   header,
   focusOnMount = false,
+  tools,
   onTypingStart,
 }: ComposerProps) {
   return (
@@ -60,7 +63,10 @@ export function Composer({
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools />
-        <PromptInputSubmit status={status} onStop={onStop} disabled={disabled} />
+        <div className="flex items-center gap-1">
+          {tools}
+          <PromptInputSubmit status={status} onStop={onStop} disabled={disabled} />
+        </div>
       </PromptInputFooter>
     </PromptInput>
   );

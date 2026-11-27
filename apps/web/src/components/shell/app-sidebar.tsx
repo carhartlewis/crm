@@ -10,7 +10,6 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@crm/ui/components/sidebar";
-import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { preloadable } from "@crm/ui/lib/preloadable";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Suspense } from "react";
@@ -27,8 +26,11 @@ import { WorkspaceMenu } from "./workspace-menu.tsx";
 
 const EditIcon = carbonIcon(edit);
 
-// Pinned chats and spaces, Spaces, Folders and Recents read synced data: their own chunk.
+// Pinned chats and spaces, Spaces, Folders and Recents read synced data: their own chunk. It is
+// the sidebar's main content, so it starts loading with the shell, not on idle.
 const ChatNav = preloadable(() => import("./chat-nav.tsx"));
+
+void ChatNav.preload();
 
 export interface AppSidebarProps {
   readonly userId: string;
@@ -39,13 +41,6 @@ export interface AppSidebarProps {
 
 export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: AppSidebarProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-
-  // The chat list is the sidebar's main content: load it as soon as the browser is idle.
-  useMountEffect(() => {
-    const idle = requestIdleCallback(() => void ChatNav.preload());
-
-    return () => cancelIdleCallback(idle);
-  });
 
   return (
     <Sidebar variant="inset">

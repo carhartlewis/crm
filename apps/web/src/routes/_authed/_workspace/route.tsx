@@ -14,7 +14,14 @@ export const Route = createFileRoute("/_authed/_workspace")({
 
     if (!first) throw redirect({ to: "/setup-workspace", replace: true });
 
-    if (session.session.activeOrganizationId) return;
+    const active = session.session.activeOrganizationId;
+
+    // The sidebar's chats, spaces and folders start syncing while the shell and page load, through
+    // a dynamic import so TanStack DB stays out of cold entry (ADR 0018).
+    if (active)
+      void import("../../../lib/chats.ts").then(({ preloadChats }) => preloadChats(active));
+
+    if (active) return;
 
     const { error } = await authClient.organization.setActive({ organizationId: first.id });
 

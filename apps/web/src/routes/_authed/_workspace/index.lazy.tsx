@@ -13,8 +13,11 @@ import { PageShell } from "@crm/ui/patterns/page-shell";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Composer } from "../../../components/chat/composer.tsx";
+import { PermissionModeMenu } from "../../../components/chat/permission-mode-menu.tsx";
+import { lastPermissionMode, rememberPermissionMode } from "../../../lib/permission-mode.ts";
 import { spaceColor } from "../../../components/chat/chat-menu.tsx";
 import { WorkspacePageHeader } from "../../../components/shell/page-header.tsx";
 import { prewarmChat, queueFirstMessage, seedNewChat } from "../../../lib/chat-api.ts";
@@ -41,6 +44,8 @@ function NewChatForm({ userId, workspaceId }: { userId: string; workspaceId: str
   const queryClient = useQueryClient();
 
   const { space: spaceId } = Route.useSearch();
+  // New chats start in the mode this person picked last (ADR 0019).
+  const [permissionMode, setPermissionMode] = useState(() => lastPermissionMode(userId));
 
   // Read once per mount: the page remounts (`key`) for another workspace.
   const spaces = useLiveQuery(() => chatSpacesCollection(workspaceId));
@@ -112,8 +117,23 @@ function NewChatForm({ userId, workspaceId }: { userId: string; workspaceId: str
               status={start.isPending || start.isSuccess ? "submitted" : "ready"}
               disabled={start.isPending || start.isSuccess}
               onTypingStart={() => prewarmChat()}
+              tools={
+                <PermissionModeMenu
+                  value={permissionMode}
+                  onChange={(mode) => {
+                    setPermissionMode(mode);
+                    rememberPermissionMode(userId, mode);
+                  }}
+                />
+              }
               onSend={(text) =>
-                start.mutate({ workspaceId, userId, text, spaceId: space?.id ?? null })
+                start.mutate({
+                  workspaceId,
+                  userId,
+                  text,
+                  spaceId: space?.id ?? null,
+                  permissionMode,
+                })
               }
             />
           </div>

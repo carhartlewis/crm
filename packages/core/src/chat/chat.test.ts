@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createId, ID_PREFIXES } from "../ids/index.ts";
 import {
+  callDecision,
+  callKind,
   decodeStoredLayout,
   normalizeChatTitle,
   normalizeSpaceName,
@@ -83,5 +85,36 @@ describe("sidebar layout", () => {
     expect(decodeStoredLayout({ pinned: ["page:companies"], folders: [] }).pinned).toEqual([
       "page:companies",
     ]);
+  });
+});
+
+describe("permission modes", () => {
+  test("reads run in every mode", () => {
+    for (const mode of ["manual", "auto", "bypass"] as const) {
+      expect(callDecision(mode, callKind("list_companies", { readOnlyHint: true }))).toBe("run");
+    }
+  });
+
+  test("a plain change asks in Manual and runs in Auto and Bypass", () => {
+    const kind = callKind("create_company", { readOnlyHint: false, destructiveHint: false });
+
+    expect(kind).toBe("change");
+    expect(callDecision("manual", kind)).toBe("ask");
+    expect(callDecision("auto", kind)).toBe("run");
+    expect(callDecision("bypass", kind)).toBe("run");
+  });
+
+  test("a risky call asks unless the chat bypasses, where it runs marked", () => {
+    const kind = callKind("forget", { readOnlyHint: false, destructiveHint: true });
+
+    expect(kind).toBe("risky");
+    expect(callDecision("auto", kind)).toBe("ask");
+    expect(callDecision("bypass", kind)).toBe("run_flagged");
+  });
+
+  test("names beat annotations, and missing annotations are risky", () => {
+    expect(callKind("send_email", { readOnlyHint: true })).toBe("risky");
+    expect(callKind("get_api_keys", { readOnlyHint: true })).toBe("risky");
+    expect(callKind("search_threads", undefined)).toBe("risky");
   });
 });

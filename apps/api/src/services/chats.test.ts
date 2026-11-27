@@ -28,6 +28,7 @@ function fakeAgent() {
   let next = 0;
   const logs = new Map<string, FakeEvent[]>();
   const calls: string[] = [];
+  const modes: string[] = [];
 
   const agent: ChatAgent = {
     createSession: async (caller: AgentCaller) => {
@@ -48,6 +49,7 @@ function fakeAgent() {
     },
     forward: async (caller, path, request) => {
       calls.push(`${request.method} ${path} as ${caller.id} in ${caller.workspaceId}`);
+      modes.push(caller.permissionMode ?? "none");
 
       return new Response("{}", { status: 202 });
     },
@@ -56,6 +58,7 @@ function fakeAgent() {
   return {
     agent,
     calls,
+    modes,
     append: (sessionId: string, event: FakeEvent) => logs.get(sessionId)?.push(event),
   };
 }
@@ -340,5 +343,35 @@ describe("the sidebar row", () => {
 
     expect(saved).toHaveLength(1);
     expect(saved[0]).toMatchObject({ id: first, userId: "alice", pinned: [`chat:${chat}`] });
+  });
+});
+
+describe("permission modes", () => {
+  test("a chat starts in Manual, changes mode, and the agent hears the chat's mode", async () => {
+    const { chats, rows, modes } = setup();
+    const id = chatId();
+
+    await run(chats.create(alice, { id, title: "Hi", spaceId: null }));
+    expect(rows().chats.get(id)?.permissionMode).toBe("manual");
+
+    await run(chats.update(alice, id, { permissionMode: "bypass" }));
+    await run(chats.forward(alice, id, "/eve/v1/session/ses_1", get()));
+
+    expect(modes.at(-1)).toBe("bypass");
+  });
+
+  test("refuses a mode that doesn't exist", async () => {
+    const { chats } = setup();
+    const id = chatId();
+
+    expect(
+      await outcome(
+        chats.create(alice, { id, title: "Hi", spaceId: null, permissionMode: "yolo" }),
+      ),
+    ).toBe("Invalid");
+
+    await run(chats.create(alice, { id, title: "Hi", spaceId: null, permissionMode: "auto" }));
+
+    expect(await outcome(chats.update(alice, id, { permissionMode: "never" }))).toBe("Invalid");
   });
 });

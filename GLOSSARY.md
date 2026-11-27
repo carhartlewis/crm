@@ -81,3 +81,5 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 **Prewarmed session**: An eve session the API creates before the first message and keeps in Redis for 10 minutes, so a new chat answers sooner.
 
 **Agent proxy**: `/api/chats/<chatId>/agent/*`. The only way a browser reaches the agent; it checks that the caller may see the chat (ADR 0018).
+
+**Permission mode**: How much the agent may do in a chat without asking: Manual (asks before every change), Auto (asks only before risky calls) or Bypass permissions (runs everything). Picked beside Send (ADR 0019).

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "column.public.chat.permission_mode",
+    "label": "Add column \"permission_mode\" to \"chat\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "permission_mode",
+        "table": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"permission_mode\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "chat",
+          "permission_mode"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"permission_mode\" on \"chat\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"permission_mode\"",
+        "sql": "ALTER TABLE \"public\".\"chat\" ADD COLUMN \"permission_mode\" text DEFAULT 'manual' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"permission_mode\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "chat",
+          "permission_mode"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"permission_mode\" on \"chat\""
+        }
+      },
+      {
+        "description": "verify column \"permission_mode\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "chat",
+          "permission_mode",
+          "text"
+        ]
+      },
+      {
+        "description": "verify column \"permission_mode\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "public",
+          "chat",
+          "permission_mode",
+          "NO"
+        ]
+      }
+    ]
+  }
+]

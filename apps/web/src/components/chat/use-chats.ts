@@ -2,7 +2,9 @@ import { decodeStoredLayout, type Folder, type PinKey, type SidebarLayout } from
 import { createId, ID_PREFIXES } from "@crm/core/ids";
 import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { useLiveQuery } from "@tanstack/react-db";
+import { useState } from "react";
 import { toast } from "sonner";
+import { readChatSnapshot, writeChatSnapshot } from "../../lib/chat-snapshot.ts";
 import {
   type Chat,
   chatSpacesCollection,
@@ -64,13 +66,17 @@ export function useChats(workspaceId: string, userId: string) {
   const chats = useLiveQuery(() => chatsCollection(workspaceId));
   const spaces = useLiveQuery(() => chatSpacesCollection(workspaceId));
   const rows = useLiveQuery(() => sidebarCollection(workspaceId));
-  const chatRows = chats.data ?? [];
-  const spaceRows = oldestFirst(spaces.data);
+  // Until each sync is ready, draw the device's last copy: the sidebar shows in the first frame.
+  const [snapshot] = useState(() => readChatSnapshot(userId, workspaceId));
+  const chatRows = chats.isReady ? (chats.data ?? []) : snapshot.chats;
+  const spaceRows = oldestFirst(spaces.isReady ? spaces.data : snapshot.spaces);
 
   // The device's copy of the order: ⌥1–⌥9 and the shell read it before this chunk loads.
   const stored = usePinnedOrder(userId);
   const row = rows.data?.[0];
-  const layout = layoutOf(row, stored);
+
+  const layout =
+    rows.isReady || row ? layoutOf(row, stored) : { pinned: stored, folders: snapshot.folders };
 
   // The synced row is the source: mirror its pinned order into the device's copy as it changes
   // (another device, another tab). The first load also copies an order saved on this device
@@ -92,9 +98,31 @@ export function useChats(workspaceId: string, userId: string) {
       }
     };
 
-    const subscription = collection.subscribeChanges(mirror, { includeInitialState: true });
+    // Keeps the device's copy current once all three syncs are ready.
+    const save = () => {
+      const all = [chatsCollection(workspaceId), chatSpacesCollection(workspaceId), collection];
 
-    return () => subscription.unsubscribe();
+      if (!all.every((item) => item.isReady())) return;
+
+      const current = [...collection.values()][0];
+
+      writeChatSnapshot(userId, workspaceId, {
+        chats: [...chatsCollection(workspaceId).values()],
+        spaces: [...chatSpacesCollection(workspaceId).values()],
+        folders: current ? decodeStoredLayout(current).folders : [],
+      });
+    };
+
+    const subscriptions = [
+      collection.subscribeChanges(mirror, { includeInitialState: true }),
+      collection.subscribeChanges(save, { includeInitialState: true }),
+      chatsCollection(workspaceId).subscribeChanges(save, { includeInitialState: true }),
+      chatSpacesCollection(workspaceId).subscribeChanges(save, { includeInitialState: true }),
+    ];
+
+    return () => {
+      for (const subscription of subscriptions) subscription.unsubscribe();
+    };
   });
 
   const save = (next: SidebarLayout) => {
@@ -114,6 +142,7 @@ export function useChats(workspaceId: string, userId: string) {
     chatById: (id: string) => byId.get(id),
     spaces: spaceRows,
     layout,
+    // Whether the synced data (not the device's copy) is in: empty states wait for it.
     isReady: chats.isReady && spaces.isReady && rows.isReady,
     togglePin: (key: PinKey) => save({ ...layout, pinned: togglePin(layout.pinned, key) }),
     moveToFolder: (chatId: string, folderId: string | null) =>

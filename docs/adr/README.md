@@ -22,3 +22,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0016](0016-prefixed-record-ids.md)                | Record ids are a registered prefix plus 24 base62 characters; older UUIDs stay valid                                                 |
 | [0017](0017-memory-fact-copy-for-search.md)        | Memory facts are copied into a synced table so ⌘K searches them locally; refreshed on demand                                         |
 | [0018](0018-chats-spaces-and-folders.md)           | Agent chats: `/` is New chat; chats in private or shared spaces, personal pins and folders; eve only behind the API proxy            |
+| [0019](0019-chat-permission-modes.md)              | Agent chats have a permission mode: Manual, Auto or Bypass permissions; each tool call is a read, change or risky call               |

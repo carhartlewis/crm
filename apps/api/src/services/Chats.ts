@@ -10,8 +10,11 @@ import {
   isChatId,
   isSidebarId,
   isSpaceColor,
+  DEFAULT_PERMISSION_MODE,
+  isPermissionMode,
   isSpaceId,
   normalizeChatTitle,
+  type PermissionMode,
   normalizeSpaceName,
   parseSidebarLayout,
   type FolderInput,
@@ -38,6 +41,8 @@ export interface ChatRow {
   readonly createdById: string | null;
   readonly title: string;
   readonly sessionId: string;
+  /** `manual`, `auto` or `bypass` (ADR 0019). */
+  readonly permissionMode: string;
 }
 
 export interface SpaceRow {
@@ -52,6 +57,7 @@ export interface SpaceRow {
 export interface ChatPatch {
   title?: string;
   spaceId?: string | null;
+  permissionMode?: PermissionMode;
 }
 
 /** The space columns its maker (or an admin) may change. */
@@ -137,12 +143,21 @@ export interface ChatsService {
   readonly prewarm: (actor: ChatActor) => Effect.Effect<void, Failure>;
   readonly create: (
     actor: ChatActor,
-    input: { id: string; title: string; spaceId: string | null },
+    input: {
+      id: string;
+      title: string;
+      spaceId: string | null;
+      permissionMode?: string | undefined;
+    },
   ) => Effect.Effect<{ txid: number; sessionId: string }, Failure>;
   readonly update: (
     actor: ChatActor,
     id: string,
-    input: { title?: string | undefined; spaceId?: string | null | undefined },
+    input: {
+      title?: string | undefined;
+      spaceId?: string | null | undefined;
+      permissionMode?: string | undefined;
+    },
   ) => Effect.Effect<TxId, Failure>;
   readonly remove: (actor: ChatActor, id: string) => Effect.Effect<TxId, Failure>;
   readonly history: (actor: ChatActor, id: string) => Effect.Effect<ChatHistory, Failure>;
@@ -199,12 +214,19 @@ const spaceIn = async (tx: ChatTx, workspaceId: string, spaceId: string | null) 
 };
 
 /** The caller as the agent sees them, acting in `workspaceId` (the chat's workspace). */
-const callerIn = (actor: ChatActor, workspaceId: string | null): AgentCaller => ({
+const callerIn = (
+  actor: ChatActor,
+  workspaceId: string | null,
+  permissionMode?: string,
+): AgentCaller => ({
   id: actor.id,
   name: actor.name,
   email: actor.email,
   workspaceId,
+  permissionMode: permissionMode ?? DEFAULT_PERMISSION_MODE,
 });
+
+const badMode = () => new Invalid({ message: "Choose Manual, Auto or Bypass permissions" });
 
 /** The chats use cases over an injected store, agent and KV (Redis in production). */
 export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore): ChatsService {
@@ -284,6 +306,10 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
         if (!isChatId(input.id))
           return yield* new Invalid({ message: "That chat id is not valid" });
 
+        if (input.permissionMode !== undefined && !isPermissionMode(input.permissionMode)) {
+          return yield* badMode();
+        }
+
         const title = normalizeChatTitle(input.title);
 
         if (!title.ok) return yield* new Invalid({ message: title.message });
@@ -314,6 +340,7 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
             createdById: actor.id,
             title: title.value,
             sessionId,
+            permissionMode: input.permissionMode ?? DEFAULT_PERMISSION_MODE,
           });
 
           return ok(undefined);
@@ -326,6 +353,10 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
       const title = input.title === undefined ? undefined : normalizeChatTitle(input.title);
 
       if (title && !title.ok) return Effect.fail(new Invalid({ message: title.message }));
+
+      const mode = input.permissionMode;
+
+      if (mode !== undefined && !isPermissionMode(mode)) return Effect.fail(badMode());
 
       return write(actor, "update", async (workspaceId, _, tx) => {
         const chat = isChatId(id) ? await tx.chat(id) : null;
@@ -351,6 +382,8 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
         if (title?.ok) patch.title = title.value;
 
         if (spaceId !== undefined) patch.spaceId = spaceId;
+
+        if (mode !== undefined) patch.permissionMode = mode;
 
         await tx.updateChat(id, patch);
 
@@ -551,7 +584,11 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
         const isMessage = request.method === "POST" && path.endsWith(chat.value.sessionId);
 
         const response = await agent
-          .forward(callerIn(actor, chat.value.workspaceId), path, request)
+          .forward(
+            callerIn(actor, chat.value.workspaceId, chat.value.permissionMode),
+            path,
+            request,
+          )
           .catch(() => null);
 
         if (response === null) return fail(agentDown());

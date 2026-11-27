@@ -8,6 +8,7 @@ import {
 } from "@crm/ui/patterns/page-shell";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   ChatMenu,
   type ChatMenuRequest,
@@ -38,7 +39,11 @@ function ChatPage() {
   const chat = api.chatById(chatId);
   const space = api.spaces.find((item) => item.id === chat?.space_id);
   const [dialog, setDialog] = useState<ChatMenuRequest | null>(null);
-  const rename = useMutation(updateChatMutation);
+
+  const rename = useMutation({
+    ...updateChatMutation,
+    onError: (error) => toast.error(error.message),
+  });
 
   return (
     <PageShell contained width="full">
@@ -71,6 +76,11 @@ function ChatPage() {
         // Another chat is another session: a fresh store and stream.
         key={chatId}
         chatId={chatId}
+        userId={userId}
+        permissionMode={chat?.permission_mode ?? "manual"}
+        onPermissionModeChange={(mode) =>
+          rename.mutate({ workspaceId, id: chatId, permissionMode: mode })
+        }
         history={history}
         firstMessage={peekFirstMessage(chatId)}
       />

@@ -22,10 +22,12 @@ import { Button } from "@crm/ui/components/button";
 import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { chatAgentBase, type ChatHistory } from "@crm/core/api";
 import type { EveMessage, EveMessagePart, SessionStreamEvent } from "eve/client";
-import { useMutation } from "@tanstack/react-query";
+import type { PermissionMode } from "@crm/core/chat";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEveAgent } from "eve/react";
 import { toast } from "sonner";
-import { takeFirstMessage } from "../../lib/chat-api.ts";
+import { chatKeys, takeFirstMessage } from "../../lib/chat-api.ts";
+import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { Composer } from "./composer.tsx";
 
 type ToolPart = Extract<EveMessagePart, { type: "tool" }>;
@@ -55,6 +57,10 @@ function toolState(part: ToolPart): ToolState {
 
 export interface ChatViewProps {
   readonly chatId: string;
+  readonly userId: string;
+  /** The chat's permission mode, and how to change it (ADR 0019). */
+  readonly permissionMode: string;
+  readonly onPermissionModeChange: (mode: PermissionMode) => void;
   readonly history: ChatHistory;
   /** Typed on New chat: sent once, as soon as the view mounts. */
   readonly firstMessage?: string;
@@ -64,7 +70,20 @@ export interface ChatViewProps {
  * One chat: the saved events render at once, then the live stream follows from their cursor
  * through the agent proxy (ADR 0018). Remount it (`key`) for another chat.
  */
-export function ChatView({ chatId, history, firstMessage }: ChatViewProps) {
+export function ChatView({
+  chatId,
+  userId,
+  permissionMode,
+  onPermissionModeChange,
+  history,
+  firstMessage,
+}: ChatViewProps) {
+  const queryClient = useQueryClient();
+
+  // The saved history is behind once the chat moves on; the next visit reads it again.
+  const historyChanged = () =>
+    queryClient.invalidateQueries({ queryKey: chatKeys.history(userId, chatId) });
+
   const agent = useEveAgent({
     baseUrl: chatAgentBase(chatId),
     // SAFETY: the API passes eve's stream events through unchanged (`ChatHistory.events`).
@@ -77,16 +96,19 @@ export function ChatView({ chatId, history, firstMessage }: ChatViewProps) {
   // the agent can no longer run) shows as a toast, and the optimistic message stays marked failed.
   const send = useMutation({
     mutationFn: (text: string) => agent.send(text),
+    onSettled: historyChanged,
     onError: (error) => toast.error(error.message),
   });
 
   const respond = useMutation({
     mutationFn: (answer: { interactionId: string; optionId: string }) => agent.respond([answer]),
+    onSettled: historyChanged,
     onError: (error) => toast.error(error.message),
   });
 
   const stop = useMutation({
     mutationFn: () => agent.cancel(),
+    onSettled: historyChanged,
     onError: (error) => toast.error(error.message),
   });
 
@@ -132,6 +154,7 @@ export function ChatView({ chatId, history, firstMessage }: ChatViewProps) {
           disabled={agent.status === "resuming"}
           onSend={(text) => send.mutate(text)}
           onStop={() => stop.mutate()}
+          tools={<PermissionModeMenu value={permissionMode} onChange={onPermissionModeChange} />}
         />
       </div>
     </div>

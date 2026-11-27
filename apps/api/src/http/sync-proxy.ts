@@ -206,6 +206,7 @@ export function chatsSync(workspaceId: string, userId: string): SyncSpec {
       "created_at",
       "updated_at",
       "last_message_at",
+      "permission_mode",
     ],
   };
 }

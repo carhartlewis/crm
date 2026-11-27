@@ -519,11 +519,14 @@ export const CreateChat = Schema.Struct({
   title: Schema.String,
   /** Null: private to the caller. */
   spaceId: Schema.NullOr(Schema.String),
+  /** `manual` (the default), `auto` or `bypass` (ADR 0019). */
+  permissionMode: Schema.optional(Schema.String),
 });
 
 export const UpdateChat = Schema.Struct({
   title: Schema.optional(Schema.String),
   spaceId: Schema.optional(Schema.NullOr(Schema.String)),
+  permissionMode: Schema.optional(Schema.String),
 });
 
 /** The eve session a new chat talks to, through `/api/chats/:id/agent`. */

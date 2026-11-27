@@ -307,6 +307,13 @@
                   }
                 }
               },
+              "permissionMode": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "sessionId": {
                 "nullable": false,
                 "type": {
@@ -409,6 +416,9 @@
                 },
                 "lastMessageAt": {
                   "column": "last_message_at"
+                },
+                "permissionMode": {
+                  "column": "permission_mode"
                 },
                 "sessionId": {
                   "column": "session_id"
@@ -3979,6 +3989,15 @@
                     "precision": 3
                   }
                 },
+                "permission_mode": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "default": {
+                    "kind": "literal",
+                    "value": "manual"
+                  },
+                  "nullable": false
+                },
                 "session_id": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
@@ -6535,7 +6554,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "5ea5fef9ea970c91636ba1d04c1368544dae0f97758c9c2f1bf4ec5d68ee3057"
+    "storageHash": "8f095540a6efe28d5ee6b4b746fc95c14fb8ecd5f4163649b47db0060510b8c0"
   },
   "execution": {
     "executionHash": "bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f",

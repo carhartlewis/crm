@@ -18,7 +18,7 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'5ea5fef9ea970c91636ba1d04c1368544dae0f97758c9c2f1bf4ec5d68ee3057'>;
+  StorageHashBase<'8f095540a6efe28d5ee6b4b746fc95c14fb8ecd5f4163649b47db0060510b8c0'>;
 export type ExecutionHash =
   ExecutionHashBase<'bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f'>;
 export type ProfileHash =
@@ -326,6 +326,7 @@ export namespace Models {
     createdById: FieldOutputTypes['public']['Chat']['createdById'];
     id: FieldOutputTypes['public']['Chat']['id'];
     lastMessageAt: FieldOutputTypes['public']['Chat']['lastMessageAt'];
+    permissionMode: FieldOutputTypes['public']['Chat']['permissionMode'];
     sessionId: FieldOutputTypes['public']['Chat']['sessionId'];
     spaceId: FieldOutputTypes['public']['Chat']['spaceId'];
     title: FieldOutputTypes['public']['Chat']['title'];
@@ -872,6 +873,16 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-date@1';
                   readonly nullable: false;
                   readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly permission_mode: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'manual'>;
+                  };
                   readonly many: false;
                 };
                 readonly session_id: {
@@ -3220,6 +3231,10 @@ type ContractBase = Omit<
                   readonly typeParams: { readonly precision: 3 };
                 };
               };
+              readonly permissionMode: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly sessionId: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -3288,6 +3303,7 @@ type ContractBase = Omit<
                 readonly createdById: { readonly column: 'created_by_id' };
                 readonly id: { readonly column: 'id' };
                 readonly lastMessageAt: { readonly column: 'last_message_at' };
+                readonly permissionMode: { readonly column: 'permission_mode' };
                 readonly sessionId: { readonly column: 'session_id' };
                 readonly spaceId: { readonly column: 'space_id' };
                 readonly title: { readonly column: 'title' };

@@ -8,6 +8,14 @@ import type { SessionAuthContext } from "eve/context";
  * secret and the caller in headers. eve has no access list per session, so accepting a cookie
  * here would let anyone who knew a session id read a chat that was later made private.
  */
+/** What the API tells the agent about a chat's caller. */
+type CallerAttributes = {
+  name: string;
+  email: string;
+  workspaceId?: string;
+  permissionMode?: string;
+};
+
 export function crmProxy(secret: string | undefined): AuthFn<Request> {
   const expected =
     secret && secret.length >= 32 ? new TextEncoder().encode(`Bearer ${secret}`) : null;
@@ -38,13 +46,20 @@ export function crmProxy(secret: string | undefined): AuthFn<Request> {
     const email = decodeURIComponent(request.headers.get("x-crm-user-email") ?? "");
     // The chat's workspace: connections, skills and memory act in it (ADR 0018).
     const workspaceId = request.headers.get("x-crm-workspace-id") ?? "";
+    // The chat's permission mode (ADR 0019): tool approvals read it each call.
+    const permissionMode = request.headers.get("x-crm-permission-mode") ?? "";
+    const attributes: CallerAttributes = { name, email };
+
+    if (workspaceId) attributes.workspaceId = workspaceId;
+
+    if (permissionMode) attributes.permissionMode = permissionMode;
 
     return {
       authenticator: "crm-proxy",
       principalType: "user",
       principalId: id,
       subject: email,
-      attributes: workspaceId ? { name, email, workspaceId } : { name, email },
+      attributes,
     } satisfies SessionAuthContext;
   };
 }

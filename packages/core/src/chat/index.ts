@@ -200,3 +200,63 @@ export function folderNameError(value: string) {
 
   return result.ok ? undefined : result.message;
 }
+
+/**
+ * How much the agent may do in a chat without asking (ADR 0019), as in comp-neo: `manual` asks
+ * before every change, `auto` asks only before risky calls, `bypass` runs everything and marks
+ * risky calls. Reads always run.
+ */
+export const PERMISSION_MODES = ["manual", "auto", "bypass"] as const;
+
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
+
+export const DEFAULT_PERMISSION_MODE: PermissionMode = "manual";
+
+export function isPermissionMode(value: string): value is PermissionMode {
+  return PERMISSION_MODES.some((mode) => mode === value);
+}
+
+/** What one tool call does, as far as the CRM can tell before it runs. */
+export type CallKind = "read" | "change" | "risky";
+
+/** A tool's MCP annotations: hints from its server, not promises. */
+export interface CallHints {
+  readonly readOnlyHint?: boolean;
+  readonly destructiveHint?: boolean;
+}
+
+/**
+ * Names that read or change secrets, credentials, raw data, code or money. A call to one is
+ * risky whatever its annotations say. Words are separated by `_` or `-`.
+ */
+const SENSITIVE_NAME =
+  /(?:^|[_-])(?:execute|exec|run[_-]sql|sql|query|queries|logs?|secrets?|keys?|tokens?|credentials?|passwords?|env|invoices?|payments?|billing|buy|purchase|ssh)(?:[_-]|$)/i;
+
+/** Names that change something: such a tool that says it only reads is not believed. */
+const CHANGING_NAME =
+  /(?:^|[_-])(?:create|update|save|delete|remove|deploy|apply|merge|reset|set|patch|put|post|edit|start|stop|restart|rotate|revoke|enable|disable|invite|grant|add|drop|insert|write|send|submit|cancel|archive|move|transfer|approve|assign|forget|remember)(?:[_-]|$)/i;
+
+/**
+ * The kind of a call from its bare tool name and its annotations. A tool that doesn't say it only
+ * reads is risky unless it says it isn't destructive, as MCP defines.
+ */
+export function callKind(toolName: string, hints: CallHints | undefined): CallKind {
+  if (SENSITIVE_NAME.test(toolName)) return "risky";
+
+  if (hints?.readOnlyHint === true) return CHANGING_NAME.test(toolName) ? "risky" : "read";
+
+  if (hints?.readOnlyHint === false && hints.destructiveHint === false) return "change";
+
+  return "risky";
+}
+
+/** What happens to a call: it runs, it waits for the person, or it runs marked as risky. */
+export type CallDecision = "run" | "ask" | "run_flagged";
+
+export function callDecision(mode: PermissionMode, kind: CallKind): CallDecision {
+  if (kind === "read") return "run";
+
+  if (kind === "risky") return mode === "bypass" ? "run_flagged" : "ask";
+
+  return mode === "manual" ? "ask" : "run";
+}

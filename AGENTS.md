@@ -104,6 +104,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - A chat is private (`space_id` null) or in a space that the whole workspace sees. Only the starter makes a chat private or deletes it. Rules live in `@crm/core/chat`; the API enforces them in `Chats`.
 - Browsers reach the agent only through `/api/chats/<id>/agent/*`, which checks the chat. The agent accepts only the API (`AGENT_PROXY_SECRET`) plus `localDev()`. Never add a cookie or browser auth to the eve channel.
 - Everything the agent does in the CRM is an MCP tool on our better-auth gateway (`/api/mcp`): the CRM's own tools are `crm__<tool>` in `apps/api/src/services/crm-tools.ts` (reads carry `readOnlyHint`; the agent asks before writes). Add new CRM capabilities there, never as agent-local tools.
+- Each chat has a permission mode (ADR 0019): Manual asks before changes, Auto only before risky calls, Bypass runs everything. Call kinds and decisions live in `@crm/core/chat` (`callKind`, `callDecision`); give every new CRM tool honest `readOnlyHint`/`destructiveHint` annotations.
 - In a chat, the agent calls the CRM (gateway, skills, memory) with `crm1.` tokens it signs for the caller and the chat's workspace (`@crm/core/auth/agent-token`); the API checks membership each time.
 - Speed: the API keeps a prewarmed eve session in Redis and caches chat events (`chat:history:<id>`); route loaders fetch history so hovering a chat preloads it. Chat UI is AI Elements in `@crm/ui/components/ai-elements/*`; keep unused parts out (first-view CSS budget).
 

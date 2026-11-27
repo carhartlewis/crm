@@ -2,6 +2,7 @@ import { CHAT_SPACES_SYNC_PATH, CHATS_SYNC_PATH, SIDEBAR_SYNC_PATH } from "@crm/
 import {
   decodeStoredLayout,
   type Json,
+  type PermissionMode,
   type SidebarLayout,
   type SpaceColor,
   titleFromMessage,
@@ -29,6 +30,8 @@ export type Chat = {
   readonly created_at: string;
   readonly updated_at: string;
   readonly last_message_at: string;
+  /** `manual`, `auto` or `bypass` (ADR 0019). */
+  readonly permission_mode: string;
 };
 
 export type ChatSpace = {
@@ -88,6 +91,7 @@ function createChatsCollection(workspaceId: string) {
                   id: modified.id,
                   title: modified.title,
                   spaceId: modified.space_id,
+                  permissionMode: modified.permission_mode,
                 }),
               });
 
@@ -109,7 +113,11 @@ function createChatsCollection(workspaceId: string) {
               collection.utils.awaitTxId,
               `/api/chats/${encodeURIComponent(original.id)}`,
               "PATCH",
-              { title: changes.title, spaceId: changes.space_id },
+              {
+                title: changes.title,
+                spaceId: changes.space_id,
+                permissionMode: changes.permission_mode,
+              },
             ),
           ),
         );
@@ -240,6 +248,7 @@ interface StartChat {
   readonly userId: string;
   readonly text: string;
   readonly spaceId: string | null;
+  readonly permissionMode: PermissionMode;
 }
 
 /**
@@ -249,7 +258,7 @@ interface StartChat {
  */
 export const startChatMutation = mutationOptions({
   mutationKey: ["chats", "start"],
-  mutationFn: async ({ workspaceId, userId, text, spaceId }: StartChat) => {
+  mutationFn: async ({ workspaceId, userId, text, spaceId, permissionMode }: StartChat) => {
     const id = createId(ID_PREFIXES.chat);
     const now = new Date().toISOString();
     const session = Promise.withResolvers<string>();
@@ -265,6 +274,7 @@ export const startChatMutation = mutationOptions({
       created_at: now,
       updated_at: now,
       last_message_at: now,
+      permission_mode: permissionMode,
     });
 
     // The row settles later, through sync; its failure already rejected `session`.
@@ -283,16 +293,19 @@ interface UpdateChat {
   readonly id: string;
   readonly title?: string;
   readonly spaceId?: string | null;
+  readonly permissionMode?: PermissionMode;
 }
 
 /** Renames a chat or moves it to another space (null: Private). */
 export const updateChatMutation = mutationOptions({
   mutationKey: ["chats", "update"],
-  mutationFn: async ({ workspaceId, id, title, spaceId }: UpdateChat) => {
+  mutationFn: async ({ workspaceId, id, title, spaceId, permissionMode }: UpdateChat) => {
     const transaction = chatsCollection(workspaceId).update(id, (draft) => {
       if (title !== undefined) draft.title = title;
 
       if (spaceId !== undefined) draft.space_id = spaceId;
+
+      if (permissionMode !== undefined) draft.permission_mode = permissionMode;
     });
 
     await transaction.when("settled");

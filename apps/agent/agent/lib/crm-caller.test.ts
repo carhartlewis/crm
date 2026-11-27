@@ -8,9 +8,14 @@ describe("crmCaller", () => {
         authenticator: "crm-proxy",
         principalType: "user",
         principalId: "user_1",
-        attributes: { name: "Ana", email: "ana@example.com", workspaceId: "ws_1" },
+        attributes: {
+          name: "Ana",
+          email: "ana@example.com",
+          workspaceId: "ws_1",
+          permissionMode: "bypass",
+        },
       }),
-    ).toEqual({ userId: "user_1", workspaceId: "ws_1" });
+    ).toEqual({ userId: "user_1", workspaceId: "ws_1", permissionMode: "bypass" });
   });
 
   test("other users have no workspace; services and anonymous callers are not CRM users", () => {
@@ -21,7 +26,7 @@ describe("crmCaller", () => {
         principalId: "user_1",
         attributes: {},
       }),
-    ).toEqual({ userId: "user_1", workspaceId: null });
+    ).toEqual({ userId: "user_1", workspaceId: null, permissionMode: "manual" });
     expect(
       crmCaller({
         authenticator: "crm-proxy",
