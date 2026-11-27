@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { EveMessagePart } from "eve/client";
-import { messageBlocks, runDetail, runState, type ToolPart } from "./tool-steps.ts";
+import {
+  formatWorked,
+  messageBlocks,
+  runDetail,
+  runState,
+  turnSummaries,
+  type ToolPart,
+} from "./tool-steps.ts";
 
 const call = (
   callId: string,
@@ -18,6 +25,19 @@ const call = (
 });
 
 const text = (value: string): EveMessagePart => ({ type: "text", id: value, text: value });
+
+const event = (type: string, turnId: string, at: string, outcome?: string) => ({
+  type,
+  data: { turnId, outcome },
+  meta: { at },
+});
+
+const reply = (id: string, turnId: string, parts: EveMessagePart[]) => ({
+  id,
+  role: "assistant" as const,
+  metadata: { turnId },
+  parts,
+});
 
 describe("tool step runs", () => {
   test("consecutive calls to one tool form one run; text or another tool starts a new one", () => {
@@ -73,5 +93,24 @@ describe("tool step runs", () => {
       kind: "part",
       part: { type: "reasoning", text: "First\n\nThen", state: "streaming" },
     });
+  });
+
+  test("a finished turn says how long it worked and how many steps it ran", () => {
+    const summaries = turnSummaries(
+      [
+        event("turn.started", "t1", "2026-11-27T03:00:00.000Z"),
+        event("turn.settled", "t1", "2026-11-27T03:00:14.400Z", "completed"),
+        event("turn.started", "t2", "2026-11-27T03:01:00.000Z"),
+      ],
+      [
+        reply("m1", "t1", [call("a", "Web search"), call("b", "Web search"), text("Done")]),
+        reply("m2", "t2", [call("c", "List companies")]),
+      ],
+    );
+
+    expect(summaries.get("m1")).toBe("Worked for 14s · 2 steps");
+    // Still running: no line yet.
+    expect(summaries.has("m2")).toBe(false);
+    expect(formatWorked(125_000)).toBe("2m 5s");
   });
 });

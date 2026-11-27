@@ -1,6 +1,6 @@
 import type { ToolStepState } from "@crm/ui/patterns/tool-step";
 import { Option, Schema } from "effect";
-import type { EveMessagePart } from "eve/client";
+import type { EveMessage, EveMessagePart } from "eve/client";
 
 export type ToolPart = Extract<EveMessagePart, { type: "tool" }>;
 
@@ -131,4 +131,75 @@ export function partKey(part: EveMessagePart, index: number) {
   if ((part.type === "text" || part.type === "reasoning") && part.id) return part.id;
 
   return `${part.type}-${index}`;
+}
+
+/** The fields of a stream event a turn's timing needs; the rest of the event is ignored. */
+const TimedTurnEvent = Schema.Struct({
+  type: Schema.Literals(["turn.started", "turn.settled"]),
+  data: Schema.Struct({ turnId: Schema.String, outcome: Schema.optional(Schema.String) }),
+  meta: Schema.Struct({ at: Schema.String }),
+});
+
+const decodeTimedTurnEvent = Schema.decodeUnknownOption(TimedTurnEvent);
+
+/** "14s", "2m 5s". */
+export function formatWorked(ms: number) {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+/**
+ * "Worked for 14s · 5 steps" under the last message of each finished turn, as in T3 Code: how
+ * long the agent took and how many steps it ran. Keyed by message id; turns still running,
+ * stopped or failed get none.
+ */
+export function turnSummaries(events: readonly unknown[], messages: readonly EveMessage[]) {
+  const started = new Map<string, number>();
+  const finished = new Map<string, number>();
+
+  for (const event of events) {
+    Option.match(decodeTimedTurnEvent(event), {
+      onNone: () => undefined,
+      onSome: ({ type, data, meta }) => {
+        const at = Date.parse(meta.at);
+
+        if (type === "turn.started") started.set(data.turnId, at);
+        else if (data.outcome === "completed") finished.set(data.turnId, at);
+      },
+    });
+  }
+
+  const lastMessage = new Map<string, string>();
+  const steps = new Map<string, number>();
+
+  for (const message of messages) {
+    const turnId = message.metadata?.turnId;
+
+    if (message.role !== "assistant" || !turnId) continue;
+
+    lastMessage.set(turnId, message.id);
+    steps.set(
+      turnId,
+      (steps.get(turnId) ?? 0) +
+        message.parts.filter((part) => part.type === "tool" && shownCall(part)).length,
+    );
+  }
+
+  const summaries = new Map<string, string>();
+
+  for (const [turnId, messageId] of lastMessage) {
+    const start = started.get(turnId);
+    const end = finished.get(turnId);
+    const count = steps.get(turnId) ?? 0;
+
+    if (start === undefined || end === undefined || count === 0) continue;
+
+    summaries.set(
+      messageId,
+      `Worked for ${formatWorked(end - start)} · ${count} ${count === 1 ? "step" : "steps"}`,
+    );
+  }
+
+  return summaries;
 }

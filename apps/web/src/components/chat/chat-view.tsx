@@ -38,6 +38,7 @@ import {
   stepLabel,
   stepState,
   type ToolPart,
+  turnSummaries,
 } from "./tool-steps.ts";
 
 type InteractionPart = Extract<EveMessagePart, { type: "interaction" }>;
@@ -141,6 +142,9 @@ export function ChatView({
     ),
   );
 
+  // "Worked for 14s · 5 steps" under each finished turn.
+  const summaries = turnSummaries(agent.events, agent.messages);
+
   const answer = (interactionId: string, optionId: string) =>
     respond.mutate([{ interactionId, optionId }]);
 
@@ -167,7 +171,12 @@ export function ChatView({
             />
           ) : (
             agent.messages.map((message) => (
-              <ChatMessage key={message.id} message={message} onAnswer={answer} />
+              <ChatMessage
+                key={message.id}
+                message={message}
+                summary={summaries.get(message.id)}
+                onAnswer={answer}
+              />
             ))
           )}
           {working && !visiblyWorking && waiting.length === 0 && <ThinkingIndicator />}
@@ -209,9 +218,12 @@ export function ChatView({
 
 function ChatMessage({
   message,
+  summary,
   onAnswer,
 }: {
   message: EveMessage;
+  /** How long the finished turn took and how many steps it ran. */
+  summary: string | undefined;
   onAnswer: (interactionId: string, optionId: string) => void;
 }) {
   return (
@@ -225,6 +237,7 @@ function ChatMessage({
           ),
         )}
       </MessageContent>
+      {summary && <p className="text-xs text-muted-foreground select-none">{summary}</p>}
     </Message>
   );
 }
