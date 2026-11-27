@@ -63,7 +63,9 @@ function Button({
       data-loading={loading || undefined}
       aria-busy={loading || undefined}
       disabled={disabled || loading}
-      className={cn(buttonVariants({ variant, size, className }), "relative")}
+      // `relative` (for the loading spinner) comes first so a caller's `absolute` (a dialog's close
+      // button) still wins.
+      className={cn("relative", buttonVariants({ variant, size, className }))}
       {...props}
     >
       <span

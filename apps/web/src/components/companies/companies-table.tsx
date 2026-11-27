@@ -1,12 +1,13 @@
 import { Button } from "@crm/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@crm/ui/components/dialog";
 import { DropdownMenuItem } from "@crm/ui/components/dropdown-menu";
+import {
+  AdaptiveSheet,
+  AdaptiveSheetContent,
+  AdaptiveSheetDescription,
+  AdaptiveSheetFooter,
+  AdaptiveSheetHeader,
+  AdaptiveSheetTitle,
+} from "@crm/ui/patterns/adaptive-sheet";
 import { BulkActionsMenu } from "@crm/ui/patterns/data-table/bulk-actions";
 import {
   DataTable,
@@ -294,14 +295,8 @@ export function CompaniesTable({
           ) : null
         }
       />
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New company</DialogTitle>
-            <DialogDescription>
-              It appears in the list at once and syncs to your workspace.
-            </DialogDescription>
-          </DialogHeader>
+      <AdaptiveSheet open={createOpen} onOpenChange={setCreateOpen}>
+        <AdaptiveSheetContent>
           <CompanyForm
             submitLabel="Create company"
             onSubmit={async (input) => {
@@ -312,9 +307,20 @@ export function CompaniesTable({
                 Cancel
               </Button>
             }
+            sheet={{
+              header: (
+                <AdaptiveSheetHeader>
+                  <AdaptiveSheetTitle>New company</AdaptiveSheetTitle>
+                  <AdaptiveSheetDescription>
+                    It appears in the list at once and syncs to your workspace.
+                  </AdaptiveSheetDescription>
+                </AdaptiveSheetHeader>
+              ),
+              Footer: AdaptiveSheetFooter,
+            }}
           />
-        </DialogContent>
-      </Dialog>
+        </AdaptiveSheetContent>
+      </AdaptiveSheet>
     </div>
   );
 }
