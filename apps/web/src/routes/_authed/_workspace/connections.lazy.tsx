@@ -72,7 +72,7 @@ function Connections() {
   const search = Route.useSearch();
   const workspaceId = session.session.activeOrganizationId ?? "";
   const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(TABS).withDefault("connectors"));
-  const [view, setView] = useQueryState("view", parseAsStringLiteral(VIEWS).withDefault("yours"));
+  const [chosenView, setView] = useQueryState("view", parseAsStringLiteral(VIEWS));
   const [query] = useQueryState("q", parseAsString.withDefault(""));
   const [adding, setAdding] = useQueryState("add", parseAsStringLiteral(ADD_KINDS));
   const [, setOpenSkill] = useQueryState("skill", parseAsString);
@@ -96,6 +96,15 @@ function Connections() {
   const { data: connections } = useSuspenseQuery(connectionsQuery(session.user.id, workspaceId));
   const { data: skills } = useSuspenseQuery(skillsQuery(session.user.id, workspaceId));
   const { data: catalog } = useSuspenseQuery(catalogQuery(session.user.id, workspaceId));
+
+  // Without a `?view=`, a tab with nothing of yours opens on Discover. Decided from what you had
+  // on arrival, so removing your last one doesn't swap the view out from under you.
+  const [emptyOnArrival] = useState(() => ({
+    connectors: connections.length === 0,
+    skills: skills.length === 0,
+  }));
+
+  const view = chosenView ?? (emptyOnArrival[tab] ? "discover" : "yours");
 
   const returned = search.connected ?? search.app ?? "";
   const appName = catalog.find((entry) => entry.id === returned)?.name ?? "The app";
