@@ -280,6 +280,38 @@
   }
 }
 
+/* Native scrollbars match ScrollArea: a thin rounded thumb in the border colour on a clear track,
+   slightly stronger on hover. WebKit/Chromium (Electron, Safari) use the pseudo-elements; other
+   browsers get the standard properties. `no-scrollbar` still hides them. */
+@supports selector(::-webkit-scrollbar) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background: var(--border) padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--border), var(--foreground) 25%) padding-box;
+  }
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+
 /* Resizing the sidebar: one cursor everywhere, no text selection, no tooltips popping up. */
 body[data-sidebar-resizing],
 body[data-sidebar-resizing] * {
