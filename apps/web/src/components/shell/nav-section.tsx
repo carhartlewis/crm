@@ -11,13 +11,15 @@ const ChevronIcon = carbonIcon(chevronRight);
  * label shows on hover (or focus), pointing down while open and right while closed. A closed
  * section still shows the row you are on (`data-section-closed` in styles.css hides the rest),
  * so the open chat or page never disappears. Open by default; the choice is kept per person on
- * this device (`lib/sidebar-sections.ts`).
+ * this device (`lib/sidebar-sections.ts`). `collapsible={false}` keeps a section always open
+ * with a plain label (Pinned: the pages are few and always wanted).
  */
 export function NavSection({
   userId,
   section,
   label,
   action,
+  collapsible = true,
   children,
 }: {
   userId: string;
@@ -25,10 +27,21 @@ export function NavSection({
   label: string;
   /** A button at the end of the label row, such as New folder. */
   action?: ReactNode;
+  collapsible?: boolean;
   children: ReactNode;
 }) {
   const open = useSectionOpen(userId, section);
   const contentId = useId();
+
+  if (!collapsible) {
+    return (
+      <SidebarGroup>
+        <SidebarGroupLabel>{label}</SidebarGroupLabel>
+        {action}
+        {children}
+      </SidebarGroup>
+    );
+  }
 
   return (
     <SidebarGroup>

@@ -97,7 +97,7 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
             </SidebarGroup>
             <Suspense
               fallback={
-                <NavSection userId={userId} section="pinned" label="Pinned">
+                <NavSection userId={userId} section="pinned" label="Pinned" collapsible={false}>
                   <PinnedNav userId={userId} workspaceId={workspaceId} />
                 </NavSection>
               }

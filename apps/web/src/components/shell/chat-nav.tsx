@@ -136,6 +136,7 @@ export default function ChatNav({ userId, workspaceId }: NavProps) {
       <PinGroup
         label="Pinned"
         section="pinned"
+        collapsible={false}
         kinds={["page"]}
         hotkeyOffset={0}
         takesChats={!pinnedChats}
@@ -173,6 +174,8 @@ interface RowProps extends NavProps {
 interface PinGroupProps extends RowProps {
   readonly label: string;
   readonly section: SidebarSection;
+  /** False keeps the section always open (Pinned's pages). */
+  readonly collapsible?: boolean;
   /** Which pins this group shows: pages in Pinned, spaces in Spaces, chats in Pinned chats. */
   readonly kinds: readonly PinKind[];
   /** The ⌥ number before this group's first row; no hotkeys when absent. */
@@ -189,6 +192,7 @@ interface PinGroupProps extends RowProps {
 function PinGroup({
   label,
   section,
+  collapsible,
   kinds,
   hotkeyOffset,
   takesChats = false,
@@ -237,7 +241,7 @@ function PinGroup({
   if (visible.length === 0) return null;
 
   return (
-    <NavSection userId={userId} section={section} label={label}>
+    <NavSection userId={userId} section={section} label={label} collapsible={collapsible}>
       {/* Chats dropped between its rows are pinned there (chat-drag.ts). */}
       <SidebarMenu ref={listRef} aria-label={label} data-drop-pinned={takesChats || undefined}>
         {visible.map(({ key, index: pinIndex, pin: item }, index) => {
