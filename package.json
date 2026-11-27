@@ -53,5 +53,10 @@
   ],
   "patchedDependencies": {
     "@tanstack/router-core@1.171.39": "patches/@tanstack%2Frouter-core@1.171.39.patch"
+  },
+  "intent": {
+    "skills": [
+      "*"
+    ]
   }
 }

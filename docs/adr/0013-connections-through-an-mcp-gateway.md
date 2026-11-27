@@ -1,4 +1,4 @@
-# 0012: Connections reach the agent through an MCP gateway
+# 0013: Connections reach the agent through an MCP gateway
 
 **Status:** accepted (2026-11)
 

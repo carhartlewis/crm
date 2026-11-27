@@ -32,7 +32,7 @@ from the main-branch README without checking the installed exports first.
 The requested setup enables four shadcn rules: no arbitrary values, no raw colors,
 statically readable class expressions, and no component restyling beyond layout.
 The component implementation directory (`**/components/ui/**`) may define its own
-appearance; it is exempt only from `no-restyle`.
+appearance; it is exempt only from `no-restyle`. Shared patterns in `packages/ui/src/patterns/**` (the data table, page shell, record sheet) compose components and own their appearance the same way, so they are exempt from `no-restyle` too.
 
 Shared `@crm/ui` imports are recognized. Once an app exists, configure its actual
 `components.json` and Tailwind v4 theme so discovery can supply precise tokens,

@@ -1,18 +1,13 @@
 import { SessionUser } from "@crm/core/api";
 import { createMemoryKv } from "@crm/core/kv";
-import { integrations } from "@crm/integrations";
-import { fakeUpstream } from "@crm/integrations/testing";
-import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { afterAll, describe, expect, test } from "bun:test";
-import { Effect, Layer, Option, Schema } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
-import { Auth, AuthError } from "../services/Auth.ts";
-import {
-  type ConnectionRecord,
-  type ConnectionStore,
-  Connections,
-  makeConnections,
-} from "../services/Connections.ts";
+import { Auth, AuthError, type SessionInfo } from "../services/Auth.ts";
+import { Companies, makeCompanies } from "../services/Companies.ts";
+import { Connections, makeConnections } from "../services/Connections.ts";
+import { createMemoryCompanyStore } from "../services/company-store-memory.ts";
+import { Electric, makeElectric } from "../services/Electric.ts";
 import { loopbackUrl } from "./desktop.ts";
 import { Routes } from "./routes.ts";
 
@@ -24,8 +19,22 @@ const alice = new SessionUser({
   image: null,
 });
 
-// Fake better-auth: a valid session cookie resolves to Alice, "broken" simulates a store outage,
-// and `/api/auth/*` echoes the path so the mount can be asserted.
+// Sessions by cookie: Alice acts in ws_a (a member); "nows" has no active workspace; "intruder"
+// claims ws_a without a membership.
+const sessions = new Map<string, SessionInfo>([
+  ["session=valid", { user: alice, activeWorkspaceId: "ws_a" }],
+  ["session=nows", { user: alice, activeWorkspaceId: null }],
+  [
+    "session=intruder",
+    {
+      user: new SessionUser({ ...alice, id: "user_2", email: "mallory@example.com" }),
+      activeWorkspaceId: "ws_a",
+    },
+  ],
+]);
+
+// Fake better-auth: a known session cookie resolves to its session, "broken" simulates a store
+// outage, and `/api/auth/*` echoes the path so the mount can be asserted.
 const FakeAuth = Layer.succeed(
   Auth,
   Auth.of({
@@ -36,35 +45,10 @@ const FakeAuth = Layer.succeed(
 
       if (cookie.includes("broken")) return Effect.fail(new AuthError({ cause: "redis down" }));
 
-      if (!cookie.includes("session=valid")) return Effect.succeed(Option.none());
-
-      return Effect.succeed(
-        Option.some({
-          // "as=bob" stands for a second signed-in user.
-          user: cookie.includes("as=bob") ? new SessionUser({ ...alice, id: "user_2" }) : alice,
-          activeWorkspaceId: cookie.includes("workspace=")
-            ? (cookie.split("workspace=")[1] ?? null)
-            : null,
-        }),
-      );
+      return Effect.succeed(Option.fromNullishOr(sessions.get(cookie)));
     },
-    // A token "user_1:ws_1" stands for a verified MCP token with those claims.
-    protectMcp: (handler) => async (request) => {
-      const token = request.headers.get("authorization")?.replace("Bearer ", "") ?? "";
-      const [userId, workspaceId] = token.split(":");
-
-      if (!userId || !workspaceId) {
-        return new Response(null, {
-          status: 401,
-          headers: {
-            "www-authenticate":
-              'Bearer resource_metadata="http://api.test/.well-known/oauth-protected-resource/api/mcp"',
-          },
-        });
-      }
-
-      return handler(request, { userId, workspaceId });
-    },
+    // The gateway is covered in connections.test.ts; here every MCP request is unauthenticated.
+    protectMcp: () => async () => new Response(null, { status: 401 }),
     desktopStart: (start, ip) =>
       Effect.succeed(
         new Response(null, {
@@ -92,86 +76,67 @@ const FakeAuth = Layer.succeed(
   }),
 );
 
-// Alice is a member of ws_1 only. Connected apps are the in-process fake from @crm/integrations.
-const upstream = fakeUpstream(integrations[0].mcpUrl);
-const rows: ConnectionRecord[] = [];
+const memory = createMemoryCompanyStore(["ws_a:user_1"]);
+const FakeCompanies = Layer.succeed(Companies, makeCompanies(memory.store));
 
-const memoryStore: ConnectionStore = {
-  isMember: async ({ workspaceId, userId }) => workspaceId === "ws_1" && userId === "user_1",
-  list: async ({ workspaceId, userId }) =>
-    rows.filter((row) => row.workspaceId === workspaceId && row.userId === userId),
-  save: async (owner, row, now) => {
-    const index = rows.findIndex(
-      (existing) =>
-        existing.workspaceId === owner.workspaceId &&
-        existing.userId === owner.userId &&
-        existing.integration === row.integration,
-    );
+// Fake Electric: records each upstream URL and answers like Electric's initial snapshot.
+const electricCalls: URL[] = [];
 
-    const createdAt = rows[index]?.createdAt ?? now;
-    const record = { id: `c${rows.length}`, ...owner, ...row, createdAt, updatedAt: now };
+const FakeElectric = Layer.succeed(
+  Electric,
+  makeElectric({
+    url: new URL("http://electric.test"),
+    secret: "electric-secret",
+    fetch: async (url) => {
+      electricCalls.push(url);
 
-    if (index === -1) rows.push(record);
-    else rows[index] = record;
-  },
-  setAccess: async (owner, integration, access, now) => {
-    const row = rows.find(
-      (existing) =>
-        existing.workspaceId === owner.workspaceId &&
-        existing.userId === owner.userId &&
-        existing.integration === integration,
-    );
+      if (url.searchParams.get("offset") === "boom") throw new Error("connection refused");
 
-    if (!row) return null;
+      return new Response('[{"headers":{"control":"up-to-date"}}]', {
+        status: url.searchParams.get("handle") === "gone" ? 409 : 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=604800, s-maxage=3600",
+          "access-control-allow-origin": "*",
+          "electric-handle": "h-1",
+          "electric-offset": "0_0",
+        },
+      });
+    },
+  }),
+);
 
-    const next = { ...row, access, updatedAt: now };
-
-    rows[rows.indexOf(row)] = next;
-
-    return next;
-  },
-  setCredentials: async (id, credentials) => {
-    const row = rows.find((existing) => existing.id === id);
-
-    if (row) rows[rows.indexOf(row)] = { ...row, credentials };
-  },
-  remove: async (owner, integration) => {
-    const index = rows.findIndex(
-      (existing) =>
-        existing.workspaceId === owner.workspaceId &&
-        existing.userId === owner.userId &&
-        existing.integration === integration,
-    );
-
-    if (index === -1) return false;
-
-    rows.splice(index, 1);
-
-    return true;
-  },
-};
-
-let states = 0;
-
+// Connections are covered in connections.test.ts; here they only complete the route layer.
 const FakeConnections = Layer.succeed(
   Connections,
   makeConnections({
-    store: memoryStore,
-    kv: createMemoryKv(),
-    cipher: { seal: async (data) => `sealed:${data}`, open: async (data) => data.slice(7) },
-    oauth: {
-      clientName: "CRM",
-      redirectUrl: "http://api.test/api/connections/callback",
-      fetch: upstream.fetch,
+    store: {
+      isMember: async () => false,
+      list: async () => [],
+      save: async () => {},
+      setAccess: async () => null,
+      setCredentials: async () => {},
+      remove: async () => false,
     },
+    kv: createMemoryKv(),
+    cipher: { seal: async (data) => data, open: async (data) => data },
+    oauth: { clientName: "CRM", redirectUrl: "http://api.test/api/connections/callback" },
     page: new URL("http://web.test/connections"),
-    now: () => new Date("2026-11-26T12:00:00Z"),
-    state: () => `state_${++states}`,
+    now: () => new Date(),
+    state: () => "state",
   }),
 );
 
 const app = HttpRouter.toWebHandler(
-  Routes.pipe(Layer.provide([FakeAuth, FakeConnections, HttpServer.layerServices])),
+  Routes.pipe(
+    Layer.provide([
+      FakeAuth,
+      FakeCompanies,
+      FakeElectric,
+      FakeConnections,
+      HttpServer.layerServices,
+    ]),
+  ),
   {
     disableLogger: true,
   },
@@ -181,6 +146,17 @@ afterAll(() => app.dispose());
 
 const get = (path: string, cookie?: string) =>
   app.handler(new Request(`http://api.test${path}`, { headers: cookie ? { cookie } : {} }));
+
+type Body = Record<string, string | null>;
+
+const send = (method: string, path: string, cookie: string, body?: Body) =>
+  app.handler(
+    new Request(`http://api.test${path}`, {
+      method,
+      headers: { cookie, "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  );
 
 describe("api routes", () => {
   test("health is public", async () => {
@@ -261,163 +237,105 @@ describe("api routes", () => {
   });
 });
 
-/** The JSON body of the connections endpoints that take one. */
-interface AccessBody {
-  readonly access: "read" | "write";
-}
+describe("companies api", () => {
+  test("create, update and delete return the write's txid", async () => {
+    const id = crypto.randomUUID();
 
-const decodeAuthorize = Schema.decodeUnknownSync(Schema.Struct({ url: Schema.String }));
-const decodeAccess = Schema.decodeUnknownSync(Schema.Struct({ access: Schema.String }));
-
-const decodeClientMetadata = Schema.decodeUnknownSync(
-  Schema.Struct({ redirect_uris: Schema.Array(Schema.String) }),
-);
-
-function send(method: string, path: string, cookie: string, body?: AccessBody) {
-  const headers = new Headers({ cookie });
-  const init: RequestInit = { method, headers };
-
-  if (body) {
-    headers.set("content-type", "application/json");
-    init.body = JSON.stringify(body);
-  }
-
-  return app.handler(new Request(`http://api.test${path}`, init));
-}
-
-const member = "session=valid; workspace=ws_1";
-
-async function connectNotes(access: "read" | "write") {
-  const started = await send("POST", "/api/connections/granola/authorize", member, { access });
-  const { url } = decodeAuthorize(await started.json());
-  const state = new URL(url).searchParams.get("state") ?? "";
-
-  return get(`/api/connections/callback?state=${state}&code=good`, member);
-}
-
-async function startedState() {
-  const started = await send("POST", "/api/connections/granola/authorize", member, {
-    access: "read",
-  });
-
-  return new URL(decodeAuthorize(await started.json()).url).searchParams.get("state");
-}
-
-async function agent(token?: string) {
-  const client = new Client({ name: "agent", version: "1.0.0" });
-
-  await client.connect(
-    new StreamableHTTPClientTransport(new URL("http://api.test/api/mcp"), {
-      fetch: (input, init) => {
-        const request = new Request(input.toString(), init);
-
-        if (token) request.headers.set("authorization", `Bearer ${token}`);
-
-        return app.handler(request);
-      },
-    }),
-  );
-
-  return client;
-}
-
-describe("connections", () => {
-  test("need a workspace the user belongs to", async () => {
-    expect((await get("/api/connections", "session=valid")).status).toBe(403);
-    expect((await get("/api/connections", "session=valid; workspace=ws_2")).status).toBe(403);
-    expect((await get("/api/connections")).status).toBe(401);
-  });
-
-  test("authorize returns the app's authorization URL; unknown apps are 404", async () => {
-    const response = await send("POST", "/api/connections/granola/authorize", member, {
-      access: "read",
+    const created = await send("POST", "/api/companies", "session=valid", {
+      id,
+      name: " Acme ",
+      domain: "https://www.acme.com",
     });
 
-    const { url } = decodeAuthorize(await response.json());
+    expect(created.status).toBe(200);
+    expect(await created.json()).toEqual({ txid: expect.any(Number) });
+    expect(memory.rows().get(id)).toMatchObject({
+      name: "Acme",
+      domain: "acme.com",
+      workspaceId: "ws_a",
+    });
 
-    expect(new URL(url).origin).toBe("https://auth.notes.example");
-    expect(
-      (await send("POST", "/api/connections/nope/authorize", member, { access: "read" })).status,
-    ).toBe(404);
+    const updated = await send("PATCH", `/api/companies/${id}`, "session=valid", { domain: null });
+
+    expect(updated.status).toBe(200);
+    expect(memory.rows().get(id)?.domain).toBeNull();
+
+    expect((await send("DELETE", `/api/companies/${id}`, "session=valid")).status).toBe(200);
+    expect(memory.rows().has(id)).toBe(false);
   });
 
-  test("the callback saves the connection and returns to the Connections page", async () => {
-    const response = await connectNotes("read");
+  test("typed errors map to 400, 401, 403 and 404", async () => {
+    const id = crypto.randomUUID();
+    const body = { id, name: "Acme", domain: null };
 
-    expect(response.headers.get("location")).toBe("http://web.test/connections?connected=granola");
-    expect(await (await get("/api/connections", member)).json()).toEqual([
-      {
-        integration: "granola",
-        access: "read",
-        createdAt: "2026-11-26T12:00:00.000Z",
-        updatedAt: "2026-11-26T12:00:00.000Z",
-      },
-    ]);
-  });
+    const invalid = await send("POST", "/api/companies", "session=valid", { ...body, name: "" });
 
-  test("a callback is single-use", async () => {
-    const state = await startedState();
-    const finish = () => get(`/api/connections/callback?state=${state}&code=good`, member);
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ _tag: "Invalid" });
+    expect((await send("POST", "/api/companies", "", body)).status).toBe(401);
+    expect((await send("POST", "/api/companies", "session=nows", body)).status).toBe(403);
+    expect((await send("POST", "/api/companies", "session=intruder", body)).status).toBe(403);
 
-    expect((await finish()).headers.get("location")).toContain("connected=granola");
-    expect((await finish()).headers.get("location")).toContain("error=expired");
-  });
+    const missing = await send("PATCH", `/api/companies/${id}`, "session=valid", { name: "B" });
 
-  test("a different signed-in user can't finish someone else's sign-in", async () => {
-    const state = await startedState();
-
-    const response = await get(
-      `/api/connections/callback?state=${state}&code=good`,
-      "session=valid; as=bob",
-    );
-
-    expect(response.headers.get("location")).toContain("error=wrong_user");
-  });
-
-  test("a signed-out browser (desktop) finishes by state and is told to go back", async () => {
-    const state = await startedState();
-    const response = await get(`/api/connections/callback?state=${state}&code=good`);
-
-    expect(response.status).toBe(200);
-    expect(await response.text()).toContain("The app is connected");
-  });
-
-  test("access can change; removing disconnects", async () => {
-    await connectNotes("read");
-
-    const updated = await send("PATCH", "/api/connections/granola", member, { access: "write" });
-
-    expect(decodeAccess(await updated.json()).access).toBe("write");
-    expect((await send("DELETE", "/api/connections/granola", member)).status).toBe(204);
-    expect((await send("DELETE", "/api/connections/granola", member)).status).toBe(404);
-  });
-
-  test("serves the Client ID Metadata Document", async () => {
-    const document = decodeClientMetadata(
-      await (await get("/api/connections/client-metadata.json")).json(),
-    );
-
-    expect(document.redirect_uris).toEqual(["http://api.test/api/connections/callback"]);
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ _tag: "NotFound" });
   });
 });
 
-describe("MCP gateway", () => {
-  test("without a token, answers 401 with the discovery challenge", async () => {
-    const response = await app.handler(
-      new Request("http://api.test/api/mcp", { method: "POST", body: "{}" }),
-    );
+describe("companies shape proxy", () => {
+  const path = "/api/shapes/companies";
+
+  test("requires a session", async () => {
+    const response = await get(`${path}?workspace=ws_a&offset=-1`);
 
     expect(response.status).toBe(401);
-    expect(response.headers.get("www-authenticate")).toContain("resource_metadata");
+    expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
-  test("gives the agent the user's connected tools in the token's workspace", async () => {
-    await connectNotes("read");
+  test("requires ?workspace= to be the session's active workspace with a membership", async () => {
+    const before = electricCalls.length;
 
-    const tools = (await (await agent("user_1:ws_1")).listTools()).tools.map(({ name }) => name);
-    const elsewhere = (await (await agent("user_1:ws_2")).listTools()).tools;
+    for (const [query, cookie] of [
+      ["offset=-1", "session=valid"],
+      ["workspace=ws_b&offset=-1", "session=valid"],
+      ["workspace=ws_a&offset=-1", "session=nows"],
+      ["workspace=ws_a&offset=-1", "session=intruder"],
+    ] as const) {
+      // oxlint-disable-next-line no-await-in-loop -- each case is independent and small.
+      expect((await get(`${path}?${query}`, cookie)).status).toBe(403);
+    }
 
-    expect(tools).toEqual(["granola__search_notes"]);
-    expect(elsewhere).toEqual([]);
+    expect(electricCalls.length).toBe(before);
+  });
+
+  test("proxies a fixed, workspace-filtered shape and makes caching private", async () => {
+    const response = await get(
+      `${path}?workspace=ws_a&offset=-1&table=user&where=true&secret=x&params%5B1%5D=ws_b`,
+      "session=valid",
+    );
+
+    const upstream = electricCalls.at(-1);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('[{"headers":{"control":"up-to-date"}}]');
+    expect(Object.fromEntries(upstream?.searchParams ?? [])).toEqual({
+      offset: "-1",
+      table: "company",
+      where: "workspace_id = $1",
+      "params[1]": "ws_a",
+      secret: "electric-secret",
+    });
+    expect(response.headers.get("electric-handle")).toBe("h-1");
+    expect(response.headers.get("cache-control")).toBe("private, max-age=604800");
+    expect(response.headers.get("vary")).toBe("Cookie");
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  test("passes Electric's error status through, and reports an unreachable Electric as 502", async () => {
+    expect(
+      (await get(`${path}?workspace=ws_a&offset=0_0&handle=gone`, "session=valid")).status,
+    ).toBe(409);
+    expect((await get(`${path}?workspace=ws_a&offset=boom`, "session=valid")).status).toBe(502);
   });
 });

@@ -160,6 +160,8 @@ function SidebarProvider({
 
   return (
     <SidebarContext.Provider value={contextValue}>
+      {/* Record sheets portal outside this wrapper and size themselves beside the sidebar. */}
+      <style>{`:root { --workspace-sidebar-width: ${open && !isMobile ? width : 0}px; }`}</style>
       <div
         data-slot="sidebar-wrapper"
         style={
@@ -533,12 +535,16 @@ function SidebarRail({
   );
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+/**
+ * The page area beside the sidebar: a fixed-height frame. Pages own scrolling and the `<main>`
+ * landmark (PageShell), so the sidebar and title bar stay put while the page scrolls.
+ */
+function SidebarInset({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <main
+    <div
       data-slot="sidebar-inset"
       className={cn(
-        "relative flex w-full flex-1 flex-col bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+        "relative flex h-svh min-h-0 w-full flex-1 flex-col overflow-hidden bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:h-[calc(100svh-(--spacing(4)))] md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className,
       )}
       {...props}

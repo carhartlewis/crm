@@ -2,6 +2,7 @@ import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { sessionQuery } from "../lib/session.ts";
+import { releaseSynced } from "../lib/synced.ts";
 
 /**
  * Keeps the app honest about the session after load. The session query refetches on window
@@ -22,6 +23,7 @@ export function SessionWatcher() {
 
     if (previousUser) {
       queryClient.removeQueries({ predicate: (query) => query.queryKey.includes(previousUser) });
+      await releaseSynced();
     }
   };
 

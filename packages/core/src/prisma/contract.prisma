@@ -125,6 +125,25 @@ model Invitation {
   @@map("invitation")
 }
 
+// CRM records. Synced to clients through Electric shapes (one per table, filtered by
+// workspace), so columns are snake_case: shape rows reach the browser with these keys.
+
+model Company {
+  // Client-generated UUID: the web app inserts the row optimistically before the API call.
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  domain      String?
+  ownerId     String?   @map("owner_id")
+  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @onUpdate(now()) @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("company")
+}
+
 // better-auth `jwt` plugin: signing keys for MCP access tokens (served at /api/auth/jwks).
 
 model Jwks {

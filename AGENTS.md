@@ -1,3 +1,15 @@
+<!-- intent-skills:start -->
+## Skill Loading
+
+Use the repository’s installed Intent. If it is unavailable, report the missing dependency instead of downloading a replacement.
+Before editing files for a substantial task:
+- Run `bunx --no-install --package @tanstack/intent intent list` from the workspace root to see available local skills.
+- If a listed skill matches the task, run `bunx --no-install --package @tanstack/intent intent load <package>#<skill>` before changing files.
+- Use the loaded `SKILL.md` guidance while making the change.
+- Monorepos: when working across packages, run the skill check from the workspace root and prefer the local skill for the package being changed.
+- Multiple matches: prefer the most specific local skill for the package or concern you are changing; load additional skills only when the task spans multiple packages or concerns.
+<!-- intent-skills:end -->
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know
@@ -74,7 +86,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - Code-split components with `preloadable()` (`@crm/ui/lib/preloadable`), not `React.lazy`: call `.preload()` on deliberate hover, focus, or press (or when idle for keyboard-first tools like ⌘K), and it renders synchronously once loaded instead of waiting a scheduler tick. Load rarely used tools on demand.
 - ForesightJS runs with `setDataAttributes: false`: its default `data-active`/`data-status` attributes collide with component variants and TanStack Router.
 
-### Connections (ADR 0012)
+### Connections (ADR 0013)
 
 - `@crm/integrations` holds the catalog of connectable apps (remote MCP servers), generic MCP OAuth (`./oauth`) and the gateway (`./gateway`). Add an app with one catalog entry; never add per-app scopes or tool lists.
 - Access is `read` (tools with `readOnlyHint: true`) or `write` (all tools). OAuth always asks for every scope the server offers.
@@ -114,9 +126,12 @@ Global rules. Use the tokens and components; never one-off timings.
 
 - **Icons:** Carbon only, from per-icon modules: `import close from "@carbon/icons/es/close/16.js"` and `const CloseIcon = carbonIcon(close)` (`@crm/ui/components/icon`). Don't use `@carbon/icons-react`: its bucket modules defeat tree-shaking. The shadcn CLI emits `lucide-react`; convert after `shadcn add`. Lint rejects both.
 
-- **Workspace shell** (`apps/web/src/components/shell`): sidebar with Home and the pinned pages (`lib/pages.ts`; order per user in `lib/pinned-order.ts`), drag-to-reorder with a haptic tick per slot (`reorder.ts`, zero renders while dragging), rubber-band overscroll (`rubber-band.ts`), peek cards on hover that warm their chunk and data, and the sidebar toggle at the top-left of the page panel (never in the sidebar). Shortcuts live in `lib/shortcuts.ts` (⌘K, ⌘B, ⌘[ ⌘], ⌥0 Home, ⌥1–⌥9 pinned pages), bound with `react-hotkeys-hook` in `components/shell/shortcuts.tsx` (match on `event.code`; pass a deps array). The sidebar's open state and width live in the `sidebar_state` and `sidebar_width` cookies (`@crm/ui/components/sidebar`), not React state. Its edge (`SidebarRail`) resizes as in Glass: drag 200–400 px (sticks at 256, resists past the limits, collapses past the minimum and reopens when dragged back, a haptic at each), click to collapse, arrow keys to resize, Escape to cancel; no renders while dragging (`@crm/ui/lib/sidebar-width`).
+- **Workspace shell** (`apps/web/src/components/shell`): sidebar with Home and the pinned pages (`lib/pages.ts`; order per user in `lib/pinned-order.ts`), drag-to-reorder with a haptic tick per slot (`reorder.ts`, zero renders while dragging), rubber-band overscroll (`rubber-band.ts`), peek cards on hover that warm their chunk and data, and the sidebar toggle leading each page header (`WorkspacePageHeader`, on the title's line; the header is the window's title bar). Shortcuts live in `lib/shortcuts.ts` (⌘K, ⌘B, ⌘[ ⌘], ⌥0 Home, ⌥1–⌥9 pinned pages), bound with `react-hotkeys-hook` in `components/shell/shortcuts.tsx` (match on `event.code`; pass a deps array). The sidebar's open state and width live in the `sidebar_state` and `sidebar_width` cookies (`@crm/ui/components/sidebar`), not React state. Its edge (`SidebarRail`) resizes as in Glass: drag 200–400 px (sticks at 256, resists past the limits, collapses past the minimum and reopens when dragged back, a haptic at each), click to collapse, arrow keys to resize, Escape to cancel; no renders while dragging (`@crm/ui/lib/sidebar-width`).
 - **Haptics:** `haptic()` (`apps/web/src/lib/haptics.ts`) calls the desktop bridge, which plays the macOS trackpad alignment pattern through the optional `macos-haptics` addon (loaded lazily in main, throttled, a no-op elsewhere). Use it for snaps and slot changes, not for every hover.
 - **Cards** carry the border beam (`@crm/ui/components/border-beam`, monochrome), running only while the card has pointer or focus interest.
+- **Pages and record lists** use the vms.dev patterns in `@crm/ui/patterns`: `PageShell` (owns `<main>` and scrolling; `SidebarInset` is a fixed frame), `DataTable` with `useListTable` (columns ordered by `kind`, settings-gear column visibility, Filters/Sort, row `…` menu via `RecordRowMenu`, selection with bulk actions, responsive "Table options" at narrow widths), and `RecordSheet` opened through `useRecordSheetParams` (`?company=<id>`). Don't restyle them at call sites; change the pattern.
+- **List keys** (`components/records/use-list-keys.ts`, pure model in `lib/list-navigation.ts`): j/k/↓/↑ move, g g / ⇧G ends, Enter/o open, x select, ⇧j/⇧k extend, Escape clears, / focuses search, c creates. They drive `DataTable`'s `activeRowId` and the table's own selection, and are enabled only while no sheet or dialog is open (derived from that state, not toggled scopes).
+- **Synced records**: one TanStack DB collection per workspace (`lib/companies.ts` is the model), shape URL carries `?workspace=` so caches never cross workspaces, writes are optimistic and await the txid, and `releaseSynced` (`lib/synced.ts`) stops old syncs on workspace switch and sign-out. Route loaders start the sync through a dynamic import so TanStack DB stays out of cold entry.
 - **Cmd+K:** shadcn `Command`. Data is prefetched and kept fresh (sync engine, SSE, or polling); results are contextual to the current page. Do your own ranking and pass `shouldFilter={false}` for large sets. Slight backdrop blur only.
 - **AI chat:** stream assistant markdown with `@pierre/words` (`Markdown` with `isAnimating` while streaming). Wrap the composer in `border-beam`'s `BorderBeam` via a `packages/ui` component, not ad hoc in the app.
 - **Emoji picker:** preload the catalog on the first `:`; open after two letters at a word boundary; rank exact, prefix, word, then substring; one row per glyph; the caret stays in the editor.

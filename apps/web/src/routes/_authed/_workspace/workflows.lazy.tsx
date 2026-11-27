@@ -9,7 +9,7 @@ export const Route = createLazyFileRoute("/_authed/_workspace/workflows")({
 function Workflows() {
   return (
     <PageLayout page={pageById("workflows")}>
-      <EmptyState title="No workflows yet">
+      <EmptyState page={pageById("workflows")} title="No workflows yet">
         Workflows will run automatically when records change.
       </EmptyState>
     </PageLayout>

@@ -68,6 +68,68 @@ export class NoActiveWorkspace extends Schema.TaggedError<NoActiveWorkspace>()(
   { httpApiStatus: 403 },
 ) {}
 
+/** Input that fails the shared rules (`@crm/core/company`); `message` is shown to the user. */
+export class Invalid extends Schema.TaggedError<Invalid>()(
+  "Invalid",
+  { message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
+/**
+ * A `company` row exactly as the Electric shape sends it: snake_case table columns, timestamps
+ * as Postgres text (`2026-11-26 22:06:00.123+00`).
+ */
+export const Company = Schema.Struct({
+  id: Schema.String,
+  workspace_id: Schema.String,
+  name: Schema.String,
+  domain: Schema.NullOr(Schema.String),
+  owner_id: Schema.NullOr(Schema.String),
+  created_at: Schema.String,
+  updated_at: Schema.String,
+});
+
+export type Company = typeof Company.Type;
+
+/** The Postgres transaction id of a write. The client awaits it in the shape before dropping optimistic state. */
+export const TxId = Schema.Struct({ txid: Schema.Number });
+
+export const CreateCompany = Schema.Struct({
+  /** Client-generated lowercase UUID (`crypto.randomUUID()`). */
+  id: Schema.String,
+  name: Schema.String,
+  domain: Schema.NullOr(Schema.String),
+});
+
+export const UpdateCompany = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  domain: Schema.optional(Schema.NullOr(Schema.String)),
+});
+
+const CompanyErrors = [NotFound, NoActiveWorkspace, Invalid];
+
+export class CompaniesApi extends HttpApiGroup.make("companies")
+  .add(
+    HttpApiEndpoint.post("create", "/", {
+      payload: CreateCompany,
+      success: TxId,
+      error: CompanyErrors,
+    }),
+    HttpApiEndpoint.patch("update", "/:id", {
+      params: { id: Schema.String },
+      payload: UpdateCompany,
+      success: TxId,
+      error: CompanyErrors,
+    }),
+    HttpApiEndpoint.delete("remove", "/:id", {
+      params: { id: Schema.String },
+      success: TxId,
+      error: CompanyErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/companies") {}
+
 /** A third-party server failed; `message` is shown to the user. */
 export class UpstreamUnavailable extends Schema.TaggedError<UpstreamUnavailable>()(
   "UpstreamUnavailable",
@@ -123,5 +185,13 @@ export class ConnectionsApi extends HttpApiGroup.make("connections")
 export class CrmApi extends HttpApi.make("crm")
   .add(SystemApi)
   .add(AccountApi)
+  .add(CompaniesApi)
   .add(ConnectionsApi)
   .prefix("/api") {}
+
+/**
+ * Electric shape proxy for companies (a raw route in apps/api, not part of `CrmApi`). Call it
+ * with `?workspace=<active workspace id>` plus Electric's protocol params; the workspace keeps
+ * the URL, and so the browser cache entry, distinct per workspace.
+ */
+export const COMPANIES_SYNC_PATH = "/api/shapes/companies";

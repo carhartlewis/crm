@@ -19,7 +19,8 @@
       "dependsOn": ["^transit"]
     },
     "//#infra:up": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["ELECTRIC_SECRET"]
     },
     "//#setup:env": {
       "cache": false

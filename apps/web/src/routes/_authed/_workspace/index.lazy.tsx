@@ -1,5 +1,13 @@
 import { Card, CardDescription, CardHeader, CardTitle } from "@crm/ui/components/card";
 import { Kbd, KbdGroup } from "@crm/ui/components/kbd";
+import {
+  PageShell,
+  PageShellActions,
+  PageShellContent,
+  PageShellHeading,
+  PageShellTitle,
+} from "@crm/ui/patterns/page-shell";
+import { WorkspacePageHeader } from "../../../components/shell/page-header.tsx";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { pageById } from "../../../lib/pages.ts";
@@ -25,45 +33,51 @@ function Home() {
   const firstName = session.user.name.split(/\s+/)[0] ?? "";
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 pt-6 pb-12">
-      <header className="animate-enter flex flex-col gap-1 select-none">
-        <h1 className="text-2xl font-medium tracking-tight">{`${hello}, ${firstName}`}</h1>
-        <p className="text-muted-foreground">{active?.name}</p>
-      </header>
-      <div className="animate-enter enter-delay-1 grid gap-3 sm:grid-cols-2">
-        {order.map((id, index) => {
-          const page = pageById(id);
-          const PageIcon = page.icon;
-          const shortcut = pinnedShortcut(index);
+    <PageShell>
+      <WorkspacePageHeader>
+        <PageShellHeading>
+          <PageShellTitle>{`${hello}, ${firstName}`}</PageShellTitle>
+        </PageShellHeading>
+        <PageShellActions>
+          <span className="text-muted-foreground">{active?.name}</span>
+        </PageShellActions>
+      </WorkspacePageHeader>
+      <PageShellContent>
+        <div className="animate-enter enter-delay-1 grid gap-3 sm:grid-cols-2">
+          {order.map((id, index) => {
+            const page = pageById(id);
+            const PageIcon = page.icon;
+            const shortcut = pinnedShortcut(index);
 
-          return (
-            <Link
-              key={id}
-              to={page.to}
-              className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle>
-                    <span className="flex items-center gap-2">
-                      <PageIcon className="text-muted-foreground" />
-                      {page.label}
-                      {shortcut && (
-                        <KbdGroup className="ml-auto">
-                          {shortcutKeys(shortcut).map((key) => (
-                            <Kbd key={key}>{key}</Kbd>
-                          ))}
-                        </KbdGroup>
-                      )}
-                    </span>
-                  </CardTitle>
-                  <CardDescription>{page.description}</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
+            return (
+              <Link
+                key={id}
+                to={page.to}
+                className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle>
+                      <span className="flex items-center gap-2">
+                        <PageIcon className="text-muted-foreground" />
+                        {page.label}
+                        {shortcut && (
+                          <KbdGroup className="ml-auto">
+                            {shortcutKeys(shortcut).map((key) => (
+                              <Kbd key={key}>{key}</Kbd>
+                            ))}
+                          </KbdGroup>
+                        )}
+                      </span>
+                    </CardTitle>
+                    <CardDescription>{page.description}</CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </PageShellContent>
+    </PageShell>
   );
 }
