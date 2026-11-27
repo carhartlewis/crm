@@ -1,5 +1,5 @@
 import { Context, Schema } from "effect";
-import { StoredFolders, StoredPinned } from "../chat/index.ts";
+import { StoredFolders, StoredPinned, StoredRecent } from "../chat/index.ts";
 import {
   HttpApi,
   HttpApiEndpoint,
@@ -621,12 +621,14 @@ export class ChatSpacesApi extends HttpApiGroup.make("chatSpaces")
   .middleware(Authentication)
   .prefix("/chat-spaces") {}
 
-/** The caller's whole sidebar row: the pinned order and folders (`@crm/core/chat`). */
+/** The caller's whole sidebar row: pins, folders and the Recents order (`@crm/core/chat`). */
 export const SaveSidebar = Schema.Struct({
   /** Made in the browser on the first save: `createId("sbr")`. */
   id: Schema.String,
   pinned: StoredPinned,
   folders: StoredFolders,
+  /** Absent from older clients: the saved order stays as it was. */
+  recentOrder: Schema.optional(StoredRecent),
 });
 
 export class SidebarApi extends HttpApiGroup.make("sidebar")

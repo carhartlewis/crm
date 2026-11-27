@@ -34,11 +34,11 @@ import {
 
 /** The layout a row holds, with every page still pinned (pages can't be unpinned). */
 function layoutOf(row: SidebarRow | undefined, fallback: readonly PinKey[]): SidebarLayout {
-  if (!row) return { pinned: fallback, folders: [] };
+  if (!row) return { pinned: fallback, folders: [], recent: [] };
 
   const stored = decodeStoredLayout(row);
 
-  return { pinned: normalizeOrder(stored.pinned), folders: stored.folders };
+  return { pinned: normalizeOrder(stored.pinned), folders: stored.folders, recent: stored.recent };
 }
 
 /**
@@ -97,7 +97,9 @@ export function useChats(workspaceId: string, userId: string) {
   const row = rows.data?.[0];
 
   const layout =
-    rows.isReady || row ? layoutOf(row, stored) : { pinned: stored, folders: snapshot.folders };
+    rows.isReady || row
+      ? layoutOf(row, stored)
+      : { pinned: stored, folders: snapshot.folders, recent: snapshot.recent };
 
   // The synced row is the source: mirror its pinned order into the device's copy as it changes
   // (another device, another tab). The first load also copies an order saved on this device
@@ -114,7 +116,7 @@ export function useChats(workspaceId: string, userId: string) {
           collection,
           undefined,
           { workspaceId, userId },
-          { pinned: readPinnedOrder(userId), folders: [] },
+          { pinned: readPinnedOrder(userId), folders: [], recent: [] },
         ).catch(() => undefined);
       }
     };
@@ -136,6 +138,7 @@ export function useChats(workspaceId: string, userId: string) {
         chats: [...chatsCollection(workspaceId).values()],
         spaces: [...chatSpacesCollection(workspaceId).values()],
         folders: current ? decodeStoredLayout(current).folders : [],
+        recent: current ? decodeStoredLayout(current).recent : [],
         joinedSpaceIds: [...chatSpaceMembersCollection(workspaceId).values()].flatMap((member) =>
           member.user_id === userId ? [member.space_id] : [],
         ),

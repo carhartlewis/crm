@@ -93,11 +93,25 @@ export default function ChatNav({ userId, workspaceId }: NavProps) {
             return;
           }
 
-          editLayoutAt(workspaceId, userId, (layout) =>
-            drop.kind === "pinned"
-              ? { ...layout, pinned: pinAt(layout.pinned, pinKey("chat", chatId), drop.index) }
-              : { ...layout, folders: moveToFolder(layout.folders, chatId, drop.id) },
-          );
+          editLayoutAt(workspaceId, userId, (layout) => {
+            if (drop.kind === "pinned") {
+              return {
+                ...layout,
+                pinned: pinAt(layout.pinned, pinKey("chat", chatId), drop.index),
+              };
+            }
+
+            if (drop.kind === "folder") {
+              return { ...layout, folders: moveToFolder(layout.folders, chatId, drop.id) };
+            }
+
+            // Into Recents at a place: out of any folder, and the shown order saved.
+            return {
+              ...layout,
+              folders: moveToFolder(layout.folders, chatId, null),
+              recent: [...drop.order],
+            };
+          });
         },
       })(root),
     [workspaceId, userId, moveChat],
@@ -379,7 +393,8 @@ function RecentsGroup({ api, userId, workspaceId, pathname, onRequest }: RowProp
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Recents</SidebarGroupLabel>
-      <SidebarMenu aria-label="Recents">
+      {/* Drag to reorder; the order saves on the synced sidebar row (chat-drag.ts). */}
+      <SidebarMenu aria-label="Recents" data-drop-recents>
         {recents.map((chat) => (
           <ChatRow
             key={chat.id}

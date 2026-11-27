@@ -3,6 +3,8 @@ import { setReordering } from "./reorder.ts";
 /** Where a dragged chat can land. */
 export type ChatDrop =
   | { readonly kind: "pinned"; readonly index: number }
+  /** Recents, in this order of chat ids (the dragged one in its new place). */
+  | { readonly kind: "recent"; readonly order: readonly string[] }
   | { readonly kind: "folder"; readonly id: string }
   | { readonly kind: "space"; readonly id: string };
 
@@ -33,6 +35,8 @@ export function sameDrop(a: ChatDrop | null, b: ChatDrop | null) {
 
   if (a.kind === "pinned") return b.kind === "pinned" && a.index === b.index;
 
+  if (a.kind === "recent") return b.kind === "recent" && a.order.join() === b.order.join();
+
   return b.kind === a.kind && b.id === a.id;
 }
 
@@ -47,6 +51,7 @@ export interface ChatDragOptions {
  * Data attributes the sidebar puts on its rows:
  * - `data-drag-chat="<id>"` (with `data-chat-space` and `data-chat-folder`): a chat to drag.
  * - `data-drop-pinned`: the Pinned list; its rows carry `data-pin-index`.
+ * - `data-drop-recents`: the Recents list; its rows are the chats it shows, in order.
  * - `data-drop-folder="<id>"`, `data-drop-space="<id>"`: rows a chat can be dropped on.
  */
 const SOURCE = "[data-drag-chat]";
@@ -119,6 +124,10 @@ export function chatDragDrop({ onTargetChange, onDrop }: ChatDragOptions) {
         return spaceId === current.spaceId ? null : [{ kind: "space", id: spaceId }, space, "on"];
       }
 
+      const recents = under.closest<HTMLElement>("[data-drop-recents]");
+
+      if (recents) return recentTarget(current, recents, y);
+
       const list = under.closest<HTMLElement>("[data-drop-pinned]");
 
       if (!list) return null;
@@ -143,6 +152,35 @@ export function chatDragDrop({ onTargetChange, onDrop }: ChatDragOptions) {
       if (index === null || !line) return null;
 
       return [{ kind: "pinned", index }, line.row, before ? "before" : "after"];
+    };
+
+    /** A slot in Recents: between the other rows, numbered without the dragged one. */
+    const recentTarget = (
+      current: Drag,
+      list: HTMLElement,
+      y: number,
+    ): [ChatDrop, HTMLElement, string] | null => {
+      const rows = [...list.querySelectorAll<HTMLElement>(":scope > [data-drag-chat]")].filter(
+        (row) => row.dataset["dragChat"] !== current.chatId,
+      );
+
+      const slots = rows.map((row, index) => {
+        const rect = row.getBoundingClientRect();
+
+        return { row, pinIndex: index, top: rect.top, bottom: rect.bottom };
+      });
+
+      const index = pinnedInsertIndex(slots, y) ?? 0;
+      const order = slots.map((slot) => slot.row.dataset["dragChat"] ?? "");
+
+      order.splice(index, 0, current.chatId);
+
+      const before = slots[index];
+      const line = before ?? slots.at(-1);
+
+      if (!line) return null;
+
+      return [{ kind: "recent", order }, line.row, before ? "before" : "after"];
     };
 
     const begin = (current: Press): Drag | null => {

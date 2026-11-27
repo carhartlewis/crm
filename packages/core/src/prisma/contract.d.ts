@@ -18,7 +18,7 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'b37cc24233474209c56905e969c451d70ea2ae97144a8a1ef5b1594f8cd0ddfe'>;
+  StorageHashBase<'d73e359f58e0badf7e6ba5e0890a299ef5cd529bcf8e0697fc5671ce2e891b0c'>;
 export type ExecutionHash =
   ExecutionHashBase<'bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f'>;
 export type ProfileHash =
@@ -603,6 +603,7 @@ export namespace Models {
     folders: FieldOutputTypes['public']['Sidebar']['folders'];
     id: FieldOutputTypes['public']['Sidebar']['id'];
     pinned: FieldOutputTypes['public']['Sidebar']['pinned'];
+    recentOrder: FieldOutputTypes['public']['Sidebar']['recentOrder'];
     updatedAt: FieldOutputTypes['public']['Sidebar']['updatedAt'];
     userId: FieldOutputTypes['public']['Sidebar']['userId'];
     workspaceId: FieldOutputTypes['public']['Sidebar']['workspaceId'];
@@ -2810,6 +2811,12 @@ type ContractBase = Omit<
                   readonly dataType: 'pg/jsonb';
                   readonly codecId: 'pg/jsonb@1';
                   readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly recent_order: {
+                  readonly dataType: 'pg/jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: true;
                   readonly many: false;
                 };
                 readonly updated_at: {
@@ -5091,6 +5098,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
               };
+              readonly recentOrder: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
               readonly updatedAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -5138,6 +5149,7 @@ type ContractBase = Omit<
                 readonly folders: { readonly column: 'folders' };
                 readonly id: { readonly column: 'id' };
                 readonly pinned: { readonly column: 'pinned' };
+                readonly recentOrder: { readonly column: 'recent_order' };
                 readonly updatedAt: { readonly column: 'updated_at' };
                 readonly userId: { readonly column: 'user_id' };
                 readonly workspaceId: { readonly column: 'workspace_id' };

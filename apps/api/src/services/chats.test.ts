@@ -387,6 +387,18 @@ describe("the sidebar row", () => {
     expect(saved).toHaveLength(1);
     expect(saved[0]).toMatchObject({ id: first, userId: "alice", pinned: [`chat:${chat}`] });
   });
+
+  test("keeps the Recents order, unless a save leaves it out", async () => {
+    const { chats, rows } = setup();
+    const id = createId(ID_PREFIXES.sidebar);
+    const [a, b] = [chatId(), chatId()];
+
+    await run(chats.saveSidebar(alice, { id, pinned: [], folders: [], recentOrder: [b, a, "x"] }));
+    // An older tab saves pins without the order: the order stays.
+    await run(chats.saveSidebar(alice, { id, pinned: ["page:companies"], folders: [] }));
+
+    expect([...rows().sidebars.values()][0]).toMatchObject({ recent: [b, a] });
+  });
 });
 
 describe("permission modes", () => {

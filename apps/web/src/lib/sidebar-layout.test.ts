@@ -49,10 +49,18 @@ describe("sidebar layout", () => {
 
     expect(
       forgetChat(
-        { pinned: [`chat:${id}`], folders: [{ id: renewals, name: "Renewals", chatIds: [id] }] },
+        {
+          pinned: [`chat:${id}`],
+          folders: [{ id: renewals, name: "Renewals", chatIds: [id] }],
+          recent: [id],
+        },
         id,
       ),
-    ).toEqual({ pinned: [], folders: [{ id: renewals, name: "Renewals", chatIds: [] }] });
+    ).toEqual({
+      pinned: [],
+      folders: [{ id: renewals, name: "Renewals", chatIds: [] }],
+      recent: [],
+    });
   });
 
   test("Recents holds your own unplaced chats, newest message first", () => {
@@ -70,7 +78,11 @@ describe("sidebar layout", () => {
         row(newer, "me", "2026-11-26T12:00:00Z"),
         row(teammates, "them", "2026-11-26T13:00:00Z"),
       ],
-      { pinned: [`chat:${pinned}`], folders: [{ id: folder(), name: "F", chatIds: [filed] }] },
+      {
+        pinned: [`chat:${pinned}`],
+        folders: [{ id: folder(), name: "F", chatIds: [filed] }],
+        recent: [],
+      },
       "me",
     );
 
@@ -86,7 +98,7 @@ describe("sidebar layout", () => {
         row(joined, "them", "2026-11-26T13:00:00Z", "spc_joined"),
         row(other, "them", "2026-11-26T14:00:00Z", "spc_other"),
       ],
-      { pinned: [], folders: [] },
+      { pinned: [], folders: [], recent: [] },
       "me",
       new Set(["spc_joined"]),
     );
@@ -109,5 +121,18 @@ describe("sidebar layout", () => {
       "page:companies",
       "page:contacts",
     ]);
+  });
+
+  test("Recents keep a dragged order; chats newer than the drag go above it", () => {
+    const chats = [
+      row("a", "me", "2026-11-27T03:01:00Z"),
+      row("b", "me", "2026-11-27T03:02:00Z"),
+      row("c", "me", "2026-11-27T03:03:00Z"),
+      row("new", "me", "2026-11-27T03:09:00Z"),
+    ];
+
+    const layout = { pinned: [], folders: [], recent: ["b", "a", "c"] };
+
+    expect(recentChats(chats, layout, "me").map((item) => item.id)).toEqual(["new", "b", "a", "c"]);
   });
 });

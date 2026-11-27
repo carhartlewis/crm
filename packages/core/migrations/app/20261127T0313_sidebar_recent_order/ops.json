@@ -1,0 +1,62 @@
+[
+  {
+    "id": "column.public.sidebar.recent_order",
+    "label": "Add column \"recent_order\" to \"sidebar\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "recent_order",
+        "table": "sidebar"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"recent_order\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "sidebar",
+          "recent_order"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"recent_order\" on \"sidebar\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"recent_order\"",
+        "sql": "ALTER TABLE \"public\".\"sidebar\" ADD COLUMN \"recent_order\" jsonb"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"recent_order\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "sidebar",
+          "recent_order"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"recent_order\" on \"sidebar\""
+        }
+      },
+      {
+        "description": "verify column \"recent_order\" has type \"jsonb\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "sidebar",
+          "recent_order",
+          "jsonb"
+        ]
+      }
+    ]
+  }
+]

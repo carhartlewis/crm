@@ -60,6 +60,7 @@ export function forgetChat(layout: SidebarLayout, chatId: string): SidebarLayout
   return {
     pinned: layout.pinned.filter((item) => item !== key),
     folders: moveToFolder(layout.folders, chatId, null),
+    recent: layout.recent.filter((id) => id !== chatId),
   };
 }
 
@@ -74,7 +75,8 @@ export const RECENTS_LIMIT = 20;
 
 /**
  * Recents: the chats you started and the chats in spaces you joined (ADR 0020) that are neither
- * pinned nor in a folder, newest message first.
+ * pinned nor in a folder. Chats placed by a drag keep their saved order; newer ones go above
+ * them, newest message first.
  */
 export function recentChats<C extends RecentChat>(
   chats: readonly C[],
@@ -87,6 +89,8 @@ export function recentChats<C extends RecentChat>(
     ...layout.pinned.flatMap((key) => (key.startsWith("chat:") ? [key.slice(5)] : [])),
   ]);
 
+  const order = new Map(layout.recent.map((id, index) => [id, index]));
+
   return chats
     .filter(
       (chat) =>
@@ -94,6 +98,15 @@ export function recentChats<C extends RecentChat>(
           (chat.space_id !== null && joinedSpaceIds.has(chat.space_id))) &&
         !placed.has(chat.id),
     )
-    .toSorted((a, b) => b.last_message_at.localeCompare(a.last_message_at))
+    .toSorted((a, b) => {
+      const placeA = order.get(a.id);
+      const placeB = order.get(b.id);
+
+      if (placeA !== undefined && placeB !== undefined) return placeA - placeB;
+
+      if (placeA !== undefined || placeB !== undefined) return placeA === undefined ? -1 : 1;
+
+      return b.last_message_at.localeCompare(a.last_message_at);
+    })
     .slice(0, RECENTS_LIMIT);
 }

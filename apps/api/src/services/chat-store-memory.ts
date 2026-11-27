@@ -6,6 +6,7 @@ export interface MemorySidebar {
   readonly userId: string;
   readonly pinned: readonly string[];
   readonly folders: readonly unknown[];
+  readonly recent: readonly string[];
 }
 
 interface Rows {
@@ -109,8 +110,10 @@ export function createMemoryChatStore(members: Iterable<string>, now = () => Dat
           [...draft.sidebars.values()].find(
             (row) => row.workspaceId === workspaceId && row.userId === userId,
           )?.id ?? null,
-        saveSidebar: async ({ id, workspaceId, userId, layout }) => {
-          draft.sidebars.set(id, { id, workspaceId, userId, ...layout });
+        saveSidebar: async ({ id, workspaceId, userId, layout, saveRecent }) => {
+          const recent = saveRecent ? layout.recent : (draft.sidebars.get(id)?.recent ?? []);
+
+          draft.sidebars.set(id, { id, workspaceId, userId, ...layout, recent });
         },
       };
 

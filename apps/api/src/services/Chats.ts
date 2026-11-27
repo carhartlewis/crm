@@ -96,6 +96,8 @@ export interface ChatTx {
     workspaceId: string;
     userId: string;
     layout: SidebarLayout;
+    /** False when the client sent no Recents order: the stored one stays. */
+    saveRecent: boolean;
   }): Promise<void>;
 }
 
@@ -220,7 +222,12 @@ export interface ChatsService {
   ) => Effect.Effect<void, Failure>;
   readonly saveSidebar: (
     actor: ChatActor,
-    input: { id: string; pinned: readonly string[]; folders: readonly FolderInput[] },
+    input: {
+      id: string;
+      pinned: readonly string[];
+      folders: readonly FolderInput[];
+      recentOrder?: readonly string[] | undefined;
+    },
   ) => Effect.Effect<TxId, Failure>;
   /**
    * The agent proxy: forwards `path` (`/eve/v1/session/<id>…`) when the caller may see the chat
@@ -691,7 +698,7 @@ export function makeChats(
       }),
 
     saveSidebar: (actor, input) => {
-      const layout = parseSidebarLayout(input.pinned, input.folders);
+      const layout = parseSidebarLayout(input.pinned, input.folders, input.recentOrder);
 
       return write(actor, "saveSidebar", async (workspaceId, _, tx) => {
         // The first save names the row; later saves keep the stored id whatever the client sends.
@@ -704,6 +711,7 @@ export function makeChats(
           workspaceId,
           userId: actor.id,
           layout,
+          saveRecent: input.recentOrder !== undefined,
         });
 
         return ok(undefined);
@@ -796,7 +804,10 @@ function chatTx(tx: DbTx): ChatTx {
         updatedAt: new Date(),
       };
 
-      const updated = await sidebars.where({ id: row.id }).update(values);
+      // A client that sent no Recents order leaves the stored one as it was.
+      const updated = await sidebars
+        .where({ id: row.id })
+        .update(row.saveRecent ? { ...values, recentOrder: [...row.layout.recent] } : values);
 
       if (updated === null) {
         await sidebars.create({
@@ -804,6 +815,7 @@ function chatTx(tx: DbTx): ChatTx {
           workspaceId: row.workspaceId,
           userId: row.userId,
           ...values,
+          recentOrder: [...row.layout.recent],
         });
       }
     },

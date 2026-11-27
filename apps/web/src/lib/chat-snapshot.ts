@@ -35,6 +35,7 @@ const Snapshot = Schema.fromJsonString(
     spaces: Schema.Array(SnapshotSpace),
     folders: Schema.Array(FolderInput),
     joinedSpaceIds: Schema.optional(Schema.Array(Schema.String)),
+    recent: Schema.optional(Schema.Array(Schema.String)),
   }),
 );
 
@@ -46,9 +47,11 @@ export interface ChatSnapshot {
   readonly folders: readonly Folder[];
   /** The spaces this person joined (ADR 0020). */
   readonly joinedSpaceIds: readonly string[];
+  /** The Recents order dragged into, so first paint matches the synced sidebar. */
+  readonly recent: readonly string[];
 }
 
-const EMPTY: ChatSnapshot = { chats: [], spaces: [], folders: [], joinedSpaceIds: [] };
+const EMPTY: ChatSnapshot = { chats: [], spaces: [], folders: [], joinedSpaceIds: [], recent: [] };
 
 /** The newest chats are enough for Recents, pins and folders on first paint. */
 const MAX_CHATS = 200;
@@ -65,6 +68,7 @@ export function readChatSnapshot(userId: string, workspaceId: string): ChatSnaps
         spaces: stored.spaces.map((space) => ({ ...space, description: space.description ?? "" })),
         folders: parseSidebarLayout([], stored.folders).folders,
         joinedSpaceIds: stored.joinedSpaceIds ?? [],
+        recent: parseSidebarLayout([], [], stored.recent ?? []).recent,
       }),
     });
   } catch {
@@ -85,6 +89,7 @@ export function writeChatSnapshot(userId: string, workspaceId: string, snapshot:
         spaces: snapshot.spaces,
         folders: snapshot.folders,
         joinedSpaceIds: snapshot.joinedSpaceIds,
+        recent: snapshot.recent,
       }),
     );
   } catch {

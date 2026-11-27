@@ -66,6 +66,7 @@ describe("sidebar layout", () => {
         { id: first, name: "Duplicate", chatIds: [] },
         { id: "fld_short", name: "Bad id", chatIds: [] },
       ],
+      [b, "x", a, b],
     );
 
     expect(layout).toEqual({
@@ -75,14 +76,15 @@ describe("sidebar layout", () => {
         // A chat sits in one folder only: the first that lists it.
         { id: second, name: "Later", chatIds: [b] },
       ],
+      // The Recents order keeps valid chat ids once each, in order.
+      recent: [b, a],
     });
   });
 
   test("a malformed stored row reads as an empty layout", () => {
-    expect(decodeStoredLayout({ pinned: null, folders: { folders: [] } })).toEqual({
-      pinned: [],
-      folders: [],
-    });
+    expect(
+      decodeStoredLayout({ pinned: null, folders: { folders: [] }, recent_order: "bad" }),
+    ).toEqual({ pinned: [], folders: [], recent: [] });
     expect(decodeStoredLayout({ pinned: ["page:companies"], folders: [] }).pinned).toEqual([
       "page:companies",
     ]);

@@ -145,13 +145,16 @@ export interface Folder {
 export interface SidebarLayout {
   readonly pinned: readonly PinKey[];
   readonly folders: readonly Folder[];
+  /** Chat ids in the order the person dragged Recents into; newer chats go above it. */
+  readonly recent: readonly string[];
 }
 
-export const EMPTY_LAYOUT: SidebarLayout = { pinned: [], folders: [] };
+export const EMPTY_LAYOUT: SidebarLayout = { pinned: [], folders: [], recent: [] };
 
 export const MAX_PINNED = 100;
 export const MAX_FOLDERS = 50;
 export const MAX_FOLDER_CHATS = 500;
+export const MAX_RECENT_ORDER = 500;
 
 /** A folder as stored in the `sidebar` row and sent to `PUT /api/sidebar`, before the rules. */
 export const FolderInput = Schema.Struct({
@@ -165,15 +168,22 @@ export type FolderInput = typeof FolderInput.Type;
 /** The row's JSON columns, decoded at the boundary (the shape stream, the request body). */
 export const StoredPinned = Schema.Array(Schema.String);
 export const StoredFolders = Schema.Array(FolderInput);
+export const StoredRecent = Schema.Array(Schema.String);
 
 const decodePinned = Schema.decodeUnknownOption(StoredPinned);
 const decodeFolders = Schema.decodeUnknownOption(StoredFolders);
+const decodeRecent = Schema.decodeUnknownOption(StoredRecent);
 
 /** A synced row's JSON columns; anything malformed reads as empty. */
-export function decodeStoredLayout(row: { readonly pinned: Json; readonly folders: Json }) {
+export function decodeStoredLayout(row: {
+  readonly pinned: Json;
+  readonly folders: Json;
+  readonly recent_order?: Json;
+}) {
   return parseSidebarLayout(
     Option.getOrElse(decodePinned(row.pinned), () => []),
     Option.getOrElse(decodeFolders(row.folders), () => []),
+    Option.getOrElse(decodeRecent(row.recent_order ?? []), () => []),
   );
 }
 
@@ -194,6 +204,7 @@ export type Json =
 export function parseSidebarLayout(
   pinned: readonly string[],
   folders: readonly FolderInput[],
+  recentOrder: readonly string[] = [],
 ): SidebarLayout {
   const pins: PinKey[] = [];
 
@@ -228,7 +239,9 @@ export function parseSidebarLayout(
     parsedFolders.push({ id: folder.id, name: name.value, chatIds });
   }
 
-  return { pinned: pins, folders: parsedFolders };
+  const recent = [...new Set(recentOrder.filter(isChatId))].slice(0, MAX_RECENT_ORDER);
+
+  return { pinned: pins, folders: parsedFolders, recent };
 }
 
 /** Field validators for forms: the error message, or `undefined` when the value is valid. */

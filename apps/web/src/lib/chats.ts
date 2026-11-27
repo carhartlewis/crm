@@ -63,6 +63,8 @@ export type SidebarRow = {
   readonly user_id: string;
   readonly pinned: Json;
   readonly folders: Json;
+  /** Chat ids in the order Recents was dragged into; null until it is. */
+  readonly recent_order: Json;
   readonly updated_at: string;
 };
 
@@ -231,7 +233,12 @@ async function saveRow(row: SidebarRow) {
 
   const response = await request<{ txid: number }>("/api/sidebar", {
     method: "PUT",
-    body: JSON.stringify({ id: row.id, pinned: layout.pinned, folders: layout.folders }),
+    body: JSON.stringify({
+      id: row.id,
+      pinned: layout.pinned,
+      folders: layout.folders,
+      recentOrder: layout.recent,
+    }),
   });
 
   return response.txid;
@@ -470,10 +477,13 @@ export function saveLayout(
     chatIds: [...folder.chatIds],
   }));
 
+  const recent = [...layout.recent];
+
   const transaction = row
     ? collection.update(row.id, (draft) => {
         draft.pinned = pinned;
         draft.folders = folders;
+        draft.recent_order = recent;
       })
     : collection.insert({
         id: createId(ID_PREFIXES.sidebar),
@@ -481,6 +491,7 @@ export function saveLayout(
         user_id: context.userId,
         pinned,
         folders,
+        recent_order: recent,
         updated_at: new Date().toISOString(),
       });
 

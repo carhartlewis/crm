@@ -3116,6 +3116,13 @@
                   "kind": "scalar"
                 }
               },
+              "recentOrder": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
               "updatedAt": {
                 "nullable": false,
                 "type": {
@@ -3185,6 +3192,9 @@
                 },
                 "pinned": {
                   "column": "pinned"
+                },
+                "recentOrder": {
+                  "column": "recent_order"
                 },
                 "updatedAt": {
                   "column": "updated_at"
@@ -6449,6 +6459,11 @@
                   "dataType": "pg/jsonb",
                   "nullable": false
                 },
+                "recent_order": {
+                  "codecId": "pg/jsonb@1",
+                  "dataType": "pg/jsonb",
+                  "nullable": true
+                },
                 "updated_at": {
                   "codecId": "pg/timestamptz-date@1",
                   "dataType": "pg/timestamptz",
@@ -6866,7 +6881,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "b37cc24233474209c56905e969c451d70ea2ae97144a8a1ef5b1594f8cd0ddfe"
+    "storageHash": "d73e359f58e0badf7e6ba5e0890a299ef5cd529bcf8e0697fc5671ce2e891b0c"
   },
   "execution": {
     "executionHash": "bf8bb506620ba8c861aacc9cd8841fdcbef98a5ff3098f5dc52865fbd7bad98f",

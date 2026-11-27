@@ -502,6 +502,9 @@ model Sidebar {
   pinned      Json(storage: jsonb)
   // `[{ id, name, chatIds }]`.
   folders     Json(storage: jsonb)
+  // Chat ids in the order the person dragged Recents into; null until they do. Newer chats go
+  // above it.
+  recentOrder Json(storage: jsonb)? @map("recent_order")
   updatedAt   DateTime  @map("updated_at")
 
   @@unique([workspaceId, userId])
