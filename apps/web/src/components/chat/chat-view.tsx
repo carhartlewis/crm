@@ -12,77 +12,33 @@ import {
 } from "@crm/ui/components/ai-elements/reasoning";
 import { ApprovalCard, type ApprovalItem } from "@crm/ui/patterns/approval-card";
 import { ThinkingIndicator } from "@crm/ui/patterns/dot-matrix";
-import { ToolStep, type ToolStepState } from "@crm/ui/patterns/tool-step";
+import { ToolStep, ToolStepGroup } from "@crm/ui/patterns/tool-step";
 import { Button } from "@crm/ui/components/button";
 import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
 import { chatAgentBase, type ChatHistory } from "@crm/core/api";
 import type { EveMessage, EveMessagePart, SessionStreamEvent } from "eve/client";
 import type { PermissionMode } from "@crm/core/chat";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Option, Schema } from "effect";
 import { useEveAgent } from "eve/react";
 import { toast } from "sonner";
 import { chatKeys, takeFirstMessage } from "../../lib/chat-api.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
 import { Composer } from "./composer.tsx";
 
-type ToolPart = Extract<EveMessagePart, { type: "tool" }>;
+import {
+  messageBlocks,
+  runDetail,
+  runState,
+  shownCall,
+  stepDetail,
+  stepLabel,
+  stepState,
+  type ToolPart,
+} from "./tool-steps.ts";
 
 type InteractionPart = Extract<EveMessagePart, { type: "interaction" }>;
 
 type Interaction = NonNullable<ToolPart["interaction"]>;
-
-/** eve's call states as tool-step states. */
-function stepState(part: ToolPart): ToolStepState {
-  switch (part.state) {
-    case "approval":
-      return "waiting";
-    case "completed":
-      return "done";
-    case "failed":
-      return "failed";
-    case "rejected":
-    case "cancelled":
-      return "denied";
-    default:
-      return "pending";
-  }
-}
-
-/** "Connections: Create company" reads as "Create company": every CRM tool is on that connection. */
-function stepLabel(part: ToolPart) {
-  return part.label.replace(/^Connections:\s*/, "");
-}
-
-/** The fields of a call's input that name what it acts on. */
-const NamedInput = Schema.Struct({
-  name: Schema.optional(Schema.String),
-  title: Schema.optional(Schema.String),
-  query: Schema.optional(Schema.String),
-  subject: Schema.optional(Schema.String),
-  text: Schema.optional(Schema.String),
-});
-
-const decodeNamedInput = Schema.decodeUnknownOption(NamedInput);
-
-/** What a call acts on, from its input: a name, title or query, when it has one. */
-function stepDetail(part: ToolPart): string | undefined {
-  return Option.match(decodeNamedInput(part.input), {
-    onNone: () => undefined,
-    onSome: (input) => {
-      const value = [input.name, input.title, input.query, input.subject, input.text]
-        .find((field) => field?.trim())
-        ?.trim();
-
-      return value?.slice(0, 80);
-    },
-  });
-}
-
-/** Tool search and task controls are the agent's own housekeeping, not steps to show. */
-function shownCall(part: ToolPart) {
-  return !part.hidden && part.kind !== "control" && !part.name.startsWith("eve__");
-}
 
 /** Calls waiting on an approval, oldest first, across the conversation. */
 function waitingApprovals(messages: readonly EveMessage[]) {
@@ -250,23 +206,16 @@ function ChatMessage({
   return (
     <Message from={message.role}>
       <MessageContent>
-        {message.parts.map((part, index) => (
-          // Text and reasoning parts carry stable ids; the rest keep their place in the turn.
-          <ChatPart key={partKey(part, index)} part={part} onAnswer={onAnswer} />
-        ))}
+        {messageBlocks(message.parts).map((block) =>
+          block.kind === "part" ? (
+            <ChatPart key={block.key} part={block.part} onAnswer={onAnswer} />
+          ) : (
+            <ToolCalls key={block.key} calls={block.calls} onAnswer={onAnswer} />
+          ),
+        )}
       </MessageContent>
     </Message>
   );
-}
-
-function partKey(part: EveMessagePart, index: number) {
-  if (part.type === "tool") return part.callId;
-
-  if (part.type === "interaction") return part.interactionId;
-
-  if ((part.type === "text" || part.type === "reasoning") && part.id) return part.id;
-
-  return `${part.type}-${index}`;
 }
 
 function ChatPart({
@@ -299,6 +248,39 @@ function ChatPart({
     default:
       return null;
   }
+}
+
+/** One call as a step; a run of two or more calls to one tool as a group that opens. */
+function ToolCalls({
+  calls,
+  onAnswer,
+}: {
+  calls: readonly ToolPart[];
+  onAnswer: (interactionId: string, optionId: string) => void;
+}) {
+  const [first] = calls;
+
+  if (!first) return null;
+
+  if (calls.length === 1) return <ToolCall part={first} onAnswer={onAnswer} />;
+
+  // A question the agent asks inside a call must be seen, so its group opens.
+  const asking = calls.some(
+    (call) => call.interaction?.status === "open" && call.interaction.request.kind !== "approval",
+  );
+
+  return (
+    <ToolStepGroup
+      label={stepLabel(first)}
+      detail={runDetail(calls.map(stepDetail))}
+      state={runState(calls.map(stepState))}
+      defaultOpen={asking}
+    >
+      {calls.map((call) => (
+        <ToolCall key={call.callId} part={call} onAnswer={onAnswer} />
+      ))}
+    </ToolStepGroup>
+  );
 }
 
 function ToolCall({

@@ -489,15 +489,41 @@
     white-space: pre;
   }
 
+  /* Tables read as lists: hairlines between rows only, a quiet header, words never split. Every
+     column but the last keeps to one line; the last wraps; a wider table scrolls sideways. */
   & [data-markdown="table"] {
     display: block;
-    overflow: auto;
+    overflow-x: auto;
+    width: max-content;
+    max-width: 100%;
     border-collapse: collapse;
   }
 
   & :is(th, td) {
-    border: 1px solid var(--border);
-    padding: 0.35em 0.75em;
+    border-bottom: 1px solid var(--border);
+    padding: 0.5em 1.5em 0.5em 0;
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  & :is(th, td):last-child {
+    padding-right: 0;
+  }
+
+  & td:not(:last-child) {
+    white-space: nowrap;
+  }
+
+  & th {
+    font-size: 0.875em;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+
+  & tbody tr:last-child td {
+    border-bottom: 0;
   }
 
   & [data-markdown="img"] {

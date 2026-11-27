@@ -127,6 +127,12 @@ export const PREWARM_TTL_SECONDS = 10 * 60;
 /** How long a chat's events stay in Redis after the last read. */
 export const HISTORY_TTL_SECONDS = 7 * 24 * 60 * 60;
 
+/**
+ * How long a history read waits for eve. A busy or restarting agent can hold the read for tens
+ * of seconds; the page shows the cached events and follows the stream for the rest.
+ */
+export const HISTORY_READ_WAIT_MS = 1500;
+
 /** Larger histories are read from eve each time instead of cached. */
 export const HISTORY_CACHE_MAX_BYTES = 2_000_000;
 
@@ -272,7 +278,12 @@ const notMember = () => new Forbidden({ message: "Join the space first" });
 const badMode = () => new Invalid({ message: "Choose Manual, Auto or Bypass permissions" });
 
 /** The chats use cases over an injected store, agent and KV (Redis in production). */
-export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore): ChatsService {
+export function makeChats(
+  store: ChatStore,
+  agent: ChatAgent | null,
+  kv: KvStore,
+  historyReadWaitMs = HISTORY_READ_WAIT_MS,
+): ChatsService {
   /** Membership, the write and the txid in one transaction. */
   const write = (
     actor: ChatActor,
@@ -503,11 +514,14 @@ export function makeChats(store: ChatStore, agent: ChatAgent | null, kv: KvStore
           });
         }
 
-        const fresh = await agent
-          .readEvents(callerIn(actor, chat.value.workspaceId), chat.value.sessionId, from)
-          .catch(() => null);
+        const fresh = await Promise.race([
+          agent
+            .readEvents(callerIn(actor, chat.value.workspaceId), chat.value.sessionId, from)
+            .catch(() => null),
+          Bun.sleep(historyReadWaitMs).then(() => null),
+        ]);
 
-        // The agent is down: show what we have; the page follows the stream once it's back.
+        // The agent is down or slow: show what we have; the page follows the stream from there.
         if (fresh === null) {
           return ok({
             session: { sessionId: chat.value.sessionId, streamIndex: from },

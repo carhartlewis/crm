@@ -1,4 +1,4 @@
-import { Button } from "@crm/ui/components/button";
+import { Button, buttonVariants } from "@crm/ui/components/button";
 import { Spinner } from "@crm/ui/components/spinner";
 import { Link, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
@@ -42,9 +42,9 @@ export function RouteError({ error }: ErrorComponentProps) {
 export function RouteNotFound() {
   return (
     <OnboardingShell title="Page not found">
-      <Button size="hero" render={<Link to="/" replace />}>
+      <Link to="/" replace className={buttonVariants({ size: "hero" })}>
         Back to CRM
-      </Button>
+      </Link>
     </OnboardingShell>
   );
 }

@@ -4,6 +4,9 @@ import type { ReactNode } from "react";
 import { RouteError, RouteNotFound, RoutePending } from "./components/route-states.tsx";
 import { routeTree } from "./routeTree.gen.ts";
 
+/** New chat and each chat: one screen with the composer at the bottom. */
+const isChatPath = (pathname: string) => pathname === "/" || pathname.startsWith("/chats/");
+
 /** What every route's `beforeLoad` and `loader` receive. Layouts extend it (e.g. `session`). */
 export interface RouterContext {
   queryClient: QueryClient;
@@ -23,8 +26,14 @@ export const router = createRouter({
   defaultPreload: "intent",
   defaultPreloadDelay: 50,
   defaultPreloadStaleTime: 0,
-  // Every route change cross-fades (styled in @crm/ui globals.css, reduced-motion aware).
-  defaultViewTransition: true,
+  // Route changes cross-fade (styled in @crm/ui globals.css, reduced-motion aware), except
+  // between chats: the composer stays in place and only the conversation changes.
+  defaultViewTransition: {
+    types: ({ fromLocation, toLocation }) =>
+      fromLocation && isChatPath(fromLocation.pathname) && isChatPath(toLocation.pathname)
+        ? false
+        : [],
+  },
   defaultErrorComponent: RouteError,
   defaultPendingComponent: RoutePending,
   defaultNotFoundComponent: RouteNotFound,

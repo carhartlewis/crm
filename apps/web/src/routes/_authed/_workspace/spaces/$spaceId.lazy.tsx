@@ -1,5 +1,5 @@
 import edit from "@carbon/icons/es/edit/16.js";
-import { Button } from "@crm/ui/components/button";
+import { buttonVariants } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { Card, CardDescription, CardHeader, CardTitle } from "@crm/ui/components/card";
 import { SpaceDot } from "@crm/ui/components/space-dot";
@@ -78,14 +78,14 @@ function SpaceView({
         </PageShellHeading>
         <PageShellActions>
           {joined && (
-            <Button
-              size="sm"
-              variant="outline"
-              render={<Link to="/" search={isPrivate ? {} : { space: spaceId }} />}
+            <Link
+              to="/"
+              search={isPrivate ? {} : { space: spaceId }}
+              className={buttonVariants({ size: "sm", variant: "outline" })}
             >
               <EditIcon />
               New chat
-            </Button>
+            </Link>
           )}
           {space && <SpaceMenu space={space} api={api} userId={userId} workspaceId={workspaceId} />}
         </PageShellActions>

@@ -1,6 +1,6 @@
 import edit from "@carbon/icons/es/edit/16.js";
 import grid from "@carbon/icons/es/grid/16.js";
-import { Button } from "@crm/ui/components/button";
+import { buttonVariants } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import {
   Sidebar,
@@ -64,17 +64,20 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
           <TitleBarControls onSearch={onSearch} onSearchIntent={onSearchIntent} />
         </div>
         <HotkeyTooltip shortcut={shortcuts.newChat} side="right">
-          <Button
-            variant="outline"
-            className="app-region-no-drag w-full"
+          {/* A link styled as a button: it navigates, so it keeps the link role. */}
+          <Link
+            to="/"
+            className={buttonVariants({
+              variant: "outline",
+              className: "app-region-no-drag w-full",
+            })}
             // A session is made ready while the pointer travels; the first answer comes sooner.
             onPointerEnter={() => prewarmChat()}
             onFocus={() => prewarmChat()}
-            render={<Link to="/" />}
           >
             <EditIcon />
             New chat
-          </Button>
+          </Link>
         </HotkeyTooltip>
       </SidebarHeader>
       <SidebarContent ref={rubberBandScroll} className="overscroll-none">
