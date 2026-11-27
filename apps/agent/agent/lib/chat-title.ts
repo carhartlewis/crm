@@ -7,7 +7,7 @@ export interface FirstMessage {
 }
 
 export interface ChatTitleOptions {
-  /** A small model's answer to a prompt (Claude Haiku on the AI Gateway). */
+  /** A small model's answer to a prompt (GLM 5.3 Flash on the AI Gateway). */
   readonly generate: (prompt: string, signal: AbortSignal) => Promise<string>;
   /** Saves the title on the chat through the CRM API. */
   readonly save: (sessionId: string, title: string, signal: AbortSignal) => Promise<void>;

@@ -23,6 +23,7 @@ import { useEveAgent } from "eve/react";
 import { toast } from "sonner";
 import { chatKeys, takeFirstMessage } from "../../lib/chat-api.ts";
 import { PermissionModeMenu } from "./permission-mode-menu.tsx";
+import { replyIslands } from "./reply-islands.tsx";
 import { Composer } from "./composer.tsx";
 
 import {
@@ -228,7 +229,9 @@ function ChatPart({
   switch (part.type) {
     case "text":
       return (
-        <MessageResponse isAnimating={part.state === "streaming"}>{part.text}</MessageResponse>
+        <MessageResponse isAnimating={part.state === "streaming"} islands={replyIslands}>
+          {part.text}
+        </MessageResponse>
       );
     case "reasoning":
       return (

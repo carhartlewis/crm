@@ -3,7 +3,7 @@
 import { cn } from "cn";
 import { memo, type ComponentProps, type HTMLAttributes } from "react";
 import { Button } from "@crm/ui/components/button";
-import { Markdown } from "@crm/ui/components/markdown";
+import { Markdown, type ReactiveIslands } from "@crm/ui/components/markdown";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@crm/ui/components/tooltip";
 
 /** Who wrote a message. Matches the AI SDK's `UIMessage["role"]` without depending on it. */
@@ -100,6 +100,8 @@ export type MessageResponseProps = {
   /** `true` while the reply streams, `false` once it ends. Always pass it for a streamed reply. */
   isAnimating?: boolean;
   className?: string;
+  /** Components the reply can embed (`Markdown`'s `islands`); a registry that never changes. */
+  islands?: ReactiveIslands;
 };
 
 /**
@@ -107,9 +109,14 @@ export type MessageResponseProps = {
  * The renderer is ~130 kB of JS: load the chat that uses this lazily.
  */
 const MessageResponse = memo(
-  function MessageResponse({ className, children, isAnimating = false }: MessageResponseProps) {
+  function MessageResponse({
+    className,
+    children,
+    isAnimating = false,
+    islands,
+  }: MessageResponseProps) {
     return (
-      <Markdown isAnimating={isAnimating} className={cn("size-full", className)}>
+      <Markdown isAnimating={isAnimating} islands={islands} className={cn("size-full", className)}>
         {children}
       </Markdown>
     );
@@ -117,7 +124,8 @@ const MessageResponse = memo(
   (previous, next) =>
     previous.children === next.children &&
     previous.isAnimating === next.isAnimating &&
-    previous.className === next.className,
+    previous.className === next.className &&
+    previous.islands === next.islands,
 );
 
 /** The older AI Elements name for `MessageResponse`. */

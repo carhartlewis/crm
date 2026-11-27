@@ -6,7 +6,7 @@ import { crmToken } from "../lib/crm-token.ts";
 import { apiUrl } from "../lib/gateway.ts";
 
 /** Small, fast and cheap: a title is a few words. */
-const TITLE_MODEL = process.env["CHAT_TITLE_MODEL"] ?? "anthropic/claude-haiku-4.5";
+const TITLE_MODEL = process.env["CHAT_TITLE_MODEL"] ?? "zai/glm-5.3-flash";
 
 /** A title that takes longer than this isn't worth waiting for; the first title stays. */
 const TITLE_TIMEOUT_MS = 15_000;

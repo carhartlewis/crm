@@ -104,7 +104,7 @@ Three tables, each workspace-scoped, synced through the API proxy (ADR 0012):
   tool.
 
 - **Chat titles:** a new chat is first titled with the start of its first message. When the
-  agent takes in that first message, its `chat-title` hook asks Claude Haiku 4.5 on the AI
+  agent takes in that first message, its `chat-title` hook asks GLM 5.3 Flash on the AI
   Gateway (`CHAT_TITLE_MODEL`) for a short title from the message alone, while the reply is
   written, and saves it through `POST /api/agent/chats/title` with its agent token. The API keeps
   it only while `chat.auto_title` is on; a person's rename turns it off.

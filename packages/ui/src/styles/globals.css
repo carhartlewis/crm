@@ -442,10 +442,17 @@
     border-color: var(--border);
   }
 
+  /* A callout: something the reader should check or decide, in a quiet panel. */
   & [data-markdown="blockquote"] {
-    border-inline-start: 2px solid var(--border);
-    padding-inline-start: 0.75em;
-    color: var(--muted-foreground);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: color-mix(in oklab, var(--muted) 50%, transparent);
+    margin-block: 1rem;
+    padding: 0.625rem 0.875rem;
+  }
+
+  & [data-markdown="blockquote"] > :is(p, ul, ol) {
+    margin-block: 0.25em;
   }
 
   & [data-markdown="code"] {
@@ -489,41 +496,79 @@
     white-space: pre;
   }
 
-  /* Tables read as lists: hairlines between rows only, a quiet header, words never split. Every
-     column but the last keeps to one line; the last wraps; a wider table scrolls sideways. */
+  /* Tables look like the app's own tables (`@crm/ui/components/table`): a hairline frame with
+     rounded corners, a quiet header band, hairlines between rows, and the row hover. Words never
+     split: every column but the last keeps to one line, the last wraps, and a wider table
+     scrolls sideways inside its frame. */
   & [data-markdown="table"] {
     display: block;
     overflow-x: auto;
     width: max-content;
     max-width: 100%;
-    border-collapse: collapse;
+    /* A border, not a hairline shadow: the reply's column clips anything drawn outside a box. */
+    border: 1px solid var(--border);
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: var(--radius-lg);
+    margin-block: 1rem;
+    font-variant-numeric: tabular-nums;
   }
 
   & :is(th, td) {
-    border-bottom: 1px solid var(--border);
-    padding: 0.5em 1.5em 0.5em 0;
+    padding: 0.5rem 0.75rem;
     text-align: left;
     vertical-align: top;
     overflow-wrap: normal;
     word-break: normal;
   }
 
-  & :is(th, td):last-child {
-    padding-right: 0;
+  & th {
+    background: color-mix(in oklab, var(--muted) 50%, transparent);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  & td {
+    border-top: 1px solid var(--border);
   }
 
   & td:not(:last-child) {
     white-space: nowrap;
   }
 
-  & th {
-    font-size: 0.875em;
+  & td:first-child {
+    color: var(--foreground);
     font-weight: 500;
-    color: var(--muted-foreground);
   }
 
-  & tbody tr:last-child td {
-    border-bottom: 0;
+  & tbody tr {
+    transition: background-color 150ms var(--ease-out);
+  }
+
+  & tbody tr:hover {
+    background: color-mix(in oklab, var(--muted) 50%, transparent);
+  }
+
+  /* A record in a table cell names its row, so the whole row opens it, as in the app's own
+     tables: the name is plain text and its button stretches over the row. */
+  & tbody tr:has([data-slot="record-chip"]) {
+    position: relative;
+    cursor: pointer;
+  }
+
+  & td [data-slot="record-chip"] {
+    position: static;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  & td [data-slot="record-chip"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
   }
 
   & [data-markdown="img"] {

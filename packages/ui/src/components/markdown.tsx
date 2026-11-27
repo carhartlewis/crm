@@ -1,4 +1,4 @@
-import { Markdown as Words } from "@pierre/words/react";
+import { type ReactiveIslands, Markdown as Words } from "@pierre/words/react";
 import { cn } from "cn";
 
 /**
@@ -10,15 +10,21 @@ import { cn } from "cn";
  * while the stream is open, `false` once it ends. Any boolean switches the renderer to streaming
  * mode, which completes unfinished syntax while the stream is open. Keep passing a boolean for the
  * life of that message so the mode never changes under the renderer.
+ *
+ * `islands` mounts React components from ```` ```island-NAME ```` fences (a JSON body with an
+ * `id`) and, for inline entries, `:NAME[label]{key="value"}` directives. Pass one registry that
+ * never changes; each `render` checks its data and returns null to show the source instead.
  */
 function Markdown({
   children,
   className,
   isAnimating,
+  islands,
 }: {
   children: string;
   className?: string;
   isAnimating?: boolean;
+  islands?: ReactiveIslands;
 }) {
   const streaming = isAnimating !== undefined;
 
@@ -35,6 +41,7 @@ function Markdown({
         allowedHtml={{}}
         controls={false}
         lineNumbers={false}
+        islands={islands}
       >
         {children}
       </Words>
@@ -42,4 +49,4 @@ function Markdown({
   );
 }
 
-export { Markdown };
+export { Markdown, type ReactiveIslands };
