@@ -15,7 +15,7 @@ const RELEASE_GAP_MS = 50;
 const MOMENTUM_SHARE = 0.7;
 
 /** How long the content takes to spring back once let go. */
-const SPRING_BACK_MS = 100;
+const SPRING_BACK_MS = 150;
 
 /**
  * Callback ref for a scroll container: pulling past either end (wheel or trackpad) stretches
