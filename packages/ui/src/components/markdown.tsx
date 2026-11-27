@@ -4,8 +4,8 @@ import { cn } from "cn";
 /**
  * Rendered Markdown (`@pierre/words`, WebAssembly). Static content only; streaming chat uses the
  * same renderer with `isAnimating`. Raw HTML is dropped, so text from third parties (skills,
- * notes) can't inject markup. Load it lazily: the renderer is ~130 kB of JS. Its stylesheet is
- * imported by globals.css.
+ * notes) can't inject markup. Load it lazily: the renderer is ~130 kB of JS. Its styles live in
+ * globals.css (`[data-slot="markdown"]`), at the app's type scale.
  */
 function Markdown({ children, className }: { children: string; className?: string }) {
   return (

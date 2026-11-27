@@ -1,16 +1,9 @@
-import { Badge } from "@crm/ui/components/badge";
-import { Button } from "@crm/ui/components/button";
+import type { SkillDetail } from "@crm/core/api";
 import { Markdown } from "@crm/ui/components/markdown";
-import { Separator } from "@crm/ui/components/separator";
-import {
-  AdaptiveSheet,
-  AdaptiveSheetContent,
-  AdaptiveSheetDescription,
-  AdaptiveSheetFooter,
-  AdaptiveSheetHeader,
-  AdaptiveSheetTitle,
-} from "@crm/ui/patterns/adaptive-sheet";
-import { FormattedDate } from "@crm/ui/patterns/formatted-date";
+import { DayCell, StatusCell } from "@crm/ui/patterns/data-table/table-cells";
+import { RailFacts } from "@crm/ui/patterns/record-sheet/record-rail";
+import { RecordSection } from "@crm/ui/patterns/record-sheet/record-section";
+import { RecordHeader, RecordSheet } from "@crm/ui/patterns/record-sheet/record-sheet";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { removeSkillMutation, setSkillEnabledMutation, skillQuery } from "../../lib/skills.ts";
@@ -18,13 +11,14 @@ import { removeSkillMutation, setSkillEnabledMutation, skillQuery } from "../../
 const onError = (error: Error) => toast.error(error.message);
 
 /** `owner/repo/skill` → `owner/repo`; the skill's own name is already the title. */
-function sourceOf(sourceId: string) {
-  return sourceId.split("/").slice(0, -1).join("/");
+function sourceOf(skill: SkillDetail) {
+  return skill.sourceId ? skill.sourceId.split("/").slice(0, -1).join("/") : "This workspace";
 }
 
 /**
- * One skill, to read before enabling it: what it is for, where it came from, and its
- * instructions as rendered Markdown. Loaded on demand (the renderer is WebAssembly).
+ * A skill as a record, like a company: name and actions in the header, what it's for and its
+ * instructions in the body, facts in the rail. Loaded on demand (the Markdown renderer is
+ * WebAssembly); stays mounted after the first open so it can animate out.
  */
 export default function SkillSheet({
   userId,
@@ -34,10 +28,10 @@ export default function SkillSheet({
 }: {
   userId: string;
   workspaceId: string;
-  id: string;
+  id: string | null;
   onClose: () => void;
 }) {
-  const skill = useQuery(skillQuery(userId, workspaceId, id));
+  const skill = useQuery({ ...skillQuery(userId, workspaceId, id ?? ""), enabled: id !== null });
   const setEnabled = useMutation({ ...setSkillEnabledMutation, onError });
 
   const remove = useMutation({
@@ -49,71 +43,81 @@ export default function SkillSheet({
     },
   });
 
-  const detail = skill.data;
-  const files = detail?.files.length ?? 0;
+  const detail = skill.data?.id === id ? skill.data : undefined;
 
   return (
-    <AdaptiveSheet open onOpenChange={(open) => (open ? undefined : onClose())} size="wide">
-      <AdaptiveSheetContent>
-        <AdaptiveSheetHeader>
-          <div className="flex items-center gap-2">
-            <AdaptiveSheetTitle>{detail?.name ?? "Skill"}</AdaptiveSheetTitle>
-            {detail ? (
-              <Badge variant="secondary">{detail.enabled ? "Enabled" : "Disabled"}</Badge>
-            ) : null}
-          </div>
-          <AdaptiveSheetDescription>
-            {detail?.description ?? (skill.isError ? skill.error.message : "")}
-          </AdaptiveSheetDescription>
-        </AdaptiveSheetHeader>
-        {detail ? (
-          <>
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-3 text-sm text-muted-foreground select-none">
-              <span>
-                {detail.sourceId
-                  ? `From ${sourceOf(detail.sourceId)}`
-                  : "Written in this workspace"}
-              </span>
-              {detail.addedBy ? (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>Added by {detail.addedBy.name}</span>
-                </>
-              ) : null}
-              <span aria-hidden>·</span>
-              <FormattedDate value={detail.createdAt} />
-              {files > 0 ? (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>{files === 1 ? "1 extra file" : `${files} extra files`}</span>
-                </>
-              ) : null}
-            </p>
-            <Separator />
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              <Markdown>{detail.content}</Markdown>
-            </div>
-            <AdaptiveSheetFooter>
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="destructive"
-                  onClick={() => remove.mutate(detail.id)}
-                  loading={remove.isPending}
-                >
-                  Remove
-                </Button>
-                <Button
-                  variant={detail.enabled ? "secondary" : "default"}
-                  onClick={() => setEnabled.mutate({ id: detail.id, enabled: !detail.enabled })}
-                  loading={setEnabled.isPending}
-                >
-                  {detail.enabled ? "Disable" : "Enable for the workspace"}
-                </Button>
-              </div>
-            </AdaptiveSheetFooter>
-          </>
-        ) : null}
-      </AdaptiveSheetContent>
-    </AdaptiveSheet>
+    <RecordSheet
+      open={id !== null}
+      onClose={onClose}
+      label="Skill"
+      loading={id !== null && !detail}
+      // One tab, so no tab bar; `?tab=` is already the page's.
+      tab="instructions"
+      onTabChange={() => undefined}
+      header={
+        detail ? (
+          <RecordHeader
+            title={detail.name}
+            actions={[
+              {
+                id: "enable",
+                label: detail.enabled ? "Disable" : "Enable for the workspace",
+                disabled: setEnabled.isPending,
+                onSelect: () => setEnabled.mutate({ id: detail.id, enabled: !detail.enabled }),
+              },
+            ]}
+            menu={[
+              {
+                id: "remove",
+                label: "Remove",
+                destructive: true,
+                disabled: remove.isPending,
+                onSelect: () => remove.mutate(detail.id),
+              },
+            ]}
+          />
+        ) : null
+      }
+      tabs={[
+        {
+          id: "instructions",
+          label: "Instructions",
+          content: detail ? (
+            <>
+              <RecordSection label="When to use it">
+                <p className="text-body">{detail.description}</p>
+              </RecordSection>
+              <RecordSection label="Instructions">
+                <Markdown>{detail.content}</Markdown>
+              </RecordSection>
+            </>
+          ) : null,
+        },
+      ]}
+      rail={
+        detail ? (
+          <RailFacts
+            facts={[
+              {
+                kind: "status",
+                label: "Status",
+                value: (
+                  // The cell is a full-width row; inline it so the rail's right alignment holds.
+                  <span className="inline-flex">
+                    <StatusCell tone={detail.enabled ? "done" : "open"}>
+                      {detail.enabled ? "Enabled" : "Disabled"}
+                    </StatusCell>
+                  </span>
+                ),
+              },
+              { kind: "property", label: "Source", value: sourceOf(detail) },
+              { kind: "person", label: "Added by", value: detail.addedBy?.name ?? "—" },
+              { kind: "count", label: "Extra files", value: String(detail.files.length) },
+              { kind: "date", label: "Added", value: <DayCell value={detail.createdAt} /> },
+            ]}
+          />
+        ) : null
+      }
+    />
   );
 }

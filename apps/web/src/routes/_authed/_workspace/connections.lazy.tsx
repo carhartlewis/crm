@@ -201,7 +201,6 @@ function Connections() {
             workspaceId={workspaceId}
             skills={skills}
             view={view}
-            query={query}
             settledQuery={settledQuery}
           />
         )}

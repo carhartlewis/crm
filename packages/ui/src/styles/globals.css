@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* Markdown (`@crm/ui/components/markdown`): spacing and lists in the inherited text colour. */
-@import "@pierre/words/styles.css";
 
 @source "../../../apps/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
@@ -279,6 +277,126 @@
   blockquote,
   [data-slot$="description"] {
     @apply text-pretty;
+  }
+}
+
+/* Markdown (`@crm/ui/components/markdown`, rendered by @pierre/words) at the app's type scale:
+   body-size headings, tight rhythm, code on the muted surface. Only what static documents use;
+   the streaming chat adds the caret rules when it ships. */
+[data-slot="markdown"] [data-markdown="root"] {
+  line-height: var(--text-body--line-height);
+  overflow-wrap: anywhere;
+
+  & :where(p, ul, ol, blockquote, table, [data-markdown="code-block"]) {
+    margin-block: 0.75em;
+  }
+
+  & :is(h1, h2, h3, h4, h5, h6) {
+    margin-block: 1.5em 0.5em;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  & > :first-child {
+    margin-top: 0;
+  }
+
+  & > :last-child {
+    margin-bottom: 0;
+  }
+}
+
+[data-slot="markdown"] {
+  & [data-markdown="h1"] {
+    font-size: 1.25em;
+  }
+
+  & [data-markdown="h2"] {
+    font-size: 1.125em;
+  }
+
+  & :is([data-markdown="ul"], [data-markdown="ol"]) {
+    padding-inline-start: 1.25em;
+  }
+
+  & [data-markdown="ul"] {
+    list-style: disc;
+  }
+
+  & [data-markdown="ol"] {
+    list-style: decimal;
+  }
+
+  & [data-markdown="li"] > :is(ul, ol, p) {
+    margin-block: 0.25em;
+  }
+
+  & [data-markdown="a"] {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  & [data-markdown="blockquote"] {
+    border-inline-start: 2px solid var(--border);
+    padding-inline-start: 0.75em;
+    color: var(--muted-foreground);
+  }
+
+  & [data-markdown="code"] {
+    border-radius: 0.25rem;
+    background: var(--muted);
+    padding: 0.1em 0.3em;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  & [data-markdown="code-block"] {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--muted);
+  }
+
+  & [data-markdown="code-header"] {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding: 0.4rem 0.75rem;
+    color: var(--muted-foreground);
+    font: 0.75rem var(--font-mono);
+  }
+
+  & [data-markdown="code-block"] pre {
+    max-height: 24rem;
+    overflow: auto;
+    margin: 0;
+    padding: 0.75rem;
+    font: 0.75rem / 1.6 var(--font-mono);
+    tab-size: 2;
+  }
+
+  & [data-markdown="code-block"] pre code {
+    display: block;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    white-space: pre;
+  }
+
+  & [data-markdown="table"] {
+    display: block;
+    overflow: auto;
+    border-collapse: collapse;
+  }
+
+  & :is(th, td) {
+    border: 1px solid var(--border);
+    padding: 0.35em 0.75em;
+  }
+
+  & [data-markdown="img"] {
+    max-width: 100%;
+    height: auto;
   }
 }
 
