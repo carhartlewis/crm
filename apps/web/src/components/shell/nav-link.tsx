@@ -12,7 +12,8 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { Suspense, useState, useSyncExternalStore } from "react";
 import type { Page } from "../../lib/pages.ts";
 import { workspaceQuery } from "../../lib/session.ts";
-import type { Shortcut } from "../../lib/shortcuts.ts";
+import { ariaKeyShortcuts, type Shortcut } from "../../lib/shortcuts.ts";
+import { RowShortcut } from "./row-shortcut.tsx";
 import { isReordering, subscribeReordering } from "./reorder.ts";
 
 // ForesightJS tags tracked elements with data-active/data-status by default, which our sidebar
@@ -66,12 +67,14 @@ export function NavLink({ page, active, shortcut, userId, workspaceId }: NavLink
         isActive={active}
         onPointerEnter={warm}
         onFocus={warm}
+        aria-keyshortcuts={shortcut ? ariaKeyShortcuts(shortcut) : undefined}
         render={
           <PreviewCardTrigger render={<Link to={page.to} ref={elementRef} draggable={false} />} />
         }
       >
         <PageIcon />
         <span>{page.label}</span>
+        <RowShortcut shortcut={shortcut} />
       </SidebarMenuButton>
       <PreviewCardContent>
         <Suspense fallback={<PeekSkeleton />}>

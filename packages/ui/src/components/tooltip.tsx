@@ -23,12 +23,42 @@ function TooltipContent({
   alignOffset = 0,
   anchor,
   children,
+  variant = "default",
   ...props
 }: TooltipPrimitive.Popup.Props &
   Pick<
     TooltipPrimitive.Positioner.Props,
     "align" | "alignOffset" | "anchor" | "side" | "sideOffset"
-  >) {
+  > & {
+    /** `keys`: just a hotkey's key caps, in a quiet frosted chip with no arrow (as in Glass). */
+    variant?: "default" | "keys";
+  }) {
+  if (variant === "keys") {
+    return (
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Positioner
+          anchor={anchor}
+          align={align}
+          alignOffset={alignOffset}
+          side={side}
+          sideOffset={sideOffset}
+          className="isolate z-50"
+        >
+          <TooltipPrimitive.Popup
+            data-slot="tooltip-keys"
+            className={cn(
+              "z-50 inline-flex origin-(--transform-origin) items-center gap-0.5 rounded-md bg-popover/80 p-0.5 text-popover-foreground shadow-md ring-1 ring-foreground/10 backdrop-blur-xl backdrop-saturate-150 select-none data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0",
+              className,
+            )}
+            {...props}
+          >
+            {children}
+          </TooltipPrimitive.Popup>
+        </TooltipPrimitive.Positioner>
+      </TooltipPrimitive.Portal>
+    );
+  }
+
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner

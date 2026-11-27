@@ -4,6 +4,8 @@ import search from "@carbon/icons/es/search/16.js";
 import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { useRouter } from "@tanstack/react-router";
+import { shortcuts } from "../../lib/shortcuts.ts";
+import { HotkeyTooltip } from "../hotkey-tooltip.tsx";
 
 const ChevronLeftIcon = carbonIcon(chevronLeft);
 const ChevronRightIcon = carbonIcon(chevronRight);
@@ -20,31 +22,37 @@ export function TitleBarControls({ onSearch, onSearchIntent }: TitleBarControlsP
 
   return (
     <div className="app-region-no-drag flex items-center gap-0.5">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Search"
-        onClick={onSearch}
-        onPointerEnter={onSearchIntent}
-      >
-        <SearchIcon />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Back"
-        onClick={() => router.history.back()}
-      >
-        <ChevronLeftIcon />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Forward"
-        onClick={() => router.history.forward()}
-      >
-        <ChevronRightIcon />
-      </Button>
+      <HotkeyTooltip shortcut={shortcuts.palette}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Search"
+          onClick={onSearch}
+          onPointerEnter={onSearchIntent}
+        >
+          <SearchIcon />
+        </Button>
+      </HotkeyTooltip>
+      <HotkeyTooltip shortcut={shortcuts.back}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Back"
+          onClick={() => router.history.back()}
+        >
+          <ChevronLeftIcon />
+        </Button>
+      </HotkeyTooltip>
+      <HotkeyTooltip shortcut={shortcuts.forward}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Forward"
+          onClick={() => router.history.forward()}
+        >
+          <ChevronRightIcon />
+        </Button>
+      </HotkeyTooltip>
     </div>
   );
 }

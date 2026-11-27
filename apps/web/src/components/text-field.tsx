@@ -12,7 +12,14 @@ interface TextFieldProps
 
 /** A TanStack Form field rendered with the shared Field primitives: label, input, then error or hint. */
 export function TextField({ field, label, description, ...input }: TextFieldProps) {
-  const error = field.state.meta.isTouched ? field.state.meta.errors.find(Boolean) : undefined;
+  // Errors wait for intent: a changed value, or a submit. Tabbing through or clicking away from an
+  // untouched empty field says nothing yet.
+  const { isTouched, isDirty } = field.state.meta;
+  const submitted = field.form.state.submissionAttempts > 0;
+
+  const error =
+    isTouched && (isDirty || submitted) ? field.state.meta.errors.find(Boolean) : undefined;
+
   const id = `field-${field.name}`;
 
   return (

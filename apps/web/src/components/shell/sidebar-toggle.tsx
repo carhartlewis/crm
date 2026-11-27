@@ -4,6 +4,8 @@ import { desktopBridge } from "@crm/core/desktop";
 import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { useSidebar } from "@crm/ui/components/sidebar";
+import { shortcuts } from "../../lib/shortcuts.ts";
+import { HotkeyTooltip } from "../hotkey-tooltip.tsx";
 
 const CloseIcon = carbonIcon(sidePanelClose);
 
@@ -23,15 +25,17 @@ export function SidebarToggle() {
   const ToggleIcon = expanded ? CloseIcon : OpenIcon;
 
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      className="app-region-no-drag"
-      aria-label={expanded ? "Hide sidebar" : "Show sidebar"}
-      aria-expanded={expanded}
-      onClick={toggleSidebar}
-    >
-      <ToggleIcon />
-    </Button>
+    <HotkeyTooltip shortcut={shortcuts.sidebar}>
+      {/* No aria-expanded: the ghost button tints itself for it, and the label carries the state. */}
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="app-region-no-drag"
+        aria-label={expanded ? "Hide sidebar" : "Show sidebar"}
+        onClick={toggleSidebar}
+      >
+        <ToggleIcon />
+      </Button>
+    </HotkeyTooltip>
   );
 }

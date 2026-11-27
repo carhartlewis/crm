@@ -4,7 +4,8 @@ import type { Dispatch, SetStateAction } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { pageById } from "../../lib/pages.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
-import { pinnedShortcut, shortcuts, toHotkey } from "../../lib/shortcuts.ts";
+import { useCreateSheet } from "../../lib/create-sheet.ts";
+import { claimsCopyShortcut, pinnedShortcut, shortcuts, toHotkey } from "../../lib/shortcuts.ts";
 
 // ⌘ shortcuts work everywhere, text fields included. The ⌥ ones (the library's default) stay
 // out of text fields, where Option types characters.
@@ -22,6 +23,7 @@ export function Shortcuts({
   const router = useRouter();
   const { toggleSidebar } = useSidebar();
   const order = usePinnedOrder(userId);
+  const [, setCreate] = useCreateSheet();
 
   const pinned = order.flatMap((_, index) => {
     const shortcut = pinnedShortcut(index);
@@ -35,6 +37,20 @@ export function Shortcuts({
   useHotkeys(toHotkey(shortcuts.sidebar), toggleSidebar, EVERYWHERE, [toggleSidebar]);
   useHotkeys(toHotkey(shortcuts.back), () => router.history.back(), EVERYWHERE, [router]);
   useHotkeys(toHotkey(shortcuts.forward), () => router.history.forward(), EVERYWHERE, [router]);
+  // Sheets open from anywhere; ⌘C stays copy while there's a selection or a field has focus.
+  useHotkeys(
+    toHotkey(shortcuts.create),
+    // Held keys repeat; one press opens one sheet, and pressing it again while open does nothing.
+    (event) => {
+      if (!event.repeat) void setCreate("company");
+    },
+    {
+      enabled: () => claimsCopyShortcut(window.getSelection(), document.activeElement),
+      enableOnFormTags: false,
+      preventDefault: true,
+    },
+    [setCreate],
+  );
   useHotkeys(toHotkey(shortcuts.home), () => void router.navigate({ to: "/" }), OUTSIDE_TEXT, [
     router,
   ]);

@@ -14,7 +14,9 @@ import {
 } from "@crm/ui/components/sidebar";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { haptic } from "../../lib/haptics.ts";
+import { ariaKeyShortcuts, shortcuts } from "../../lib/shortcuts.ts";
 import { PinnedNav } from "./pinned-nav.tsx";
+import { RowShortcut } from "./row-shortcut.tsx";
 import { rubberBandScroll } from "./rubber-band.ts";
 import { TitleBarControls } from "./title-bar.tsx";
 import { WorkspaceMenu } from "./workspace-menu.tsx";
@@ -44,9 +46,14 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={onHome} render={<Link to="/" />}>
+                <SidebarMenuButton
+                  isActive={onHome}
+                  aria-keyshortcuts={ariaKeyShortcuts(shortcuts.home)}
+                  render={<Link to="/" />}
+                >
                   <HomeIcon />
                   <span>Home</span>
+                  <RowShortcut shortcut={shortcuts.home} />
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

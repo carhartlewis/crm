@@ -6,6 +6,7 @@ import { Outlet } from "@tanstack/react-router";
 import { NuqsAdapter } from "nuqs/adapters/tanstack-router";
 import { Suspense, useState } from "react";
 import { AppSidebar } from "./app-sidebar.tsx";
+import { CreateSheets } from "./create-sheets.tsx";
 import { Shortcuts } from "./shortcuts.tsx";
 import { TitleBarContext } from "./page-header.tsx";
 
@@ -49,6 +50,7 @@ export function WorkspaceShell({ userId, workspaceId }: WorkspaceShellProps) {
               <Outlet />
             </TitleBarContext>
           </SidebarInset>
+          <CreateSheets userId={userId} workspaceId={workspaceId} />
           <Shortcuts userId={userId} setPaletteOpen={setPaletteOpen} />
           {paletteOpen && (
             <Suspense fallback={null}>
