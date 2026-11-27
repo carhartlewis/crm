@@ -24,6 +24,10 @@ import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { AddConnectorSheet } from "../../../components/connections/add-connector-sheet.tsx";
 import { ConnectorsPanel } from "../../../components/connections/connectors-panel.tsx";
 import {
+  ConnectionsToolbar,
+  type ConnectionsToolbarParts,
+} from "../../../components/connections/connections-toolbar.tsx";
+import {
   CreateSkillSheet,
   EMPTY_SKILL,
   type SkillDraft,
@@ -171,27 +175,29 @@ function Connections() {
     </DropdownMenu>
   );
 
-  // What to show, whose, and the search. A table puts it on its own toolbar's line, by Sort.
-  const toolbar = (
-    <div className="flex flex-wrap items-center gap-3">
-      <Tabs value={tab} onValueChange={(next: (typeof TABS)[number]) => void setTab(next)}>
-        <TabsList aria-label="Show">
-          <TabsTrigger value="connectors">Connectors</TabsTrigger>
-          <TabsTrigger value="skills">Skills</TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <Separator orientation="vertical" className="h-5" />
-      <Tabs value={view} onValueChange={(next: (typeof VIEWS)[number]) => void setView(next)}>
-        <TabsList aria-label="Whose">
-          <TabsTrigger value="yours">Yours</TabsTrigger>
-          <TabsTrigger value="discover">Discover</TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <div className="min-w-48 flex-1 sm:max-w-80">
-        <ListSearch placeholder={tab === "connectors" ? "Search connectors…" : "Search skills…"} />
+  // What to show and whose, then the search. A table puts its Sort between them.
+  const toolbar: ConnectionsToolbarParts = {
+    tabs: (
+      <div className="flex flex-wrap items-center gap-3">
+        <Tabs value={tab} onValueChange={(next: (typeof TABS)[number]) => void setTab(next)}>
+          <TabsList aria-label="Show">
+            <TabsTrigger value="connectors">Connectors</TabsTrigger>
+            <TabsTrigger value="skills">Skills</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Separator orientation="vertical" className="h-5" />
+        <Tabs value={view} onValueChange={(next: (typeof VIEWS)[number]) => void setView(next)}>
+          <TabsList aria-label="Whose">
+            <TabsTrigger value="yours">Yours</TabsTrigger>
+            <TabsTrigger value="discover">Discover</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
-    </div>
-  );
+    ),
+    search: (
+      <ListSearch placeholder={tab === "connectors" ? "Search connectors…" : "Search skills…"} />
+    ),
+  };
 
   const outcome = outcomeMessage(search, appName);
 
@@ -208,7 +214,7 @@ function Connections() {
             </Link>
           </output>
         ) : null}
-        {tab === "connectors" ? toolbar : null}
+        {tab === "connectors" ? <ConnectionsToolbar {...toolbar} /> : null}
         {tab === "connectors" ? (
           <ConnectorsPanel
             catalog={catalog}

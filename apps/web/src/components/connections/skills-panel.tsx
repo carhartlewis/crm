@@ -20,9 +20,10 @@ import { useListTable } from "@crm/ui/patterns/data-table/use-list-table";
 import { RecordRowMenu } from "@crm/ui/patterns/record-sheet/record-sheet";
 import { preloadable } from "@crm/ui/lib/preloadable";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { type ReactNode, Suspense } from "react";
+import { Suspense } from "react";
 import { parseAsString, useQueryState } from "nuqs";
 import { toast } from "sonner";
+import { ConnectionsToolbar, type ConnectionsToolbarParts } from "./connections-toolbar.tsx";
 import {
   discoverQuery,
   installSkillMutation,
@@ -184,7 +185,7 @@ export function SkillsPanel({
   view: "yours" | "discover";
   settledQuery: string;
   /** The page's tabs and search; the table shows them on one line with its Sort. */
-  toolbar: ReactNode;
+  toolbar: ConnectionsToolbarParts;
 }) {
   const [open, setOpen] = useQueryState("skill", parseAsString);
   const scope = { userId, workspaceId };
@@ -200,7 +201,7 @@ export function SkillsPanel({
         />
       ) : (
         <div className="flex flex-col gap-6">
-          {toolbar}
+          <ConnectionsToolbar {...toolbar} />
           <DiscoverSkills
             scope={scope}
             skills={skills}
@@ -232,7 +233,7 @@ function YourSkills({
 }: {
   workspaceId: string;
   skills: readonly SkillItem[];
-  toolbar: ReactNode;
+  toolbar: ConnectionsToolbarParts;
   onOpen: (id: string) => void;
 }) {
   const collection = skillsCollection(workspaceId);
@@ -270,8 +271,8 @@ function YourSkills({
   return (
     <DataTable
       {...list.tableProps}
-      search={toolbar}
-      searchPosition="start"
+      lead={toolbar.tabs}
+      search={toolbar.search}
       meta={null}
       columns={COLUMNS}
       onRowClick={(row) => onOpen(row.id)}

@@ -160,13 +160,13 @@ export type DataTableProps<TRow, TSub, TColumn extends string = string> = {
   columnsKey?: string;
   actions?: ReactNode;
   leadingActions?: ReactNode;
-  search?: ReactNode;
   /**
-   * Where `search` sits on wide screens. `end` (default) keeps Filters and Sort on the left, so
-   * their menus and submenus open rightward with room to spare. Use `start` when `search` carries
-   * leading controls of its own, such as tabs.
+   * Controls that always come first and never fold into the small-screen options toggle, such as
+   * a page's tabs. Filters and Sort follow them; `search` sits at the far right on wide screens,
+   * so their menus and submenus open rightward with room to spare.
    */
-  searchPosition?: "start" | "end";
+  lead?: ReactNode;
+  search?: ReactNode;
   meta?: ReactNode;
   empty?: ReactNode;
   groupHeader?: (row: TRow, previous: TRow | undefined) => ReactNode;
@@ -708,8 +708,8 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
   columnsKey,
   actions,
   leadingActions,
+  lead,
   search,
-  searchPosition = "end",
   meta,
   empty,
   groupHeader,
@@ -798,11 +798,8 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
           )}
           inert={selecting}
         >
-          {search != null && (
-            <div className={cn(searchPosition === "end" && "lg:order-last lg:ml-auto")}>
-              {search}
-            </div>
-          )}
+          {lead}
+          {search != null && <div className="lg:order-last lg:ml-auto">{search}</div>}
           {hasFilterControls && (
             <Button
               type="button"
@@ -836,12 +833,7 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
             {quiet ? (
               actions
             ) : (
-              <div
-                className={cn(
-                  "grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center",
-                  searchPosition === "start" && "lg:ml-auto",
-                )}
-              >
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
                 {tabs && (
                   <DropdownMenu>
                     <DropdownMenuTrigger
