@@ -25,6 +25,7 @@ import { TextDetail } from "./detail-fields.tsx";
 import { ContactAvatar, MemberAvatar, MoneyCell, MARK_SIZE } from "./record-visuals.tsx";
 import type { Member } from "./use-crm.ts";
 import { type StageChange, StageMenu } from "./stage-menu.tsx";
+import { ResearchIndicator } from "./research-indicator.tsx";
 
 const AddIcon = carbonIcon(add16);
 const CloseIcon = carbonIcon(close16);
@@ -166,6 +167,7 @@ function contactColumns(
       <>
         <ContactAvatar contact={row} size={MARK_SIZE} />
         <span className="truncate font-medium text-foreground">{contactName(row)}</span>
+        <ResearchIndicator record={row} compact />
       </>
     ),
   };

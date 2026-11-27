@@ -60,6 +60,8 @@ export interface MemoryViewProps {
   readonly fill?: boolean;
   /** Until when (epoch ms) an empty memory waits for its first source: a new company's research. */
   readonly expectUntil?: number;
+  /** Keep looking for sources while the record's agent is still researching. */
+  readonly researching?: boolean;
 }
 
 /**
@@ -92,10 +94,11 @@ export function MemoryView({
   subject,
   fill = false,
   expectUntil = 0,
+  researching = false,
 }: MemoryViewProps) {
   const [state, setState] = useQueryStates(params, { history: "push" });
 
-  const knowledge = useQuery(knowledgeQuery(userId, workspaceId, target, expectUntil));
+  const knowledge = useQuery(knowledgeQuery(userId, workspaceId, target, expectUntil, researching));
 
   const sources = knowledge.data?.sources ?? [];
 
@@ -160,7 +163,7 @@ export function MemoryView({
           empty={
             query
               ? "No matching facts."
-              : processing
+              : processing || researching
                 ? `Learning about ${subject}…`
                 : `Nothing remembered about ${subject} yet. Add a note, or tell the assistant.`
           }
@@ -190,7 +193,11 @@ export function MemoryView({
             graph.data ? (
               <>
                 <span>{`Facts: ${graph.data.totals.facts} · Sources: ${graph.data.totals.sources}`}</span>
-                {processing ? <output>Learning from new sources…</output> : null}
+                {processing ? (
+                  <output>Learning from new sources…</output>
+                ) : researching ? (
+                  <output>Researching — facts appear as they are found.</output>
+                ) : null}
               </>
             ) : undefined
           }

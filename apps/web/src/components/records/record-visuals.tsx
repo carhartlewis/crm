@@ -5,6 +5,7 @@ import { EmptyCellDash } from "@crm/ui/patterns/empty-cell";
 import type { ReactNode } from "react";
 import type { Company } from "../../lib/companies.ts";
 import type { Contact } from "../../lib/contacts.ts";
+import { researchActive, type ResearchRecord } from "../../lib/research-status.ts";
 import type { Member } from "./use-crm.ts";
 
 type LogoSize = "xs" | "sm" | "default" | "lg" | "xl";
@@ -15,7 +16,8 @@ type LogoSize = "xs" | "sm" | "default" | "lg" | "xl";
  */
 export const MARK_SIZE = "sm" satisfies LogoSize;
 
-type CompanyMark = Pick<Company, "name" | "icon_url" | "logo_url" | "icon_dark_url" | "icon_tone">;
+type CompanyMark = Pick<Company, "name" | "icon_url" | "logo_url" | "icon_dark_url" | "icon_tone"> &
+  Partial<ResearchRecord>;
 
 /** A company's square logo from our storage, or its initials. */
 export function CompanyLogo({
@@ -28,6 +30,10 @@ export function CompanyLogo({
   return (
     <EntityLogo
       darkSrc={company.icon_dark_url}
+      loading={
+        !company.archived_at &&
+        (company.enrichment_status === "pending" || company.enrichment_status === "running")
+      }
       name={company.name}
       size={size}
       src={company.icon_url ?? company.logo_url}
@@ -63,7 +69,13 @@ export function ContactAvatar({
   size?: LogoSize;
 }) {
   return (
-    <EntityLogo kind="contact" name={contactName(contact)} size={size} src={contact.image_url} />
+    <EntityLogo
+      kind="contact"
+      name={contactName(contact)}
+      size={size}
+      src={contact.image_url}
+      loading={researchActive(contact)}
+    />
   );
 }
 
@@ -72,15 +84,18 @@ export function NameWithMark({
   mark,
   name,
   strong,
+  status,
 }: {
   mark: ReactNode;
   name: string;
   strong?: boolean;
+  status?: ReactNode;
 }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
       <span className="flex shrink-0">{mark}</span>
       <span className={strong ? "truncate font-medium" : "truncate text-foreground"}>{name}</span>
+      {status}
     </span>
   );
 }

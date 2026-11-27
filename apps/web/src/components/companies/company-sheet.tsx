@@ -50,6 +50,8 @@ import {
 import { WebsiteActivity } from "../records/website-activity.tsx";
 import { byId, useCompanies, useContacts, useDeals, useMembers } from "../records/use-crm.ts";
 import { CompanyKnowledge } from "./company-knowledge.tsx";
+import { ResearchIndicator } from "../records/research-indicator.tsx";
+import { researchingPeople } from "../../lib/research-status.ts";
 
 const RenewIcon = carbonIcon(renew16);
 const ResearchIcon = carbonIcon(search16);
@@ -234,11 +236,14 @@ export default function CompanySheet({ userId, workspaceId }: CompanySheetProps)
               leading={<CompanyLogo company={current} size="lg" />}
               menu={menu}
               status={
-                current.archived_at
-                  ? "Archived"
-                  : current.enrichment_status === "running"
-                    ? "Researching"
-                    : null
+                current.archived_at ? (
+                  "Archived"
+                ) : (
+                  <ResearchIndicator
+                    record={current}
+                    people={researchingPeople(contacts).get(current.id)}
+                  />
+                )
               }
               title={current.name}
             />

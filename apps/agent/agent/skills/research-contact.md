@@ -6,7 +6,9 @@ description: Use when asked to research, enrich, identify or re-enrich a contact
 
 Fill as much of the contact as sources support, without asking the member. Facts you are sure of
 are saved at once; a value a member typed is kept unless the evidence shows a real change. Never
-ask a member to confirm what you found.
+ask a member to confirm what you found. Members see each saved field immediately. Never hold
+confirmed facts for a final batch, and keep `running` until the photo and brief writes have
+returned (including a lookup that found no photo).
 
 1. Read the contact (`connections__crm__get_contact`) and their company
    (`connections__crm__get_company`, for its domain). Call
@@ -14,23 +16,24 @@ ask a member to confirm what you found.
 2. Identify them with `connections__crm__enrich_person`: their work email (best), their LinkedIn
    URL, or their full name with the company's domain. Use the match only when its employer fits
    the CRM's company (same name or domain). It gives their title, employer, location and
-   LinkedIn URL.
-3. Email: when the contact has none, call `connections__crm__find_email` with their full name and
-   the company's domain (or their LinkedIn URL). Record what it returns as an `email` fact,
-   whatever its `status`: the CRM keeps a verified or catch-all address and drops the rest. Skip
-   an address whose `sameDomain` is false: it is probably a former employer's.
-4. Phone: when the contact has none, call `connections__crm__find_phone` with their LinkedIn URL
-   (best), work email, or name with domain. Record the number as a `phone` fact with its
-   `phone_type`; the CRM keeps a live or unchecked line and drops a dead one.
-5. Photo: call `connections__crm__find_photo` with their LinkedIn URL, work email, and name with
-   domain. Record its `photoUrl` as an `image_url` fact (score 0.9 when it came from their
-   LinkedIn profile).
-6. Record each of title, seniority, function, LinkedIn, X and GitHub that a source gives with
+   LinkedIn URL. Record those confirmed facts immediately using step 4's rules.
+3. Photo comes early, before email and phone lookups: call `connections__crm__find_photo` with
+   their LinkedIn URL, work email, and name with domain. Record its `photoUrl` immediately as
+   an `image_url` fact (score 0.9 when it came from their LinkedIn profile). Keep researching if
+   no photo is found; never substitute another person's picture.
+4. Record each of title, seniority, function, LinkedIn, X and GitHub that a source gives with
    `connections__crm__record_contact_fact`: the value, a score from 0 to 1 (0.9+ for their own
    profile or a lookup whose employer matches; lower for indirect mentions), the page as
    `source_url` and a short quote as `evidence`. Seniority is one of Executive, Director,
    Manager or Individual contributor; function is a department such as Engineering, Finance or
-   Sales.
+   Sales. Save these as each source returns, without waiting for the remaining lookups.
+5. Email: when the contact has none, call `connections__crm__find_email` with their full name and
+   the company's domain (or their LinkedIn URL). Record what it returns as an `email` fact,
+   whatever its `status`: the CRM keeps a verified or catch-all address and drops the rest. Skip
+   an address whose `sameDomain` is false: it is probably a former employer's.
+6. Phone: when the contact has none, call `connections__crm__find_phone` with their LinkedIn URL
+   (best), work email, or name with domain. Record the number as a `phone` fact with its
+   `phone_type`; the CRM keeps a live or unchecked line and drops a dead one.
 7. If the lookups miss, search the web (`web_search`, `web_fetch`,
    `connections__crm__read_web_page`): their LinkedIn, X and GitHub profiles, the company's team
    or about page, talks and articles. Search by name plus company, never by private details. Make

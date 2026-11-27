@@ -35,6 +35,8 @@ import { ConfirmDeleteDialog } from "../records/confirm-delete-dialog.tsx";
 import { ActivityFeed } from "../records/activity-feed.tsx";
 import { RecordAgentTab, useRecordChat } from "../records/agent-tab.tsx";
 import { RecordKnowledge } from "../records/record-knowledge.tsx";
+import { ResearchIndicator } from "../records/research-indicator.tsx";
+import { researchActive } from "../../lib/research-status.ts";
 import {
   enrichContactPrompt,
   findEmailPrompt,
@@ -306,16 +308,19 @@ export default function ContactSheet({
               leading={<ContactAvatar contact={current} size="lg" />}
               menu={menu}
               status={
-                isPrimary ? (
-                  <>
-                    <StatusDot tone="success" />
-                    Primary contact
-                  </>
-                ) : current.archived_at ? (
+                current.archived_at ? (
                   "Archived"
-                ) : current.enrichment_status === "running" ? (
-                  "Researching"
-                ) : null
+                ) : (
+                  <>
+                    {isPrimary ? (
+                      <>
+                        <StatusDot tone="success" />
+                        Primary contact
+                      </>
+                    ) : null}
+                    <ResearchIndicator record={current} />
+                  </>
+                )
               }
               title={contactName(current)}
             />
@@ -572,6 +577,8 @@ export default function ContactSheet({
           content: current ? (
             <RecordKnowledge
               key={current.id}
+              researching={researchActive(current)}
+              expectUntil={Date.parse(current.enriched_at ?? current.created_at) + 3 * 60 * 1000}
               subject={contactName(current)}
               target={{ contactId: current.id }}
               userId={userId}

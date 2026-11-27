@@ -52,12 +52,15 @@ export function EntityLogo({
   name,
   size,
   kind,
+  loading = false,
   className,
 }: {
   src: string | null | undefined;
   darkSrc?: string | null | undefined;
   tone?: string | null | undefined;
   name: string;
+  /** Research may still find a picture. Existing images remain visible. */
+  loading?: boolean;
   className?: string;
 } & VariantProps<typeof entityLogoVariants>) {
   const invert =
@@ -97,7 +100,9 @@ export function EntityLogo({
           src={darkSrc}
         />
       ) : null}
-      <AvatarPrimitive.Fallback className="leading-none tracking-tight">
+      <AvatarPrimitive.Fallback
+        className={cn("leading-none tracking-tight", loading && "animate-pulse")}
+      >
         {entityInitials(name)}
       </AvatarPrimitive.Fallback>
     </AvatarPrimitive.Root>

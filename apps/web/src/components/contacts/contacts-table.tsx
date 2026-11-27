@@ -11,6 +11,7 @@ import { ACTIVITY_FACET, activityBuckets } from "../../lib/activity-bucket.ts";
 import { localDay, momentDate, relativeTime } from "../../lib/record-format.ts";
 import { deleteRecords } from "../../lib/synced-records.ts";
 import { useCustomColumns } from "../records/use-custom-columns.ts";
+import { ResearchIndicator } from "../records/research-indicator.tsx";
 import {
   AssignOwnerMenu,
   type BulkTarget,
@@ -64,6 +65,7 @@ function contactColumns({
         <NameWithMark
           mark={<ContactAvatar contact={row} size={MARK_SIZE} />}
           name={contactName(row)}
+          status={<ResearchIndicator record={row} compact />}
           strong
         />
       ),

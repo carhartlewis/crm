@@ -9,6 +9,8 @@ import { ACTIVITY_FACET, activityBuckets } from "../../lib/activity-bucket.ts";
 import { localDay, momentDate, relativeTime } from "../../lib/record-format.ts";
 import { deleteRecords } from "../../lib/synced-records.ts";
 import { useCustomColumns } from "../records/use-custom-columns.ts";
+import { ResearchIndicator } from "../records/research-indicator.tsx";
+import { researchingPeople } from "../../lib/research-status.ts";
 import { AssignOwnerMenu } from "../records/bulk-edit.tsx";
 import { CompanyLogo, NameWithMark, OwnerCell, MARK_SIZE } from "../records/record-visuals.tsx";
 import {
@@ -51,12 +53,14 @@ interface ColumnDeps {
   readonly memberOf: (id: string | null | undefined) => Member | null;
   readonly contactCounts: ReadonlyMap<string, number>;
   readonly openDealCounts: ReadonlyMap<string, number>;
+  readonly researchCounts: ReadonlyMap<string, number>;
 }
 
 function companyColumns({
   memberOf,
   contactCounts,
   openDealCounts,
+  researchCounts,
 }: ColumnDeps): DataTableColumn<Company, Column>[] {
   return [
     {
@@ -69,6 +73,7 @@ function companyColumns({
         <NameWithMark
           mark={<CompanyLogo company={row} size={MARK_SIZE} />}
           name={row.name}
+          status={<ResearchIndicator record={row} people={researchCounts.get(row.id)} compact />}
           strong
         />
       ),
@@ -212,7 +217,12 @@ export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
     };
   };
 
-  const columns = companyColumns({ memberOf, contactCounts, openDealCounts });
+  const columns = companyColumns({
+    memberOf,
+    contactCounts,
+    openDealCounts,
+    researchCounts: researchingPeople(contacts),
+  });
 
   return (
     <RecordTable

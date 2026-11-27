@@ -53,18 +53,33 @@ const targetQuery = (target: MemoryTarget) => {
 
 const POLL_MS = 4_000;
 
-const processing = (knowledge: Knowledge | undefined) =>
-  knowledge?.sources.some((source) => source.status === "processing") ?? false;
+/** Keep following new sources until research and extraction have both settled. */
+export function knowledgePollInterval(
+  knowledge: Knowledge | undefined,
+  researching: boolean,
+  expectUntil = 0,
+  now = Date.now(),
+) {
+  if (!knowledge?.enabled) return false;
+
+  return researching ||
+    now < expectUntil ||
+    knowledge.sources.some((source) => source.status === "processing")
+    ? POLL_MS
+    : false;
+}
 
 /**
  * A new company's website research starts when it is created and lands a few seconds later, so
- * an empty memory polls until `expectUntil` (epoch ms) for its first source.
+ * a memory polls until `expectUntil` (epoch ms), and throughout active record research.
+ * Existing notes must not stop it looking for a new research source.
  */
 export const knowledgeQuery = (
   userId: string,
   workspaceId: string,
   target: MemoryTarget = {},
   expectUntil = 0,
+  researching = false,
 ) =>
   queryOptions({
     queryKey: [...memoryKeys.target(userId, workspaceId, target), "knowledge"],
@@ -77,12 +92,7 @@ export const knowledgeQuery = (
           : "/api/memory",
       );
     },
-    refetchInterval: (query) => {
-      const knowledge = query.state.data;
-      const awaited = knowledge?.enabled === true && knowledge.sources.length === 0;
-
-      return processing(knowledge) || (awaited && Date.now() < expectUntil) ? POLL_MS : false;
-    },
+    refetchInterval: (query) => knowledgePollInterval(query.state.data, researching, expectUntil),
   });
 
 /** Sources and their facts, as the memory graph draws them. */

@@ -8,6 +8,7 @@ export function RecordKnowledge({
   target,
   subject,
   expectUntil = 0,
+  researching = false,
 }: {
   userId: string;
   workspaceId: string;
@@ -16,6 +17,7 @@ export function RecordKnowledge({
   subject: string;
   /** Until when (epoch ms) an empty memory waits for its first source. */
   expectUntil?: number;
+  researching?: boolean;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 py-3">
@@ -28,6 +30,7 @@ export function RecordKnowledge({
         target={target}
         subject={subject}
         expectUntil={expectUntil}
+        researching={researching}
         fill
       />
     </div>
