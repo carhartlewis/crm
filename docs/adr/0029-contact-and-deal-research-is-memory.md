@@ -2,7 +2,7 @@
 
 **Status:** accepted (2026-11). Extends [0025](0025-records-fill-themselves.md) to deals and
 [0014](0014-workspace-and-company-memory.md) and [0026](0026-research-is-the-graph-core.md) to
-contacts and deals.
+contacts and deals. Supersedes the per-workspace research cap of 0025.
 
 ## Context
 
@@ -19,7 +19,7 @@ memory is lost to both.
   Markdown with the narrative and each section the brief has (`contactResearch` in
   `intel-tools.ts`). Writing the brief again replaces it. Memory being off never fails the brief.
 - **Deals research themselves.** When a deal is created (by a member or the agent), `Research`
-  starts a background Auto session about it (`research:<id>`, the same per-workspace cap). The
+  starts a background Auto session about it (`research:<id>`). The
   agent follows its `research-deal` skill: it reads the deal, the company, its people and what the
   CRM remembers (including what the workspace sells), researches the buyer's situation that bears
   on the deal, and saves a brief with `crm__write_deal_brief`: narrative, why now, needs, buying
@@ -32,15 +32,19 @@ memory is lost to both.
   change, with a new source kind `research` ("Research" in the graph). Facts read from it are
   static, as website research's are. Companies and the workspace keep website research;
   `Memory.agent.research` refuses them.
+- **No research cap.** 0025 let each workspace start 30 runs per 10 minutes. The number had no
+  basis and silently left records unresearched, so it is gone: every created record, every sweep
+  retry and every "Fill the rest" starts its session. The sweep still starts its retries one at a
+  time.
 - **No research state on deals.** Deals have no `enrichment_status`, so the sheet shows no
   "Researching" state and the sweep never retries a deal whose start was missed (the agent was
-  down, or the workspace was at its cap).
+  down).
 
 ## Consequences
 
 - Every new contact and deal gets memory within minutes, and the agent recalls it in later chats.
-- Each new deal costs an agent run and any web lookups it makes. The per-workspace cap bounds
-  imports.
+- Each new deal costs an agent run and any web lookups it makes. With no cap, a bulk import
+  starts one run per record at once; the agent and its providers carry that load.
 - A deal whose research did not start stays without a brief until a member asks for one. Add a
   research state to deals if that proves common.
 - Contact and deal facts are still not copied to `memory_fact` (0017), so ⌘K doesn't list them.

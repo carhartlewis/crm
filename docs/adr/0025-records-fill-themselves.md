@@ -15,7 +15,7 @@ asking should be very rare (under 1% of facts). context.dev now has a people API
   the API's `Research` service starts a background eve session as the creating member, in Auto
   permissions, about that record (`POST /eve/v1/session` with the research message and
   `operationId: research:<id>`). Nobody watches it; the sheet shows "Researching" and values
-  arrive through sync. Each workspace may start 30 runs per 10 minutes. The API only starts the
+  arrive through sync. ~~Each workspace may start 30 runs per 10 minutes.~~ (No cap since 0029.) The API only starts the
   session; the agent does the research (agentic-first).
 - **"Fill the rest"** (`POST /api/fields/:id/fill`) starts the same kind of session to fill one
   agent-filled custom field on every record without a value.
@@ -42,6 +42,5 @@ asking should be very rare (under 1% of facts). context.dev now has a people API
 
 - Most contacts gain a title, seniority, function, links, photo and background within a minute of
   being added, with no clicks. Proposals remain for the rare real conflict.
-- Every create costs an agent run and context.dev credits (people enrich: 20 per match). The
-  per-workspace cap bounds bulk imports.
+- Every create costs an agent run and context.dev credits (people enrich: 20 per match).
 - Values the agent writes can be wrong; each is a stored fact with its score, source and evidence.

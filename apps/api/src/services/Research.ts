@@ -41,11 +41,14 @@ export interface ResearchService {
   /** Starts research on a new record, off the request path. Never fails the caller. */
   readonly start: (actor: ResearchActor, kind: ResearchKind, id: string) => void;
   /**
-   * Starts research on records that never got it (the agent was down, or the workspace was at
-   * its cap when they were added), within the cap. Returns how many started.
+   * Starts research on records that never got it (the agent was down when they were added).
+   * Returns how many started.
    */
   readonly sweep: () => Promise<number>;
-  /** Starts a background session that fills one custom field across records; false at the cap. */
+  /**
+   * Starts a background session that fills one custom field across records; false without a
+   * workspace or a known member.
+   */
   readonly fill: (actor: ResearchActor, field: FillRequest) => Promise<boolean>;
 }
 
@@ -63,11 +66,6 @@ export interface ResearchDependencies {
   /** Records still `pending` a while after they were added, or stuck `running`, oldest first. */
   readonly pending?: () => Promise<readonly PendingRecord[]>;
 }
-
-/** Research runs one workspace may start in a window, so a bulk import can't flood the agent. */
-export const RESEARCH_LIMIT = 30;
-
-export const RESEARCH_WINDOW_MS = 10 * 60 * 1000;
 
 /** The first message of a research session; the skills hold the steps. */
 export const RESEARCH_PROMPTS: Record<ResearchKind, string> = {
@@ -87,24 +85,8 @@ export const fillPrompt = (field: FillRequest) =>
 
 export function makeResearch(deps: ResearchDependencies): ResearchService {
   const now = deps.now ?? Date.now;
-  const started = new Map<string, number[]>();
 
-  /** Whether the workspace is under its limit; counts this run when it is. */
-  const admit = (workspaceId: string) => {
-    const at = now();
-
-    const recent = (started.get(workspaceId) ?? []).filter(
-      (time) => at - time < RESEARCH_WINDOW_MS,
-    );
-
-    if (recent.length >= RESEARCH_LIMIT) return false;
-
-    started.set(workspaceId, [...recent, at]);
-
-    return true;
-  };
-
-  /** Starts one Auto session as the member; false when the workspace is at its cap. */
+  /** Starts one Auto session as the member; false without a workspace or a known member. */
   const session = async (
     actor: ResearchActor,
     message: string,
@@ -113,7 +95,7 @@ export function makeResearch(deps: ResearchDependencies): ResearchService {
   ) => {
     const workspaceId = actor.activeWorkspaceId;
 
-    if (!workspaceId || !admit(workspaceId)) return false;
+    if (!workspaceId) return false;
 
     const user = await deps.user(actor.userId);
 
@@ -159,7 +141,7 @@ export function makeResearch(deps: ResearchDependencies): ResearchService {
         // One retry per record per day: eve starts each operation id once.
         const day = new Date(now()).toISOString().slice(0, 10);
 
-        // oxlint-disable-next-line no-await-in-loop -- one at a time, so the cap holds.
+        // oxlint-disable-next-line no-await-in-loop -- one at a time, so a sweep can't flood the agent.
         const begun = await session(
           actor,
           RESEARCH_PROMPTS[record.kind],

@@ -32,4 +32,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0026](0026-research-is-the-graph-core.md)          | The record's website research is the memory graph's core, so the record sits at the centre; a drawn core only until it lands         |
 | [0027](0027-enrichment-through-treg.md)             | People search, emails, phones and enrichment through treg; a usage ledger per workspace; costs shown in chats                        |
 | [0028](0028-shared-enrichment-cache.md)             | treg and context.dev answers are cached once for every workspace; a hit is free                                                      |
-| [0029](0029-contact-and-deal-research-is-memory.md) | A contact's brief and a deal's research brief are the record's memory core; deals research themselves when created                   |
+| [0029](0029-contact-and-deal-research-is-memory.md) | A contact's brief and a deal's research brief are the record's memory core; deals research themselves; no research cap               |

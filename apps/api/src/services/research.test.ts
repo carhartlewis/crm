@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentCaller } from "./chat-agent.ts";
-import { makeResearch, RESEARCH_LIMIT, RESEARCH_PROMPTS, RESEARCH_WINDOW_MS } from "./Research.ts";
+import { makeResearch, RESEARCH_PROMPTS } from "./Research.ts";
 
 const alice = { userId: "user_alice", activeWorkspaceId: "ws_a" };
 
 function setup() {
   const sessions: { caller: AgentCaller; message: string; operationId: string }[] = [];
-  let clock = 0;
 
   const research = makeResearch({
     startSession: async (caller, message, operationId) => {
@@ -14,10 +13,10 @@ function setup() {
     },
     user: async (id) => (id === "user_alice" ? { name: "Alice", email: "alice@a.test" } : null),
     log: () => {},
-    now: () => clock,
+    now: () => 0,
   });
 
-  return { research, sessions, advance: (ms: number) => (clock += ms) };
+  return { research, sessions };
 }
 
 /** Lets the started work run. */
@@ -61,23 +60,18 @@ describe("background research", () => {
     expect(env.sessions[0]?.message).toContain("write_deal_brief");
   });
 
-  test("skips callers without a workspace or a user, and caps each workspace", async () => {
+  test("skips callers without a workspace or a user, and never caps a workspace", async () => {
     const env = setup();
 
     env.research.start({ userId: "user_alice", activeWorkspaceId: null }, "company", "com_1");
     env.research.start({ userId: "user_ghost", activeWorkspaceId: "ws_a" }, "company", "com_2");
 
-    for (let index = 0; index <= RESEARCH_LIMIT; index += 1) {
+    for (let index = 0; index < 100; index += 1) {
       env.research.start(alice, "company", `com_${index + 10}`);
     }
 
     await settle();
-    expect(env.sessions).toHaveLength(RESEARCH_LIMIT - 1);
-
-    env.advance(RESEARCH_WINDOW_MS);
-    env.research.start(alice, "company", "com_late");
-    await settle();
-    expect(env.sessions.at(-1)?.operationId).toBe("research:com_late");
+    expect(env.sessions).toHaveLength(100);
   });
 
   test("a failed start is logged, never thrown", async () => {
