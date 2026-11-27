@@ -5,6 +5,7 @@ import { AppConfig } from "./config.ts";
 import { Routes } from "./http/routes.ts";
 import { Auth } from "./services/Auth.ts";
 import { Connections } from "./services/Connections.ts";
+import { Chats } from "./services/Chats.ts";
 import { Companies } from "./services/Companies.ts";
 import { Electric } from "./services/Electric.ts";
 import { Images } from "./services/Images.ts";
@@ -21,6 +22,7 @@ const Server = Layer.unwrap(
       Layer.provide([
         Auth.layer,
         Companies.layer,
+        Chats.layer,
         Electric.layer,
         Connections.layer,
         Skills.layer,

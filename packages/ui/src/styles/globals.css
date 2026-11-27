@@ -660,3 +660,26 @@ body[data-sidebar-resizing] [data-slot="tooltip-content"] {
     scale: none !important;
   }
 }
+
+/* Chat space colours (ADR 0018): mid-tone, so one set reads in both themes. */
+[data-slot="space-dot"] {
+  background: #8a8a8a;
+}
+[data-slot="space-dot"][data-color="private"] {
+  background: var(--muted-foreground);
+}
+[data-slot="space-dot"][data-color="blue"] {
+  background: #4f8ff0;
+}
+[data-slot="space-dot"][data-color="orange"] {
+  background: #f2994a;
+}
+[data-slot="space-dot"][data-color="green"] {
+  background: #3fb27f;
+}
+[data-slot="space-dot"][data-color="purple"] {
+  background: #9b6cf0;
+}
+[data-slot="space-dot"][data-color="pink"] {
+  background: #ec8fb8;
+}

@@ -2,6 +2,7 @@ import { SessionUser } from "@crm/core/api";
 import { createAuth } from "@crm/core/auth";
 import { registerAgentClient, WORKSPACE_CLAIM } from "@crm/core/auth/mcp";
 import { requireMcpAuth } from "@better-auth/mcp";
+import { isAgentToken, verifyAgentToken } from "@crm/core/auth/agent-token";
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { AppConfig } from "../config.ts";
 import type { DesktopCallback, DesktopStart } from "../http/desktop.ts";
@@ -113,8 +114,27 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
         catch: (cause) => new AuthError({ cause }),
       });
 
-      const protectMcp: AuthService["protectMcp"] = (handler) =>
-        requireMcpAuth(
+      const agentSecret = Option.map(config.agentProxySecret, Redacted.value);
+
+      /** A chat's caller, from a token the agent signed with the shared secret (ADR 0018). */
+      const agentPrincipal = async (token: string): Promise<McpPrincipal | null> => {
+        if (Option.isNone(agentSecret)) return null;
+
+        const claims = await verifyAgentToken(agentSecret.value, token);
+
+        if (!claims) return null;
+
+        // Membership is checked on every call: a removed member's token stops working at once.
+        const member = await pool.query(
+          'SELECT 1 FROM "member" WHERE "organizationId" = $1 AND "userId" = $2 LIMIT 1',
+          [claims.workspaceId, claims.userId],
+        );
+
+        return member.rowCount ? claims : null;
+      };
+
+      const protectMcp: AuthService["protectMcp"] = (handler) => {
+        const oauth = requireMcpAuth(
           auth,
           async (request, claims) =>
             Option.match(decodeMcpClaims(claims), {
@@ -125,6 +145,19 @@ export class Auth extends Context.Service<Auth, AuthService>()("@crm/api/service
             }),
           { resource: gateway },
         );
+
+        return async (request) => {
+          const token = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
+
+          if (!isAgentToken(token)) return oauth(request);
+
+          const principal = await agentPrincipal(token);
+
+          return principal
+            ? handler(request, principal)
+            : Response.json({ error: "invalid_token" }, { status: 401 });
+        };
+      };
 
       const session = Effect.fn("Auth.session")(function* (headers: Headers) {
         const result = yield* Effect.tryPromise({

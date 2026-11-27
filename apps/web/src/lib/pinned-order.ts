@@ -1,14 +1,17 @@
+import { parsePinKey, type PinKey, pinKey } from "@crm/core/chat";
 import { useSyncExternalStore } from "react";
-import { isPageId, pages, type PageId } from "./pages.ts";
+import { isPageId, pages } from "./pages.ts";
 
 /**
- * The order of the pinned sidebar pages, per user. It lives in localStorage (a per-device
- * preference) and is read through `useSyncExternalStore`, so other tabs follow along.
+ * The order of the Pinned sidebar group, per user: pages, spaces and chats (ADR 0018). The
+ * synced `sidebar` row is the source; this localStorage copy lets the shell and ⌥1–⌥9 read the
+ * order synchronously, before the chats chunk loads. Read through `useSyncExternalStore`, so
+ * other tabs follow along.
  */
-const DEFAULT_ORDER: readonly PageId[] = pages.map((page) => page.id);
+const DEFAULT_ORDER: readonly PinKey[] = pages.map((page) => pinKey("page", page.id));
 const storageKey = (userId: string) => `crm:pinned:${userId}`;
 const listeners = new Set<() => void>();
-const cache = new Map<string, { raw: string | null; order: readonly PageId[] }>();
+const cache = new Map<string, { raw: string | null; order: readonly PinKey[] }>();
 
 /** The stored JSON as a list of strings; anything else (missing, corrupt, edited) is empty. */
 export function parseStoredOrder(raw: string | null): readonly string[] {
@@ -23,11 +26,31 @@ export function parseStoredOrder(raw: string | null): readonly string[] {
   }
 }
 
-/** Known ids in the saved order, then any page added since, so nothing is lost or duplicated. */
-export function normalizeOrder(saved: readonly string[]): readonly PageId[] {
-  const unique = [...new Set(saved.filter(isPageId))];
+/** A stored entry as a pin key; bare page ids are the format from before chats. */
+function toPinKey(entry: string): PinKey | undefined {
+  if (isPageId(entry)) return pinKey("page", entry);
 
-  return [...unique, ...DEFAULT_ORDER.filter((id) => !unique.includes(id))];
+  const pin = parsePinKey(entry);
+
+  if (!pin || (pin.kind === "page" && !isPageId(pin.id))) return undefined;
+
+  return pinKey(pin.kind, pin.id);
+}
+
+/**
+ * Known keys in the saved order, then any page added since, so nothing is lost or duplicated.
+ * Pages are always pinned; spaces and chats only when the user pinned them.
+ */
+export function normalizeOrder(saved: readonly string[]): readonly PinKey[] {
+  const keys: PinKey[] = [];
+
+  for (const entry of saved) {
+    const key = toPinKey(entry);
+
+    if (key && !keys.includes(key)) keys.push(key);
+  }
+
+  return [...keys, ...DEFAULT_ORDER.filter((key) => !keys.includes(key))];
 }
 
 /** Moves the item at `from` to `to`, shifting the items between. */
@@ -48,7 +71,7 @@ function readRaw(userId: string) {
   }
 }
 
-export function readPinnedOrder(userId: string): readonly PageId[] {
+export function readPinnedOrder(userId: string): readonly PinKey[] {
   const raw = readRaw(userId);
   const cached = cache.get(userId);
 
@@ -62,9 +85,19 @@ export function readPinnedOrder(userId: string): readonly PageId[] {
   return order;
 }
 
-export function writePinnedOrder(userId: string, order: readonly PageId[]) {
+/** Whether the device has an order saved from before the synced row existed. */
+export function hasStoredOrder(userId: string) {
+  return readRaw(userId) !== null;
+}
+
+export function writePinnedOrder(userId: string, order: readonly PinKey[]) {
+  const raw = JSON.stringify(order);
+
+  // Writing the same order again (each sync of the row) must not wake every subscriber.
+  if (readRaw(userId) === raw) return;
+
   try {
-    localStorage.setItem(storageKey(userId), JSON.stringify(order));
+    localStorage.setItem(storageKey(userId), raw);
   } catch {
     // Storage is full or blocked: the order lasts until reload.
     cache.set(userId, { raw: readRaw(userId), order });

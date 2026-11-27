@@ -1,7 +1,8 @@
 import { useSidebar } from "@crm/ui/components/sidebar";
 import { useRouter } from "@tanstack/react-router";
 import { useHotkeys } from "react-hotkeys-hook";
-import { pageById } from "../../lib/pages.ts";
+import { parsePinKey } from "@crm/core/chat";
+import { isPageId, pageById } from "../../lib/pages.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { claimsCopyShortcut, pinnedShortcut, shortcuts, toHotkey } from "../../lib/shortcuts.ts";
@@ -48,15 +49,21 @@ export function Shortcuts({
     },
     [setCreate],
   );
-  useHotkeys(toHotkey(shortcuts.home), () => void router.navigate({ to: "/" }), OUTSIDE_TEXT, [
+  useHotkeys(toHotkey(shortcuts.newChat), () => void router.navigate({ to: "/" }), OUTSIDE_TEXT, [
     router,
   ]);
   useHotkeys(
     pinned,
     (event) => {
-      const id = order[Number(event.code.replace("Digit", "")) - 1];
+      const pin = parsePinKey(order[Number(event.code.replace("Digit", "")) - 1] ?? "");
 
-      if (id) void router.navigate({ to: pageById(id).to });
+      if (pin?.kind === "chat") {
+        void router.navigate({ to: "/chats/$chatId", params: { chatId: pin.id } });
+      } else if (pin?.kind === "space") {
+        void router.navigate({ to: "/spaces/$spaceId", params: { spaceId: pin.id } });
+      } else if (pin && isPageId(pin.id)) {
+        void router.navigate({ to: pageById(pin.id).to });
+      }
     },
     OUTSIDE_TEXT,
     [order, router],

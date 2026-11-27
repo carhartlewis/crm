@@ -8,7 +8,7 @@
       "outputs": ["dist/**"]
     },
     "dev": {
-      "with": ["@crm/api#dev", "@crm/web#routes:watch"],
+      "with": ["@crm/api#dev", "@crm/web#routes:watch", "@crm/agent#dev"],
       "env": ["RENDERER", "PORT", "CRM_API_URL"]
     },
     "routes": {

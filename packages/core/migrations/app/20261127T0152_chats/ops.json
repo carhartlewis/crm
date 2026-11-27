@@ -1,0 +1,945 @@
+[
+  {
+    "id": "table.chat",
+    "label": "Create table \"chat\"",
+    "summary": "Creates table \"chat\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"chat\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"chat\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"chat\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"chat\"",
+        "sql": "CREATE TABLE \"public\".\"chat\" (\n  \"created_at\" timestamptz(3) NOT NULL,\n  \"created_by_id\" text,\n  \"id\" text NOT NULL,\n  \"last_message_at\" timestamptz(3) NOT NULL,\n  \"session_id\" text NOT NULL,\n  \"space_id\" text,\n  \"title\" text NOT NULL,\n  \"updated_at\" timestamptz(3) NOT NULL,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"chat\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"chat\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"chat\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.chat_space",
+    "label": "Create table \"chat_space\"",
+    "summary": "Creates table \"chat_space\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "chat_space"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"chat_space\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"chat_space\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"chat_space\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"chat_space\"",
+        "sql": "CREATE TABLE \"public\".\"chat_space\" (\n  \"color\" text NOT NULL,\n  \"created_at\" timestamptz(3) NOT NULL,\n  \"created_by_id\" text,\n  \"id\" text NOT NULL,\n  \"name\" text NOT NULL,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"chat_space\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"chat_space\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"chat_space\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.sidebar",
+    "label": "Create table \"sidebar\"",
+    "summary": "Creates table \"sidebar\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "sidebar"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"sidebar\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"sidebar\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"sidebar\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"sidebar\"",
+        "sql": "CREATE TABLE \"public\".\"sidebar\" (\n  \"folders\" jsonb NOT NULL,\n  \"id\" text NOT NULL,\n  \"pinned\" jsonb NOT NULL,\n  \"updated_at\" timestamptz(3) NOT NULL,\n  \"user_id\" text NOT NULL,\n  \"workspace_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"sidebar\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"sidebar\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"sidebar\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "unique.chat.chat_session_id_key",
+    "label": "Add unique constraint on \"chat\" (session_id)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "chat_session_id_key",
+        "table": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"chat_session_id_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chat_session_id_key",
+          "public",
+          "\"public\".\"chat\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "constraint \"chat_session_id_key\" on \"chat\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"chat_session_id_key\"",
+        "sql": "ALTER TABLE \"public\".\"chat\" ADD CONSTRAINT \"chat_session_id_key\" UNIQUE (\"session_id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify unique constraint \"chat_session_id_key\" exists on (session_id)",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb)) AS \"result\"",
+        "params": [
+          "chat_session_id_key",
+          "public",
+          "\"public\".\"chat\"",
+          "u",
+          "[\"session_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.sidebar.sidebar_workspace_id_user_id_key",
+    "label": "Add unique constraint on \"sidebar\" (workspace_id, user_id)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "sidebar_workspace_id_user_id_key",
+        "table": "sidebar"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"sidebar_workspace_id_user_id_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "sidebar_workspace_id_user_id_key",
+          "public",
+          "\"public\".\"sidebar\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "constraint \"sidebar_workspace_id_user_id_key\" on \"sidebar\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"sidebar_workspace_id_user_id_key\"",
+        "sql": "ALTER TABLE \"public\".\"sidebar\" ADD CONSTRAINT \"sidebar_workspace_id_user_id_key\" UNIQUE (\"workspace_id\", \"user_id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify unique constraint \"sidebar_workspace_id_user_id_key\" exists on (workspace_id, user_id)",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb)) AS \"result\"",
+        "params": [
+          "sidebar_workspace_id_user_id_key",
+          "public",
+          "\"public\".\"sidebar\"",
+          "u",
+          "[\"workspace_id\",\"user_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chat.chat_created_by_id_idx_2b1d9a03",
+    "label": "Create index \"chat_created_by_id_idx_2b1d9a03\" on \"chat\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "chat_created_by_id_idx_2b1d9a03",
+        "table": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chat_created_by_id_idx_2b1d9a03\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"chat_created_by_id_idx_2b1d9a03\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"chat_created_by_id_idx_2b1d9a03\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chat_created_by_id_idx_2b1d9a03\"",
+        "sql": "CREATE INDEX \"chat_created_by_id_idx_2b1d9a03\" ON \"public\".\"chat\" (\"created_by_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chat_created_by_id_idx_2b1d9a03\" exists on \"chat\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"chat_created_by_id_idx_2b1d9a03\"",
+          "i",
+          "I",
+          "\"public\".\"chat\"",
+          "btree",
+          "[\"created_by_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chat.chat_space_id_idx_5ce13788",
+    "label": "Create index \"chat_space_id_idx_5ce13788\" on \"chat\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "chat_space_id_idx_5ce13788",
+        "table": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chat_space_id_idx_5ce13788\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"chat_space_id_idx_5ce13788\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"chat_space_id_idx_5ce13788\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chat_space_id_idx_5ce13788\"",
+        "sql": "CREATE INDEX \"chat_space_id_idx_5ce13788\" ON \"public\".\"chat\" (\"space_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chat_space_id_idx_5ce13788\" exists on \"chat\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"chat_space_id_idx_5ce13788\"",
+          "i",
+          "I",
+          "\"public\".\"chat\"",
+          "btree",
+          "[\"space_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chat.chat_workspace_id_idx_90a9f461",
+    "label": "Create index \"chat_workspace_id_idx_90a9f461\" on \"chat\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "chat_workspace_id_idx_90a9f461",
+        "table": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chat_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"chat_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"chat_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chat_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"chat_workspace_id_idx_90a9f461\" ON \"public\".\"chat\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chat_workspace_id_idx_90a9f461\" exists on \"chat\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"chat_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"chat\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chat_space.chat_space_created_by_id_idx_2b1d9a03",
+    "label": "Create index \"chat_space_created_by_id_idx_2b1d9a03\" on \"chat_space\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "chat_space_created_by_id_idx_2b1d9a03",
+        "table": "chat_space"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chat_space_created_by_id_idx_2b1d9a03\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"chat_space_created_by_id_idx_2b1d9a03\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"chat_space_created_by_id_idx_2b1d9a03\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chat_space_created_by_id_idx_2b1d9a03\"",
+        "sql": "CREATE INDEX \"chat_space_created_by_id_idx_2b1d9a03\" ON \"public\".\"chat_space\" (\"created_by_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chat_space_created_by_id_idx_2b1d9a03\" exists on \"chat_space\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"chat_space_created_by_id_idx_2b1d9a03\"",
+          "i",
+          "I",
+          "\"public\".\"chat_space\"",
+          "btree",
+          "[\"created_by_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chat_space.chat_space_workspace_id_idx_90a9f461",
+    "label": "Create index \"chat_space_workspace_id_idx_90a9f461\" on \"chat_space\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "chat_space_workspace_id_idx_90a9f461",
+        "table": "chat_space"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chat_space_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"chat_space_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"chat_space_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chat_space_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"chat_space_workspace_id_idx_90a9f461\" ON \"public\".\"chat_space\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chat_space_workspace_id_idx_90a9f461\" exists on \"chat_space\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"chat_space_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"chat_space\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.sidebar.sidebar_user_id_idx_6c952402",
+    "label": "Create index \"sidebar_user_id_idx_6c952402\" on \"sidebar\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "sidebar_user_id_idx_6c952402",
+        "table": "sidebar"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"sidebar_user_id_idx_6c952402\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"sidebar_user_id_idx_6c952402\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"sidebar_user_id_idx_6c952402\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"sidebar_user_id_idx_6c952402\"",
+        "sql": "CREATE INDEX \"sidebar_user_id_idx_6c952402\" ON \"public\".\"sidebar\" (\"user_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"sidebar_user_id_idx_6c952402\" exists on \"sidebar\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"sidebar_user_id_idx_6c952402\"",
+          "i",
+          "I",
+          "\"public\".\"sidebar\"",
+          "btree",
+          "[\"user_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.sidebar.sidebar_workspace_id_idx_90a9f461",
+    "label": "Create index \"sidebar_workspace_id_idx_90a9f461\" on \"sidebar\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "sidebar_workspace_id_idx_90a9f461",
+        "table": "sidebar"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"sidebar_workspace_id_idx_90a9f461\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"sidebar_workspace_id_idx_90a9f461\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"sidebar_workspace_id_idx_90a9f461\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"sidebar_workspace_id_idx_90a9f461\"",
+        "sql": "CREATE INDEX \"sidebar_workspace_id_idx_90a9f461\" ON \"public\".\"sidebar\" (\"workspace_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"sidebar_workspace_id_idx_90a9f461\" exists on \"sidebar\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"sidebar_workspace_id_idx_90a9f461\"",
+          "i",
+          "I",
+          "\"public\".\"sidebar\"",
+          "btree",
+          "[\"workspace_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chat.chat_workspace_id_fkey",
+    "label": "Add foreign key \"chat_workspace_id_fkey\" on \"chat\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "chat_workspace_id_fkey",
+        "table": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chat_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chat_workspace_id_fkey",
+          "public",
+          "\"public\".\"chat\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"chat_workspace_id_fkey\" on \"chat\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chat_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"chat\"\nADD CONSTRAINT \"chat_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chat_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "chat_workspace_id_fkey",
+          "public",
+          "\"public\".\"chat\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chat.chat_space_id_fkey",
+    "label": "Add foreign key \"chat_space_id_fkey\" on \"chat\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "chat_space_id_fkey",
+        "table": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chat_space_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chat_space_id_fkey",
+          "public",
+          "\"public\".\"chat\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"chat_space_id_fkey\" on \"chat\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chat_space_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"chat\"\nADD CONSTRAINT \"chat_space_id_fkey\"\nFOREIGN KEY (\"space_id\")\nREFERENCES \"public\".\"chat_space\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chat_space_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "chat_space_id_fkey",
+          "public",
+          "\"public\".\"chat\"",
+          "f",
+          "[\"space_id\"]",
+          "\"public\".\"chat_space\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chat.chat_created_by_id_fkey",
+    "label": "Add foreign key \"chat_created_by_id_fkey\" on \"chat\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "chat_created_by_id_fkey",
+        "table": "chat"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chat_created_by_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chat_created_by_id_fkey",
+          "public",
+          "\"public\".\"chat\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"chat_created_by_id_fkey\" on \"chat\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chat_created_by_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"chat\"\nADD CONSTRAINT \"chat_created_by_id_fkey\"\nFOREIGN KEY (\"created_by_id\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chat_created_by_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "chat_created_by_id_fkey",
+          "public",
+          "\"public\".\"chat\"",
+          "f",
+          "[\"created_by_id\"]",
+          "\"public\".\"user\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chat_space.chat_space_workspace_id_fkey",
+    "label": "Add foreign key \"chat_space_workspace_id_fkey\" on \"chat_space\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "chat_space_workspace_id_fkey",
+        "table": "chat_space"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chat_space_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chat_space_workspace_id_fkey",
+          "public",
+          "\"public\".\"chat_space\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"chat_space_workspace_id_fkey\" on \"chat_space\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chat_space_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"chat_space\"\nADD CONSTRAINT \"chat_space_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chat_space_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "chat_space_workspace_id_fkey",
+          "public",
+          "\"public\".\"chat_space\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chat_space.chat_space_created_by_id_fkey",
+    "label": "Add foreign key \"chat_space_created_by_id_fkey\" on \"chat_space\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "chat_space_created_by_id_fkey",
+        "table": "chat_space"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chat_space_created_by_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chat_space_created_by_id_fkey",
+          "public",
+          "\"public\".\"chat_space\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"chat_space_created_by_id_fkey\" on \"chat_space\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chat_space_created_by_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"chat_space\"\nADD CONSTRAINT \"chat_space_created_by_id_fkey\"\nFOREIGN KEY (\"created_by_id\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chat_space_created_by_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "chat_space_created_by_id_fkey",
+          "public",
+          "\"public\".\"chat_space\"",
+          "f",
+          "[\"created_by_id\"]",
+          "\"public\".\"user\"",
+          "[\"id\"]",
+          "n",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.sidebar.sidebar_workspace_id_fkey",
+    "label": "Add foreign key \"sidebar_workspace_id_fkey\" on \"sidebar\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "sidebar_workspace_id_fkey",
+        "table": "sidebar"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"sidebar_workspace_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "sidebar_workspace_id_fkey",
+          "public",
+          "\"public\".\"sidebar\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"sidebar_workspace_id_fkey\" on \"sidebar\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"sidebar_workspace_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"sidebar\"\nADD CONSTRAINT \"sidebar_workspace_id_fkey\"\nFOREIGN KEY (\"workspace_id\")\nREFERENCES \"public\".\"workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"sidebar_workspace_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "sidebar_workspace_id_fkey",
+          "public",
+          "\"public\".\"sidebar\"",
+          "f",
+          "[\"workspace_id\"]",
+          "\"public\".\"workspace\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.sidebar.sidebar_user_id_fkey",
+    "label": "Add foreign key \"sidebar_user_id_fkey\" on \"sidebar\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "sidebar_user_id_fkey",
+        "table": "sidebar"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"sidebar_user_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "sidebar_user_id_fkey",
+          "public",
+          "\"public\".\"sidebar\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"sidebar_user_id_fkey\" on \"sidebar\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"sidebar_user_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"sidebar\"\nADD CONSTRAINT \"sidebar_user_id_fkey\"\nFOREIGN KEY (\"user_id\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"sidebar_user_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "sidebar_user_id_fkey",
+          "public",
+          "\"public\".\"sidebar\"",
+          "f",
+          "[\"user_id\"]",
+          "\"public\".\"user\"",
+          "[\"id\"]",
+          "c",
+          "a"
+        ]
+      }
+    ]
+  }
+]

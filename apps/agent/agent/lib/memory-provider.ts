@@ -1,3 +1,4 @@
+import { type CrmCaller, crmCaller } from "./crm-caller.ts";
 import { companiesForEmails, mentionedCompanies } from "@crm/memory";
 import {
   type JevClient,
@@ -40,7 +41,7 @@ import {
 
 export interface CrmMemoryProviderOptions {
   /** The CRM memory client for a signed-in user. */
-  readonly memoryFor: (userId: string) => CrmMemory;
+  readonly memoryFor: (caller: CrmCaller) => CrmMemory;
   /** Jev, or null without an AI Gateway key: chats are still saved, no facts are judged. */
   readonly jev: JevClient | null;
   readonly now?: () => Date;
@@ -59,9 +60,11 @@ const MAX_COMPANIES = 4;
 const MemberName = z.string().min(1).catch("The member");
 
 function userOf(caller: Caller) {
-  if (caller?.principalType !== "user") return null;
+  const crm = crmCaller(caller);
 
-  return { id: caller.principalId, name: MemberName.parse(caller.attributes["name"]) };
+  if (!crm || !caller) return null;
+
+  return { id: crm.userId, crm, name: MemberName.parse(caller.attributes["name"]) };
 }
 
 /** The CRM keeps one chat source per session; its id allows letters, digits and hyphens. */
@@ -170,7 +173,7 @@ export function crmMemoryProvider(options: CrmMemoryProviderOptions) {
         if (!user) return null;
 
         const query = ctx.turn.input.map(messageText).join("\n").slice(0, 1_000);
-        const recall = await options.memoryFor(user.id).recall(query, ctx.abortSignal);
+        const recall = await options.memoryFor(user.crm).recall(query, ctx.abortSignal);
 
         // A stable id replaces what an earlier turn recalled instead of piling up copies.
         return {
@@ -192,7 +195,7 @@ export function crmMemoryProvider(options: CrmMemoryProviderOptions) {
 
         if (!user) return;
 
-        const memory = options.memoryFor(user.id);
+        const memory = options.memoryFor(user.crm);
         const messages: readonly TurnMessage[] = ctx.messages;
 
         try {
@@ -234,7 +237,7 @@ export function crmMemoryProvider(options: CrmMemoryProviderOptions) {
 
       if (!user) return null;
 
-      const memory = options.memoryFor(user.id);
+      const memory = options.memoryFor(user.crm);
 
       const companyId = z
         .string()

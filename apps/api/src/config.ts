@@ -56,4 +56,12 @@ export const AppConfig = Config.all({
   // The eve agent's origin. Its sign-in callback is the only redirect the MCP authorization
   // server accepts for the agent client (see @crm/core/auth/mcp).
   agentUrl: Config.URL("AGENT_URL").pipe(Config.withDefault(new URL("http://localhost:2000"))),
+  // Shared with the agent: it accepts chat requests only with this secret (ADR 0018). Optional;
+  // without it, chats are off.
+  agentProxySecret: Config.option(
+    Config.schema(
+      Schema.Redacted(Schema.String.check(Schema.isMinLength(32))),
+      "AGENT_PROXY_SECRET",
+    ),
+  ),
 });

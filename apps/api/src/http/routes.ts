@@ -1,14 +1,20 @@
 import {
+  AgentUnavailable,
+  CHAT_SPACES_SYNC_PATH,
+  CHATS_SYNC_PATH,
   COMPANIES_SYNC_PATH,
   CONNECTIONS_SYNC_PATH,
   CrmApi,
   CUSTOM_CONNECTORS_SYNC_PATH,
   CurrentSession,
   CurrentUser,
+  Forbidden,
   Invalid,
   NoActiveWorkspace,
+  NotFound,
   SKILLS_SYNC_PATH,
   MEMORY_FACTS_SYNC_PATH,
+  SIDEBAR_SYNC_PATH,
   Unauthorized,
 } from "@crm/core/api";
 import { createGateway } from "@crm/integrations/gateway";
@@ -17,6 +23,7 @@ import { Effect, Layer, Option, Result, Schema } from "effect";
 import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 import { Auth, type McpPrincipal } from "../services/Auth.ts";
+import { type ChatActor, Chats } from "../services/Chats.ts";
 import { Companies } from "../services/Companies.ts";
 import { type Actor, Connections } from "../services/Connections.ts";
 import { Electric } from "../services/Electric.ts";
@@ -27,11 +34,14 @@ import { AuthenticationLive } from "./Authentication.ts";
 import { clientIp, withClientIp } from "./client-ip.ts";
 import { callbackFromUrl, startFromUrl } from "./desktop.ts";
 import {
+  chatSpacesSync,
+  chatsSync,
   companiesSync,
   connectionsSync,
   customConnectorsSync,
   skillsSync,
   memoryFactsSync,
+  sidebarSync,
   type SyncSpec,
 } from "./sync-proxy.ts";
 
@@ -91,6 +101,67 @@ const CompaniesHandlers = HttpApiBuilder.group(
       .handle("remove", ({ params }) =>
         Effect.flatMap(actor, (who) => companies.remove(who, params.id)),
       );
+  }),
+);
+
+/** The acting user as the agent sees them, and the session's workspace (ADR 0018). */
+const chatActor = Effect.gen(function* () {
+  const user = yield* CurrentUser;
+  const session = yield* CurrentSession;
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    activeWorkspaceId: session.activeWorkspaceId,
+  } satisfies ChatActor;
+});
+
+const ChatsHandlers = HttpApiBuilder.group(CrmApi, "chats", (handlers) =>
+  Effect.gen(function* () {
+    const chats = yield* Chats;
+
+    return handlers
+      .handle("prewarm", () => Effect.flatMap(chatActor, chats.prewarm))
+      .handle("create", ({ payload }) =>
+        Effect.flatMap(chatActor, (who) => chats.create(who, payload)),
+      )
+      .handle("update", ({ params, payload }) =>
+        Effect.flatMap(chatActor, (who) => chats.update(who, params.id, payload)),
+      )
+      .handle("remove", ({ params }) =>
+        Effect.flatMap(chatActor, (who) => chats.remove(who, params.id)),
+      )
+      .handle("history", ({ params }) =>
+        Effect.flatMap(chatActor, (who) => chats.history(who, params.id)),
+      );
+  }),
+);
+
+const ChatSpacesHandlers = HttpApiBuilder.group(CrmApi, "chatSpaces", (handlers) =>
+  Effect.gen(function* () {
+    const chats = yield* Chats;
+
+    return handlers
+      .handle("create", ({ payload }) =>
+        Effect.flatMap(chatActor, (who) => chats.createSpace(who, payload)),
+      )
+      .handle("update", ({ params, payload }) =>
+        Effect.flatMap(chatActor, (who) => chats.updateSpace(who, params.id, payload)),
+      )
+      .handle("remove", ({ params }) =>
+        Effect.flatMap(chatActor, (who) => chats.removeSpace(who, params.id)),
+      );
+  }),
+);
+
+const SidebarHandlers = HttpApiBuilder.group(CrmApi, "sidebar", (handlers) =>
+  Effect.gen(function* () {
+    const chats = yield* Chats;
+
+    return handlers.handle("save", ({ payload }) =>
+      Effect.flatMap(chatActor, (who) => chats.saveSidebar(who, payload)),
+    );
   }),
 );
 
@@ -185,6 +256,9 @@ const ApiRoutes = HttpApiBuilder.layer(CrmApi).pipe(
     ConnectionsHandlers,
     SkillsHandlers,
     MemoryHandlers,
+    ChatsHandlers,
+    ChatSpacesHandlers,
+    SidebarHandlers,
   ]),
   Layer.provide(AuthenticationLive),
 );
@@ -254,6 +328,9 @@ const synced: ReadonlyArray<
   [CUSTOM_CONNECTORS_SYNC_PATH, (workspaceId) => customConnectorsSync(workspaceId)],
   [SKILLS_SYNC_PATH, (workspaceId) => skillsSync(workspaceId)],
   [MEMORY_FACTS_SYNC_PATH, (workspaceId) => memoryFactsSync(workspaceId)],
+  [CHATS_SYNC_PATH, (workspaceId, userId) => chatsSync(workspaceId, userId)],
+  [CHAT_SPACES_SYNC_PATH, (workspaceId) => chatSpacesSync(workspaceId)],
+  [SIDEBAR_SYNC_PATH, (workspaceId, userId) => sidebarSync(workspaceId, userId)],
 ];
 
 /**
@@ -475,6 +552,79 @@ const AgentMemoryRoutes = Layer.effectDiscard(
   }),
 );
 
+const AGENT_PATH = /^\/api\/chats\/([^/]+)\/agent(\/.*)$/;
+
+const ProxyFailure = Schema.Union([
+  Unauthorized,
+  NotFound,
+  NoActiveWorkspace,
+  Forbidden,
+  Invalid,
+  AgentUnavailable,
+]);
+
+const encodeProxyFailure = Schema.encodeSync(ProxyFailure);
+
+/** The same error bodies and statuses the HttpApi endpoints send, never cached. */
+function proxyFailure(error: typeof ProxyFailure.Type) {
+  const status =
+    error instanceof Unauthorized
+      ? 401
+      : error instanceof NotFound
+        ? 404
+        : error instanceof Invalid
+          ? 400
+          : error instanceof AgentUnavailable
+            ? 502
+            : 403;
+
+  return Response.json(encodeProxyFailure(error), { status, headers: noStore });
+}
+
+/**
+ * The agent proxy (ADR 0018), a raw route because eve's NDJSON stream passes straight through.
+ * The browser's `useEveAgent` uses `/api/chats/<id>/agent` as its base URL; the Chats service
+ * checks the chat and forwards only that chat's own session routes.
+ */
+const AgentProxyRoutes = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const router = yield* HttpRouter.HttpRouter;
+    const auth = yield* Auth;
+    const chats = yield* Chats;
+
+    const handler = async (web: Request) => {
+      const match = AGENT_PATH.exec(new URL(web.url).pathname);
+
+      const session = await Effect.runPromise(
+        auth.session(web.headers).pipe(Effect.orElseSucceed(() => Option.none())),
+      );
+
+      if (Option.isNone(session))
+        return proxyFailure(new Unauthorized({ message: "Not signed in" }));
+
+      if (!match?.[1] || !match[2])
+        return proxyFailure(new NotFound({ message: "Chat not found" }));
+
+      const { user, activeWorkspaceId } = session.value;
+
+      const caller: ChatActor = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        activeWorkspaceId,
+      };
+
+      const result = await Effect.runPromise(
+        Effect.result(chats.forward(caller, decodeURIComponent(match[1]), match[2], web)),
+      );
+
+      return Result.isSuccess(result) ? result.success : proxyFailure(result.failure);
+    };
+
+    yield* router.add("*", "/api/chats/:id/agent/*", () => HttpEffect.fromWebHandler(handler));
+  }),
+);
+
 /**
  * Every HTTP route, still requiring `Auth`, `Companies`, `Electric` and `Connections`. `main.ts`
  * provides the real services; tests provide fakes.
@@ -485,4 +635,5 @@ export const Routes = Layer.mergeAll(
   SyncRoutes,
   ConnectionRoutes,
   AgentMemoryRoutes,
+  AgentProxyRoutes,
 );

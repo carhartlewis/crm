@@ -1,4 +1,5 @@
 import { Context, Schema } from "effect";
+import { StoredFolders, StoredPinned } from "../chat/index.ts";
 import {
   HttpApi,
   HttpApiEndpoint,
@@ -497,6 +498,125 @@ export class MemoryApi extends HttpApiGroup.make("memory")
   .middleware(Authentication)
   .prefix("/memory") {}
 
+/** The caller may see the record but not change it this way; `message` is shown to the user. */
+export class Forbidden extends Schema.TaggedError<Forbidden>()(
+  "Forbidden",
+  { message: Schema.String },
+  { httpApiStatus: 403 },
+) {}
+
+/** The agent didn't answer; the chat can't start or load right now. */
+export class AgentUnavailable extends Schema.TaggedError<AgentUnavailable>()(
+  "AgentUnavailable",
+  { message: Schema.String },
+  { httpApiStatus: 502 },
+) {}
+
+/** Chats with the agent (ADR 0018). Rules in `@crm/core/chat`. */
+export const CreateChat = Schema.Struct({
+  /** Made in the browser: `createId("cht")`. */
+  id: Schema.String,
+  title: Schema.String,
+  /** Null: private to the caller. */
+  spaceId: Schema.NullOr(Schema.String),
+});
+
+export const UpdateChat = Schema.Struct({
+  title: Schema.optional(Schema.String),
+  spaceId: Schema.optional(Schema.NullOr(Schema.String)),
+});
+
+/** The eve session a new chat talks to, through `/api/chats/:id/agent`. */
+export const ChatCreated = Schema.Struct({ txid: Schema.Number, sessionId: Schema.String });
+
+/**
+ * A chat's saved events and the stream cursor after them, for `useEveAgent`'s `initialEvents`
+ * and `initialSession`. Events are eve's stream events, passed through unchanged.
+ */
+export const ChatHistory = Schema.Struct({
+  session: Schema.Struct({ sessionId: Schema.String, streamIndex: Schema.Number }),
+  events: Schema.Array(Schema.Unknown),
+});
+
+export type ChatHistory = typeof ChatHistory.Type;
+
+const ChatErrors = [NotFound, NoActiveWorkspace, Invalid, Forbidden, AgentUnavailable];
+
+export class ChatsApi extends HttpApiGroup.make("chats")
+  .add(
+    /** Keeps an eve session ready for the caller's next chat (10 minutes, in Redis). */
+    HttpApiEndpoint.post("prewarm", "/prewarm", {
+      success: HttpApiSchema.NoContent,
+      error: ChatErrors,
+    }),
+    HttpApiEndpoint.post("create", "/", {
+      payload: CreateChat,
+      success: ChatCreated,
+      error: ChatErrors,
+    }),
+    HttpApiEndpoint.patch("update", "/:id", {
+      params: { id: Schema.String },
+      payload: UpdateChat,
+      success: TxId,
+      error: ChatErrors,
+    }),
+    HttpApiEndpoint.delete("remove", "/:id", {
+      params: { id: Schema.String },
+      success: TxId,
+      error: ChatErrors,
+    }),
+    HttpApiEndpoint.get("history", "/:id/history", {
+      params: { id: Schema.String },
+      success: ChatHistory,
+      error: ChatErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/chats") {}
+
+export const CreateSpace = Schema.Struct({
+  /** Made in the browser: `createId("spc")`. */
+  id: Schema.String,
+  name: Schema.String,
+  color: Schema.String,
+});
+
+export const UpdateSpace = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  color: Schema.optional(Schema.String),
+});
+
+export class ChatSpacesApi extends HttpApiGroup.make("chatSpaces")
+  .add(
+    HttpApiEndpoint.post("create", "/", { payload: CreateSpace, success: TxId, error: ChatErrors }),
+    HttpApiEndpoint.patch("update", "/:id", {
+      params: { id: Schema.String },
+      payload: UpdateSpace,
+      success: TxId,
+      error: ChatErrors,
+    }),
+    HttpApiEndpoint.delete("remove", "/:id", {
+      params: { id: Schema.String },
+      success: TxId,
+      error: ChatErrors,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/chat-spaces") {}
+
+/** The caller's whole sidebar row: the pinned order and folders (`@crm/core/chat`). */
+export const SaveSidebar = Schema.Struct({
+  /** Made in the browser on the first save: `createId("sbr")`. */
+  id: Schema.String,
+  pinned: StoredPinned,
+  folders: StoredFolders,
+});
+
+export class SidebarApi extends HttpApiGroup.make("sidebar")
+  .add(HttpApiEndpoint.put("save", "/", { payload: SaveSidebar, success: TxId, error: ChatErrors }))
+  .middleware(Authentication)
+  .prefix("/sidebar") {}
+
 export class CrmApi extends HttpApi.make("crm")
   .add(SystemApi)
   .add(AccountApi)
@@ -504,6 +624,9 @@ export class CrmApi extends HttpApi.make("crm")
   .add(ConnectionsApi)
   .add(SkillsApi)
   .add(MemoryApi)
+  .add(ChatsApi)
+  .add(ChatSpacesApi)
+  .add(SidebarApi)
   .prefix("/api") {}
 
 /**
@@ -533,3 +656,21 @@ export const SKILLS_SYNC_PATH = "/api/shapes/skills";
  * every company's, so ⌘K searches them locally (ADR 0017).
  */
 export const MEMORY_FACTS_SYNC_PATH = "/api/shapes/memory-facts";
+
+/**
+ * Chats the caller may see in the active workspace (same `?workspace=` rule): shared ones and
+ * their own private ones (ADR 0018). `session_id` stays on the server.
+ */
+export const CHATS_SYNC_PATH = "/api/shapes/chats";
+
+/** The active workspace's chat spaces (same `?workspace=` rule). */
+export const CHAT_SPACES_SYNC_PATH = "/api/shapes/chat-spaces";
+
+/** The caller's own sidebar row in the active workspace (same `?workspace=` rule). */
+export const SIDEBAR_SYNC_PATH = "/api/shapes/sidebar";
+
+/**
+ * The agent proxy's prefix: `useEveAgent({ baseUrl: chatAgentBase(chatId) })`. The API checks
+ * the chat and forwards `/eve/v1/session/<its session>/…` to the agent (ADR 0018).
+ */
+export const chatAgentBase = (chatId: string) => `/api/chats/${encodeURIComponent(chatId)}/agent`;

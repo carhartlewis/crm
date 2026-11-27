@@ -1,38 +1,21 @@
-import { isConnectionAuthorizationRequiredError } from "eve/connections";
 import { defineDynamic, defineSkill } from "eve/skills";
-import { agentSkillsUrl, gatewayAuthorization } from "../lib/gateway.ts";
+import { crmCaller, crmToken } from "../lib/crm-token.ts";
+import { agentSkillsUrl } from "../lib/gateway.ts";
 import { loadWorkspaceSkills } from "../lib/workspace-skills.ts";
 
 /**
- * Skills the user's workspace shares (Connections → Skills in the CRM): installed from skills.sh
- * and enabled by a member. Read once per turn. They load after the user has signed the agent in
- * to the CRM, because they use the same token as the connections gateway.
+ * Skills the workspace shares (Workspace settings → Workspace Skills): installed from skills.sh
+ * and enabled by a member. Read once per turn. A chat from the CRM loads its workspace's skills
+ * at once (a signed agent token, ADR 0018); other callers once they signed the agent in to the
+ * CRM, with the same token as the connections gateway.
  */
 export default defineDynamic(async (ctx) => {
-  const user = ctx.session.auth.current;
+  const caller = crmCaller(ctx.session.auth.current);
 
-  if (user?.principalType !== "user" || !ctx.turn) return null;
-
-  const principal = { type: "user", id: user.principalId } as const;
+  if (!caller || !ctx.turn) return null;
 
   const skills = await ctx.memo(`workspace-skills:${ctx.turn.id}`, () =>
-    loadWorkspaceSkills({
-      url: agentSkillsUrl,
-      token: async () => {
-        try {
-          const { token } = await gatewayAuthorization.getToken({
-            principal,
-            connection: { url: agentSkillsUrl },
-          });
-
-          return token;
-        } catch (error) {
-          if (isConnectionAuthorizationRequiredError(error)) return null;
-
-          throw error;
-        }
-      },
-    }),
+    loadWorkspaceSkills({ url: agentSkillsUrl, token: () => crmToken(caller) }),
   );
 
   if (skills.length === 0) return null;

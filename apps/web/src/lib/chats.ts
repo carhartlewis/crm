@@ -1,0 +1,395 @@
+import { CHAT_SPACES_SYNC_PATH, CHATS_SYNC_PATH, SIDEBAR_SYNC_PATH } from "@crm/core/api";
+import {
+  decodeStoredLayout,
+  type Json,
+  type SidebarLayout,
+  type SpaceColor,
+  titleFromMessage,
+} from "@crm/core/chat";
+import { createId, ID_PREFIXES } from "@crm/core/ids";
+import { electricCollectionOptions } from "@tanstack/electric-db-collection";
+import { mutationOptions } from "@tanstack/react-query";
+import { createCollection } from "@tanstack/react-db";
+import { request } from "./api-fetch.ts";
+import { prewarmUsed } from "./chat-api.ts";
+import { isoTimestamp, perWorkspace, syncedWrite, type WriteBody } from "./sync-collections.ts";
+
+/**
+ * Chats, spaces and the user's sidebar row, synced like CRM records (ADR 0012, ADR 0018). Loaded
+ * with the chat nav and chat pages, never in cold entry.
+ */
+
+/** A chat row as Electric syncs it, without `session_id` (the API keeps it). */
+export type Chat = {
+  readonly id: string;
+  readonly workspace_id: string;
+  readonly space_id: string | null;
+  readonly created_by_id: string | null;
+  readonly title: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+  readonly last_message_at: string;
+};
+
+export type ChatSpace = {
+  readonly id: string;
+  readonly workspace_id: string;
+  readonly name: string;
+  readonly color: string;
+  readonly created_by_id: string | null;
+  readonly created_at: string;
+};
+
+export type SidebarRow = {
+  readonly id: string;
+  readonly workspace_id: string;
+  readonly user_id: string;
+  readonly pinned: Json;
+  readonly folders: Json;
+  readonly updated_at: string;
+};
+
+/** Where a collection syncs from: the API proxy, with the workspace in the URL (ADR 0012). */
+const syncedFrom = (path: string, workspaceId: string) => ({
+  url: new URL(path, window.location.origin).href,
+  params: { workspace: workspaceId },
+  parser: { timestamptz: isoTimestamp },
+});
+
+/** Calls a write endpoint and waits for its txid in the collection's stream. */
+async function writeAndAwait(
+  awaitTxId: (txid: number) => Promise<boolean>,
+  path: string,
+  method: "POST" | "PATCH" | "DELETE",
+  body?: WriteBody,
+) {
+  await awaitTxId((await syncedWrite(path, method, body)).txid);
+}
+
+/** Session ids of chats being created, handed from `onInsert` to the create mutation. */
+const pendingSessions = new Map<string, PromiseWithResolvers<string>>();
+
+function createChatsCollection(workspaceId: string) {
+  return createCollection(
+    electricCollectionOptions<Chat>({
+      id: `chats:${workspaceId}`,
+      getKey: (chat) => chat.id,
+      // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- TanStack DB's option name (an Electric "shape").
+      shapeOptions: syncedFrom(CHATS_SYNC_PATH, workspaceId),
+      onInsert: async ({ transaction, collection }) => {
+        await Promise.all(
+          transaction.mutations.map(async ({ modified }) => {
+            const pending = pendingSessions.get(modified.id);
+
+            try {
+              const created = await request<{ txid: number; sessionId: string }>("/api/chats", {
+                method: "POST",
+                body: JSON.stringify({
+                  id: modified.id,
+                  title: modified.title,
+                  spaceId: modified.space_id,
+                }),
+              });
+
+              pending?.resolve(created.sessionId);
+              await collection.utils.awaitTxId(created.txid);
+            } catch (error) {
+              pending?.reject(error);
+              throw error;
+            } finally {
+              pendingSessions.delete(modified.id);
+            }
+          }),
+        );
+      },
+      onUpdate: async ({ transaction, collection }) => {
+        await Promise.all(
+          transaction.mutations.map(({ original, changes }) =>
+            writeAndAwait(
+              collection.utils.awaitTxId,
+              `/api/chats/${encodeURIComponent(original.id)}`,
+              "PATCH",
+              { title: changes.title, spaceId: changes.space_id },
+            ),
+          ),
+        );
+      },
+      onDelete: async ({ transaction, collection }) => {
+        await Promise.all(
+          transaction.mutations.map(({ original }) =>
+            writeAndAwait(
+              collection.utils.awaitTxId,
+              `/api/chats/${encodeURIComponent(original.id)}`,
+              "DELETE",
+            ),
+          ),
+        );
+      },
+    }),
+  );
+}
+
+function createSpacesCollection(workspaceId: string) {
+  return createCollection(
+    electricCollectionOptions<ChatSpace>({
+      id: `chat-spaces:${workspaceId}`,
+      getKey: (space) => space.id,
+      // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- TanStack DB's option name (an Electric "shape").
+      shapeOptions: syncedFrom(CHAT_SPACES_SYNC_PATH, workspaceId),
+      onInsert: async ({ transaction, collection }) => {
+        await Promise.all(
+          transaction.mutations.map(({ modified }) =>
+            writeAndAwait(collection.utils.awaitTxId, "/api/chat-spaces", "POST", {
+              id: modified.id,
+              name: modified.name,
+              color: modified.color,
+            }),
+          ),
+        );
+      },
+      onUpdate: async ({ transaction, collection }) => {
+        await Promise.all(
+          transaction.mutations.map(({ original, changes }) =>
+            writeAndAwait(
+              collection.utils.awaitTxId,
+              `/api/chat-spaces/${encodeURIComponent(original.id)}`,
+              "PATCH",
+              { name: changes.name, color: changes.color },
+            ),
+          ),
+        );
+      },
+      onDelete: async ({ transaction, collection }) => {
+        await Promise.all(
+          transaction.mutations.map(({ original }) =>
+            writeAndAwait(
+              collection.utils.awaitTxId,
+              `/api/chat-spaces/${encodeURIComponent(original.id)}`,
+              "DELETE",
+            ),
+          ),
+        );
+      },
+    }),
+  );
+}
+
+/** Saves the whole row: the API upserts it, so insert and update send the same request. */
+async function saveRow(row: SidebarRow) {
+  const layout = decodeStoredLayout(row);
+
+  const response = await request<{ txid: number }>("/api/sidebar", {
+    method: "PUT",
+    body: JSON.stringify({ id: row.id, pinned: layout.pinned, folders: layout.folders }),
+  });
+
+  return response.txid;
+}
+
+function createSidebarCollection(workspaceId: string) {
+  return createCollection(
+    electricCollectionOptions<SidebarRow>({
+      id: `sidebar:${workspaceId}`,
+      getKey: (row) => row.id,
+      // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- TanStack DB's option name (an Electric "shape").
+      shapeOptions: syncedFrom(SIDEBAR_SYNC_PATH, workspaceId),
+      onInsert: async ({ transaction, collection }) => {
+        const txids = await Promise.all(
+          transaction.mutations.map(({ modified }) => saveRow(modified)),
+        );
+
+        await Promise.all(txids.map((txid) => collection.utils.awaitTxId(txid)));
+      },
+      onUpdate: async ({ transaction, collection }) => {
+        const txids = await Promise.all(
+          transaction.mutations.map(({ modified }) => saveRow(modified)),
+        );
+
+        await Promise.all(txids.map((txid) => collection.utils.awaitTxId(txid)));
+      },
+    }),
+  );
+}
+
+export const chatsCollection = perWorkspace(createChatsCollection);
+
+export const chatSpacesCollection = perWorkspace(createSpacesCollection);
+
+export const sidebarCollection = perWorkspace(createSidebarCollection);
+
+export type ChatsCollection = ReturnType<typeof createChatsCollection>;
+
+export type ChatSpacesCollection = ReturnType<typeof createSpacesCollection>;
+
+export type SidebarCollection = ReturnType<typeof createSidebarCollection>;
+
+/** Spaces oldest first, so a new space joins the end of the list. */
+export function oldestFirst(spaces: readonly ChatSpace[] | undefined) {
+  return (spaces ?? []).toSorted((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+/** Starts all three syncs; route loaders call it so the sidebar and pages read local data. */
+export function preloadChats(workspaceId: string) {
+  void chatsCollection(workspaceId).preload();
+  void chatSpacesCollection(workspaceId).preload();
+  void sidebarCollection(workspaceId).preload();
+}
+
+interface StartChat {
+  readonly workspaceId: string;
+  readonly userId: string;
+  readonly text: string;
+  readonly spaceId: string | null;
+}
+
+/**
+ * Starts a chat from its first message. The row shows in the sidebar at once (optimistic); the
+ * mutation resolves as soon as the API answers with the eve session, without waiting for sync,
+ * so the chat page opens and sends the message right away. A refusal rolls the row back.
+ */
+export const startChatMutation = mutationOptions({
+  mutationKey: ["chats", "start"],
+  mutationFn: async ({ workspaceId, userId, text, spaceId }: StartChat) => {
+    const id = createId(ID_PREFIXES.chat);
+    const now = new Date().toISOString();
+    const session = Promise.withResolvers<string>();
+
+    pendingSessions.set(id, session);
+
+    const transaction = chatsCollection(workspaceId).insert({
+      id,
+      workspace_id: workspaceId,
+      space_id: spaceId,
+      created_by_id: userId,
+      title: titleFromMessage(text),
+      created_at: now,
+      updated_at: now,
+      last_message_at: now,
+    });
+
+    // The row settles later, through sync; its failure already rejected `session`.
+    void transaction.when("settled").catch(() => undefined);
+
+    const sessionId = await session.promise;
+
+    prewarmUsed();
+
+    return { id, sessionId };
+  },
+});
+
+interface UpdateChat {
+  readonly workspaceId: string;
+  readonly id: string;
+  readonly title?: string;
+  readonly spaceId?: string | null;
+}
+
+/** Renames a chat or moves it to another space (null: Private). */
+export const updateChatMutation = mutationOptions({
+  mutationKey: ["chats", "update"],
+  mutationFn: async ({ workspaceId, id, title, spaceId }: UpdateChat) => {
+    const transaction = chatsCollection(workspaceId).update(id, (draft) => {
+      if (title !== undefined) draft.title = title;
+
+      if (spaceId !== undefined) draft.space_id = spaceId;
+    });
+
+    await transaction.when("settled");
+  },
+});
+
+export const deleteChatMutation = mutationOptions({
+  mutationKey: ["chats", "delete"],
+  mutationFn: async ({ workspaceId, id }: { workspaceId: string; id: string }) => {
+    await chatsCollection(workspaceId).delete(id).when("settled");
+  },
+});
+
+interface SaveSpace {
+  readonly workspaceId: string;
+  readonly userId: string;
+  readonly name: string;
+  readonly color: SpaceColor;
+}
+
+export const createSpaceMutation = mutationOptions({
+  mutationKey: ["chat-spaces", "create"],
+  mutationFn: async ({ workspaceId, userId, name, color }: SaveSpace) => {
+    const id = createId(ID_PREFIXES.chat_space);
+
+    await chatSpacesCollection(workspaceId)
+      .insert({
+        id,
+        workspace_id: workspaceId,
+        name,
+        color,
+        created_by_id: userId,
+        created_at: new Date().toISOString(),
+      })
+      .when("settled");
+
+    return id;
+  },
+});
+
+export const renameSpaceMutation = mutationOptions({
+  mutationKey: ["chat-spaces", "rename"],
+  mutationFn: async ({
+    workspaceId,
+    id,
+    name,
+  }: {
+    workspaceId: string;
+    id: string;
+    name: string;
+  }) => {
+    await chatSpacesCollection(workspaceId)
+      .update(id, (draft) => {
+        draft.name = name;
+      })
+      .when("settled");
+  },
+});
+
+export const deleteSpaceMutation = mutationOptions({
+  mutationKey: ["chat-spaces", "delete"],
+  mutationFn: async ({ workspaceId, id }: { workspaceId: string; id: string }) => {
+    await chatSpacesCollection(workspaceId).delete(id).when("settled");
+  },
+});
+
+/**
+ * Replaces the user's sidebar layout. The first save creates the row; the edit shows at once
+ * and rolls back if the server refuses.
+ */
+export function saveLayout(
+  collection: SidebarCollection,
+  row: SidebarRow | undefined,
+  context: { workspaceId: string; userId: string },
+  layout: SidebarLayout,
+) {
+  const pinned = [...layout.pinned];
+
+  const folders = layout.folders.map((folder) => ({
+    id: folder.id,
+    name: folder.name,
+    chatIds: [...folder.chatIds],
+  }));
+
+  const transaction = row
+    ? collection.update(row.id, (draft) => {
+        draft.pinned = pinned;
+        draft.folders = folders;
+      })
+    : collection.insert({
+        id: createId(ID_PREFIXES.sidebar),
+        workspace_id: context.workspaceId,
+        user_id: context.userId,
+        pinned,
+        folders,
+        updated_at: new Date().toISOString(),
+      });
+
+  return transaction.when("settled");
+}

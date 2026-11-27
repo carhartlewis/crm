@@ -16,6 +16,7 @@
     "@effect/platform-bun": "4.1.6",
     "better-auth": "1.7.28",
     "effect": "4.1.6",
+    "eve": "1.5.0",
     "pg": "8.23.1"
   },
   "devDependencies": {

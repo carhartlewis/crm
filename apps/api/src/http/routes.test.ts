@@ -6,6 +6,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { Effect, Layer, Option } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 import { Auth, AuthError, type SessionInfo } from "../services/Auth.ts";
+import { Chats, makeChats } from "../services/Chats.ts";
+import { createMemoryChatStore } from "../services/chat-store-memory.ts";
 import { Companies, makeCompanies } from "../services/Companies.ts";
 import { Images } from "../services/Images.ts";
 import { makeMemory, Memory } from "../services/Memory.ts";
@@ -86,6 +88,11 @@ const FakeAuth = Layer.succeed(
 const memory = createMemoryCompanyStore(["ws_a:user_1"]);
 const FakeCompanies = Layer.succeed(Companies, makeCompanies(memory.store));
 
+const FakeChats = Layer.succeed(
+  Chats,
+  makeChats(createMemoryChatStore([]).store, null, createMemoryKv()),
+);
+
 // Fake Electric: records each upstream URL and answers like Electric's initial snapshot.
 const electricCalls: URL[] = [];
 
@@ -144,6 +151,7 @@ const app = HttpRouter.toWebHandler(
     Layer.provide([
       FakeAuth,
       FakeCompanies,
+      FakeChats,
       FakeElectric,
       FakeConnections,
       Layer.succeed(

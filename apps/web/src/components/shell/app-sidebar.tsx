@@ -1,4 +1,5 @@
-import home from "@carbon/icons/es/home/16.js";
+import edit from "@carbon/icons/es/edit/16.js";
+import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import {
   Sidebar,
@@ -7,23 +8,27 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
 } from "@crm/ui/components/sidebar";
+import { useMountEffect } from "@crm/ui/hooks/use-mount-effect";
+import { preloadable } from "@crm/ui/lib/preloadable";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { Suspense } from "react";
+import { prewarmChat } from "../../lib/chat-api.ts";
 import { haptic } from "../../lib/haptics.ts";
 import { isSettingsPath } from "../../lib/settings.ts";
+import { shortcuts } from "../../lib/shortcuts.ts";
+import { HotkeyTooltip } from "../hotkey-tooltip.tsx";
 import { SettingsNav } from "../settings/settings-nav.tsx";
-import { ariaKeyShortcuts, shortcuts } from "../../lib/shortcuts.ts";
 import { PinnedNav } from "./pinned-nav.tsx";
-import { RowShortcut } from "./row-shortcut.tsx";
 import { rubberBandScroll } from "./rubber-band.ts";
 import { TitleBarControls } from "./title-bar.tsx";
 import { WorkspaceMenu } from "./workspace-menu.tsx";
 
-const HomeIcon = carbonIcon(home);
+const EditIcon = carbonIcon(edit);
+
+// Pinned chats and spaces, Spaces, Folders and Recents read synced data: their own chunk.
+const ChatNav = preloadable(() => import("./chat-nav.tsx"));
 
 export interface AppSidebarProps {
   readonly userId: string;
@@ -34,7 +39,13 @@ export interface AppSidebarProps {
 
 export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: AppSidebarProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const onHome = pathname === "/";
+
+  // The chat list is the sidebar's main content: load it as soon as the browser is idle.
+  useMountEffect(() => {
+    const idle = requestIdleCallback(() => void ChatNav.preload());
+
+    return () => cancelIdleCallback(idle);
+  });
 
   return (
     <Sidebar variant="inset">
@@ -43,32 +54,34 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
         <div className="mt-2.5 flex h-7 items-center justify-end">
           <TitleBarControls onSearch={onSearch} onSearchIntent={onSearchIntent} />
         </div>
+        <HotkeyTooltip shortcut={shortcuts.newChat} side="right">
+          <Button
+            variant="outline"
+            className="app-region-no-drag w-full"
+            // A session is made ready while the pointer travels; the first answer comes sooner.
+            onPointerEnter={() => prewarmChat()}
+            onFocus={() => prewarmChat()}
+            render={<Link to="/" />}
+          >
+            <EditIcon />
+            New chat
+          </Button>
+        </HotkeyTooltip>
       </SidebarHeader>
       <SidebarContent ref={rubberBandScroll} className="overscroll-none">
         {isSettingsPath(pathname) ? (
           <SettingsNav />
         ) : (
-          <div>
-            <SidebarGroup>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={onHome}
-                    aria-keyshortcuts={ariaKeyShortcuts(shortcuts.home)}
-                    render={<Link to="/" />}
-                  >
-                    <HomeIcon />
-                    <span>Home</span>
-                    <RowShortcut shortcut={shortcuts.home} />
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroup>
-            <SidebarGroup>
-              <SidebarGroupLabel>Pinned</SidebarGroupLabel>
-              <PinnedNav userId={userId} workspaceId={workspaceId} />
-            </SidebarGroup>
-          </div>
+          <Suspense
+            fallback={
+              <SidebarGroup>
+                <SidebarGroupLabel>Pinned</SidebarGroupLabel>
+                <PinnedNav userId={userId} workspaceId={workspaceId} />
+              </SidebarGroup>
+            }
+          >
+            <ChatNav key={workspaceId} userId={userId} workspaceId={workspaceId} />
+          </Suspense>
         )}
       </SidebarContent>
       <SidebarFooter>

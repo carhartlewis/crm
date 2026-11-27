@@ -98,6 +98,14 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - Logos for apps and workspaces come from context.dev by domain and are copied into our storage (`ImageCache.logo`); the favicon is the fallback. Never hotlink or bundle vendor logos.
 - Upstream tokens stay in the API, encrypted. The agent reaches apps only through `/api/mcp`, with a better-auth MCP token for the `crm-agent` client; keep its eve connection file named `connections`.
 
+### Chats (ADR 0018)
+
+- `/` is New chat; Home has no sidebar row. The sidebar is New chat, Pinned (pages, spaces and chats in one order, `sidebar` row), Spaces, Folders (personal) and Recents. A pinned item shows only in Pinned.
+- A chat is private (`space_id` null) or in a space that the whole workspace sees. Only the starter makes a chat private or deletes it. Rules live in `@crm/core/chat`; the API enforces them in `Chats`.
+- Browsers reach the agent only through `/api/chats/<id>/agent/*`, which checks the chat. The agent accepts only the API (`AGENT_PROXY_SECRET`) plus `localDev()`. Never add a cookie or browser auth to the eve channel.
+- In a chat, the agent calls the CRM (gateway, skills, memory) with `crm1.` tokens it signs for the caller and the chat's workspace (`@crm/core/auth/agent-token`); the API checks membership each time.
+- Speed: the API keeps a prewarmed eve session in Redis and caches chat events (`chat:history:<id>`); route loaders fetch history so hovering a chat preloads it. Chat UI is AI Elements in `@crm/ui/components/ai-elements/*`; keep unused parts out (first-view CSS budget).
+
 ### Memory (ADR 0014)
 
 - `@crm/memory` (server-only) holds the memory store interface, the Supermemory adapter, Jev's questions and thresholds, and the recall format. Tests use `createInMemoryStore` from `@crm/memory/testing`.

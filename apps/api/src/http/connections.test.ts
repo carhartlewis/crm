@@ -9,6 +9,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { Effect, Layer, Option, Schema } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 import { Auth, AuthError } from "../services/Auth.ts";
+import { Chats, makeChats } from "../services/Chats.ts";
+import { createMemoryChatStore } from "../services/chat-store-memory.ts";
 import { Companies, makeCompanies } from "../services/Companies.ts";
 import { Images } from "../services/Images.ts";
 import { makeMemory, Memory } from "../services/Memory.ts";
@@ -216,6 +218,11 @@ const FakeConnections = Layer.succeed(
 // Companies and Electric are not under test here; they only complete the route layer.
 const FakeCompanies = Layer.succeed(Companies, makeCompanies(createMemoryCompanyStore([]).store));
 
+const FakeChats = Layer.succeed(
+  Chats,
+  makeChats(createMemoryChatStore([]).store, null, createMemoryKv()),
+);
+
 const FakeElectric = Layer.succeed(
   Electric,
   makeElectric({
@@ -231,6 +238,7 @@ const app = HttpRouter.toWebHandler(
       FakeAuth,
       FakeConnections,
       FakeCompanies,
+      FakeChats,
       FakeElectric,
       Layer.succeed(
         Skills,

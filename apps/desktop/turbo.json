@@ -7,7 +7,7 @@
       "outputs": ["dist/**"]
     },
     "dev": {
-      "with": ["@crm/web#dev", "@crm/api#dev"],
+      "with": ["@crm/web#dev", "@crm/api#dev", "@crm/agent#dev"],
       "env": ["CRM_WEB_URL", "CRM_API_URL"]
     }
   }

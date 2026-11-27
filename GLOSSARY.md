@@ -38,7 +38,7 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Onboarding shell**: The full-window layout for sign-in, setup and route-level states: shader backdrop, app mark, title, content.
 
-**Pinned pages**: The workspace's top-level pages in the sidebar: Companies, Contacts, Workflows, Connections. Each user orders them by dragging; ⌥1–⌥9 open them in that order.
+**Pinned**: The sidebar group with the workspace's pages (Companies, Contacts, Workflows), plus the spaces and chats a user pinned, in one order per user (the `sidebar` row, ADR 0018). Each user orders it by dragging; ⌥1–⌥9 open the first nine.
 
 **Peek**: The card that opens when you hover or focus a pinned page: what it holds, its shortcut, and the workspace's members. Its code and data load on hover, before it opens.
 
@@ -67,3 +67,17 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 **Memory graph**: Supermemory's canvas of sources and the facts read from them, in Workspace settings → Workspace Memory and on a company's Knowledge tab.
 
 **Jev**: The decision model (`typesafe-ai/jev` on the Vercel AI Gateway) that judges each chat message and sent email: sensitive, lasting, which company, already known, or a correction. Thresholds in `@crm/memory/jev` decide what is kept.
+
+**Chat**: A conversation with the agent (table `chat`), backed by one eve session. Private to the person who started it, or shared in a space (ADR 0018).
+
+**New chat**: The page at `/`: the composer and a space picker. It replaced Home.
+
+**Space**: A shared place for chats (table `chat_space`), seen by every member of the workspace. **Private** is not a space row: it is the chats only you see.
+
+**Folder**: A personal group of chats in the sidebar. Kept in the user's `sidebar` row; teammates never see it.
+
+**Recents**: The sidebar list of the chats you started that are not pinned and not in a folder, newest message first.
+
+**Prewarmed session**: An eve session the API creates before the first message and keeps in Redis for 10 minutes, so a new chat answers sooner.
+
+**Agent proxy**: `/api/chats/<chatId>/agent/*`. The only way a browser reaches the agent; it checks that the caller may see the chat (ADR 0018).

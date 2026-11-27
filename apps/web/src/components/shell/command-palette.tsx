@@ -1,6 +1,6 @@
 import add from "@carbon/icons/es/add/16.js";
 import book from "@carbon/icons/es/book/16.js";
-import home from "@carbon/icons/es/home/16.js";
+import edit from "@carbon/icons/es/edit/16.js";
 import link from "@carbon/icons/es/link/16.js";
 import logout from "@carbon/icons/es/logout/16.js";
 import screen from "@carbon/icons/es/screen/16.js";
@@ -27,7 +27,8 @@ import { useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import { rankCommands, type Searchable } from "../../lib/command-search.ts";
 import { useMemoryFacts } from "../../lib/memory-facts.ts";
-import { pageById, pageForPath, type Page } from "../../lib/pages.ts";
+import { parsePinKey } from "@crm/core/chat";
+import { isPageId, pageById, pageForPath, type Page } from "../../lib/pages.ts";
 import { useRecordHits } from "../../lib/record-search.ts";
 import { useOpenRecord, type RecordKind } from "../../lib/records.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
@@ -39,18 +40,27 @@ import type { FileRoutesByTo } from "../../routeTree.gen.ts";
 
 const AddIcon = carbonIcon(add);
 const KnowledgeIcon = carbonIcon(book);
-const HomeIcon = carbonIcon(home);
+const NewChatIcon = carbonIcon(edit);
 const LinkIcon = carbonIcon(link);
 const LogoutIcon = carbonIcon(logout);
 const ThemeIcon = carbonIcon(screen);
 const SwitchIcon = carbonIcon(arrowsHorizontal);
 const SidebarIcon = carbonIcon(sidePanelOpen);
 
-/** Every page ⌘K can go to: Home, the pinned pages, settings, and a new workspace. */
+/** Every page ⌘K can go to: New chat, the pinned pages, settings, and a new workspace. */
 type Listed = "/" | Page["to"] | SettingsPath | "/new-workspace";
 
-/** Routes ⌘K leaves out: signed-out and first-run pages, and an old URL that redirects. */
-type Unlisted = "/sign-in" | "/setup-workspace" | "/connections";
+/**
+ * Routes ⌘K leaves out: signed-out and first-run pages, an old URL that redirects, and single
+ * chats and spaces, which need an id (the sidebar lists them; ⌘K search over chats is
+ * `.scratch/chat/issues/08`).
+ */
+type Unlisted =
+  | "/sign-in"
+  | "/setup-workspace"
+  | "/connections"
+  | "/chats/$chatId"
+  | "/spaces/$spaceId";
 
 type Fails<Missing extends never> = Missing;
 
@@ -196,14 +206,20 @@ export default function CommandPalette({
       : []),
     {
       id: "go:/",
-      label: "Home",
+      label: "New chat",
       section: "Go to",
-      icon: HomeIcon,
-      shortcut: shortcuts.home,
+      keywords: ["home", "assistant", "ask"],
+      icon: NewChatIcon,
+      shortcut: shortcuts.newChat,
       run: () => void navigate({ to: "/" }),
     },
-    ...order.map((id, index) => {
-      const page = pageById(id);
+    // Pinned chats and spaces are in the sidebar; ⌘K lists the pages, with their pinned shortcut.
+    ...order.flatMap((key, index) => {
+      const pin = parsePinKey(key);
+
+      if (pin?.kind !== "page" || !isPageId(pin.id)) return [];
+
+      const page = pageById(pin.id);
 
       return {
         id: `go:${page.to}`,

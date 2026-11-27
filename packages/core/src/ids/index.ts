@@ -20,6 +20,11 @@ export const ID_PREFIXES = {
   connection: "cnx",
   custom_connector: "ccn",
   skill: "skl",
+  chat: "cht",
+  chat_space: "spc",
+  sidebar: "sbr",
+  // Not a table: personal folders live in the `sidebar` row (ADR 0018), with ids of this scheme.
+  folder: "fld",
 } as const;
 
 /** Tables whose ids are not ours to make, and why. */

@@ -25,6 +25,7 @@
     "@tanstack/react-router": "1.170.46",
     "@tanstack/redact": "0.3.1",
     "better-auth": "1.7.28",
+    "eve": "1.5.0",
     "js.foresight": "4.2.1",
     "nuqs": "2.10.3",
     "react": "19.3.1",

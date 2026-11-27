@@ -3,18 +3,37 @@ import { moveItem, normalizeOrder, parseStoredOrder } from "./pinned-order.ts";
 
 describe("normalizeOrder", () => {
   test("keeps the saved order and appends pages added since", () => {
+    expect(normalizeOrder(["page:workflows", "page:companies"])).toEqual([
+      "page:workflows",
+      "page:companies",
+      "page:contacts",
+    ]);
+  });
+
+  test("reads bare page ids saved before chats", () => {
     expect(normalizeOrder(["workflows", "companies"])).toEqual([
-      "workflows",
-      "companies",
-      "contacts",
+      "page:workflows",
+      "page:companies",
+      "page:contacts",
+    ]);
+  });
+
+  test("keeps pinned chats and spaces in place", () => {
+    const chat = "chat:cht_0123456789ABCDEFGHIJKLMN";
+
+    expect(normalizeOrder([chat, "page:contacts"])).toEqual([
+      chat,
+      "page:contacts",
+      "page:companies",
+      "page:workflows",
     ]);
   });
 
   test("drops unknown and duplicate ids, and survives garbage", () => {
-    expect(normalizeOrder(["deals", "contacts", "contacts"])).toEqual([
-      "contacts",
-      "companies",
-      "workflows",
+    expect(normalizeOrder(["deals", "page:deals", "chat:nope", "contacts", "contacts"])).toEqual([
+      "page:contacts",
+      "page:companies",
+      "page:workflows",
     ]);
   });
 });

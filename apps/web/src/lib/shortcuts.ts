@@ -17,13 +17,14 @@ export const shortcuts = {
   sidebar: { code: "KeyB", mod: true },
   back: { code: "BracketLeft", mod: true },
   forward: { code: "BracketRight", mod: true },
-  home: { code: "Digit0", alt: true },
+  // New chat, the workspace home (ADR 0018).
+  newChat: { code: "Digit0", alt: true },
   // Opens the create sheet from anywhere. ⌘C stays copy whenever there's something to copy:
   // see `claimsCopyShortcut`.
   create: { code: "KeyC", mod: true },
 } as const satisfies Record<string, Shortcut>;
 
-/** ⌥1 to ⌥9 open the pinned pages, in the order the user arranged them. */
+/** ⌥1 to ⌥9 open the first nine pinned pages, spaces and chats, in the order the user arranged. */
 export function pinnedShortcut(index: number): Shortcut | undefined {
   return index < 9 ? { code: `Digit${index + 1}`, alt: true } : undefined;
 }

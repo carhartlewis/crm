@@ -1,8 +1,9 @@
 import { localDev } from "eve/channels/auth";
 import { eveChannel } from "eve/channels/eve";
-import { crmSession } from "../lib/crm-auth.ts";
+import { crmProxy } from "../lib/crm-auth.ts";
 
-// Signed-in CRM users in every environment; same-machine callers in `eve dev` only.
+// Only the CRM API, which checks who may see each chat (ADR 0018); same-machine callers in
+// `eve dev` only.
 export default eveChannel({
-  auth: [crmSession(process.env["CRM_API_URL"] ?? "http://localhost:3001"), localDev()],
+  auth: [crmProxy(process.env["AGENT_PROXY_SECRET"]), localDev()],
 });

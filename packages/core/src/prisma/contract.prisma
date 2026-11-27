@@ -23,6 +23,9 @@ model User {
   connections        Connection[]
   skills             Skill[]
   customConnectors   CustomConnector[]
+  chats              Chat[]
+  chatSpaces         ChatSpace[]
+  sidebars           Sidebar[]
 
   @@map("user")
 }
@@ -95,6 +98,9 @@ model Workspace {
   skills      Skill[]
   customConnectors CustomConnector[]
   memoryFacts MemoryFact[]
+  chats       Chat[]
+  chatSpaces  ChatSpace[]
+  sidebars    Sidebar[]
 
   @@map("workspace")
 }
@@ -429,4 +435,65 @@ model CustomConnector {
 
   @@unique([workspaceId, key])
   @@map("custom_connector")
+}
+
+// Chats with the agent (ADR 0018). A chat is one eve session. With no space it is private to
+// the person who started it; in a space every member of the workspace sees it.
+
+model Chat {
+  // Client-generated (`createId("cht")`): the web app inserts the row optimistically.
+  id            String     @id
+  workspaceId   String     @map("workspace_id")
+  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Null: private. Deleting a space makes its chats private again.
+  spaceId       String?    @map("space_id")
+  space         ChatSpace? @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  createdById   String?    @map("created_by_id")
+  createdBy     User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  title         String
+  // The eve session. Never synced: the API looks it up for the agent proxy.
+  sessionId     String     @unique @map("session_id")
+  createdAt     DateTime   @map("created_at")
+  updatedAt     DateTime   @map("updated_at")
+  lastMessageAt DateTime   @map("last_message_at")
+
+  @@index([workspaceId])
+  @@index([spaceId])
+  @@map("chat")
+}
+
+// A shared place for chats, seen by every member of the workspace.
+
+model ChatSpace {
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // One of the palette names in `@crm/core/chat` (`SPACE_COLORS`).
+  color       String
+  createdById String?   @map("created_by_id")
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @map("created_at")
+  chats       Chat[]
+
+  @@index([workspaceId])
+  @@map("chat_space")
+}
+
+// One user's sidebar in one workspace: the pinned order and personal folders (ADR 0018).
+
+model Sidebar {
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Ordered keys: `page:<id>`, `space:<id>`, `chat:<id>`.
+  pinned      Json(storage: jsonb)
+  // `[{ id, name, chatIds }]`.
+  folders     Json(storage: jsonb)
+  updatedAt   DateTime  @map("updated_at")
+
+  @@unique([workspaceId, userId])
+  @@map("sidebar")
 }
