@@ -23,6 +23,7 @@ import { carbonIcon } from "@crm/ui/components/icon";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  accessLabels,
   type Connection,
   connectionLogosQuery,
   connectionsCollection,
@@ -37,8 +38,6 @@ import {
 const AddIcon = carbonIcon(add);
 const VerifiedIcon = carbonIcon(checkmarkOutline);
 const CheckIcon = carbonIcon(checkmark);
-
-const accessLabels: Record<Access, string> = { read: "Read only", write: "Read and write" };
 
 const accessHints: Record<Access, string> = {
   read: "Look things up",

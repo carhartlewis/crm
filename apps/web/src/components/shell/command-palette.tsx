@@ -4,6 +4,7 @@ import chat from "@carbon/icons/es/chat/16.js";
 import edit from "@carbon/icons/es/edit/16.js";
 import grid from "@carbon/icons/es/grid/16.js";
 import link from "@carbon/icons/es/link/16.js";
+import plug from "@carbon/icons/es/plug/16.js";
 import logout from "@carbon/icons/es/logout/16.js";
 import screen from "@carbon/icons/es/screen/16.js";
 import arrowsHorizontal from "@carbon/icons/es/arrows--horizontal/16.js";
@@ -33,6 +34,7 @@ import { queueFirstMessage, seedNewChat } from "../../lib/chat-api.ts";
 import { useChatSpaces, useVisibleChats } from "../../lib/chat-spaces.ts";
 import { startChatMutation } from "../../lib/chats.ts";
 import { lastPermissionMode } from "../../lib/permission-mode.ts";
+import { accessLabels, connectMutation, useConnectionHits } from "../../lib/connections.ts";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { useMemoryFacts } from "../../lib/memory-facts.ts";
 import { parsePinKey } from "@crm/core/chat";
@@ -54,6 +56,7 @@ const NewChatIcon = carbonIcon(edit);
 const SpacesIcon = carbonIcon(grid);
 const LinkIcon = carbonIcon(link);
 const LogoutIcon = carbonIcon(logout);
+const ConnectionIcon = carbonIcon(plug);
 const ThemeIcon = carbonIcon(screen);
 const SwitchIcon = carbonIcon(arrowsHorizontal);
 const SidebarIcon = carbonIcon(sidePanelOpen);
@@ -234,6 +237,40 @@ export default function CommandPalette({
     };
   });
 
+  // Apps (ADR 0013), connected or not, searched by name, vendor, domain and summary while
+  // typing. The app's row opens Connections filtered to it; an app not connected also has a row
+  // per access level that starts its sign-in at once.
+  const connect = useMutation({
+    ...connectMutation,
+    onError: (error) => toast.error(error.message),
+  });
+
+  const connections: PaletteCommand[] = useConnectionHits(workspaceId).flatMap((app) => {
+    const keywords = [app.name].concat(app.keywords);
+
+    const page: PaletteCommand = {
+      id: `connection:${app.id}`,
+      label: app.name,
+      section: app.connected ? "Connected" : "Connections",
+      keywords,
+      icon: ConnectionIcon,
+      run: () => void navigate({ href: app.href }),
+    };
+
+    if (app.connected) return [page];
+
+    return [page].concat(
+      (["read", "write"] as const).map((access) => ({
+        id: `connect:${app.id}:${access}`,
+        label: `Connect ${app.name} (${accessLabels[access].toLowerCase()})`,
+        section: "Connections",
+        keywords: ["install", "add"].concat(keywords),
+        icon: AddIcon,
+        run: () => connect.mutate({ integration: app.id, access }),
+      })),
+    );
+  });
+
   const commands: PaletteCommand[] = [
     ...(current
       ? [
@@ -408,7 +445,7 @@ export default function CommandPalette({
     >
       <PaletteSearch
         commands={commands}
-        records={[...records, ...chats, ...spaces, ...facts]}
+        records={[...records, ...chats, ...spaces, ...connections, ...facts]}
         select={select}
         findPeople={askFindPeople}
         placeholder={

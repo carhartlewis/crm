@@ -2,7 +2,7 @@ import type { CatalogEntry } from "@crm/core/api";
 import { CONNECTIONS_SYNC_PATH, CUSTOM_CONNECTORS_SYNC_PATH } from "@crm/core/api";
 import { type Access, customIntegration, integrations, type Integration } from "@crm/integrations";
 import { electricCollectionOptions } from "@tanstack/electric-db-collection";
-import { createCollection } from "@tanstack/react-db";
+import { createCollection, useLiveQuery } from "@tanstack/react-db";
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 import { request } from "./api-fetch.ts";
 import { isoTimestamp, perWorkspace, syncedWrite } from "./sync-collections.ts";
@@ -124,6 +124,55 @@ export function catalogOf(custom: readonly CustomConnector[]): readonly CatalogE
       toEntry(customIntegration({ key, name, mcpUrl: mcp_url }), true),
     ),
   ];
+}
+
+export const accessLabels: Record<Access, string> = { read: "Read only", write: "Read and write" };
+
+/** An app as ⌘K finds it: connected or not, and where Connections shows it. */
+export interface ConnectionHit {
+  readonly id: string;
+  readonly name: string;
+  readonly keywords: readonly string[];
+  readonly connected: boolean;
+  /** Connections, filtered to this app: under Yours when connected, else Discover to connect it. */
+  readonly href: string;
+}
+
+/** Every app the workspace can connect, marked with whether the caller has connected it. */
+export function connectionHits(
+  catalog: readonly CatalogEntry[],
+  connections: readonly Pick<Connection, "integration">[],
+): readonly ConnectionHit[] {
+  const connected = new Set(connections.map((connection) => connection.integration));
+
+  return catalog.map(({ id, name, summary, vendor, domain }) => {
+    const isConnected = connected.has(id);
+    const search = new URLSearchParams({ view: isConnected ? "yours" : "discover", q: name });
+
+    return {
+      id,
+      name,
+      keywords: [vendor, domain, summary],
+      connected: isConnected,
+      href: `/settings/connections?${search}`,
+    };
+  });
+}
+
+/** The workspace's apps for ⌘K, live (subscribing starts both syncs). */
+export function useConnectionHits(workspaceId: string): readonly ConnectionHit[] {
+  const { data: connections = [] } = useLiveQuery({
+    query: (q) => q.from({ connection: connectionsCollection(workspaceId) }),
+  });
+
+  const { data: custom = [] } = useLiveQuery({
+    query: (q) =>
+      q
+        .from({ connector: customConnectorsCollection(workspaceId) })
+        .orderBy(({ connector }) => connector.created_at, "asc"),
+  });
+
+  return connectionHits(catalogOf(custom), connections);
 }
 
 /** Logos are per user and workspace in the key, so one account's cache never serves another. */
