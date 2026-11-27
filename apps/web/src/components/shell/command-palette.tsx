@@ -1,5 +1,6 @@
 import add from "@carbon/icons/es/add/16.js";
 import book from "@carbon/icons/es/book/16.js";
+import chat from "@carbon/icons/es/chat/16.js";
 import edit from "@carbon/icons/es/edit/16.js";
 import grid from "@carbon/icons/es/grid/16.js";
 import link from "@carbon/icons/es/link/16.js";
@@ -27,7 +28,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import { rankCommands, type Searchable } from "../../lib/command-search.ts";
-import { useChatSpaces } from "../../lib/chat-spaces.ts";
+import { useChatSpaces, useVisibleChats } from "../../lib/chat-spaces.ts";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { useMemoryFacts } from "../../lib/memory-facts.ts";
 import { parsePinKey } from "@crm/core/chat";
@@ -42,6 +43,7 @@ import { switchWorkspaceMutation } from "../../lib/workspaces.ts";
 import type { FileRoutesByTo } from "../../routeTree.gen.ts";
 
 const AddIcon = carbonIcon(add);
+const ChatIcon = carbonIcon(chat);
 const KnowledgeIcon = carbonIcon(book);
 const NewChatIcon = carbonIcon(edit);
 const SpacesIcon = carbonIcon(grid);
@@ -56,8 +58,7 @@ type Listed = "/" | "/spaces" | Page["to"] | SettingsPath | "/new-workspace";
 
 /**
  * Routes ⌘K leaves out: signed-out and first-run pages, an old URL that redirects, and single
- * chats and spaces, which need an id (the sidebar lists them; ⌘K search over chats is
- * `.scratch/chat/issues/08`).
+ * chats and spaces, which need an id (⌘K finds them by search, below).
  */
 type Unlisted =
   | "/sign-in"
@@ -199,7 +200,10 @@ export default function CommandPalette({
   });
 
   // Spaces (ADR 0020), searched by name and description while typing; Enter opens the space.
-  const spaces: PaletteCommand[] = useChatSpaces(workspaceId).map((space) => ({
+  const chatSpaces = useChatSpaces(workspaceId);
+  const spaceNames = new Map(chatSpaces.map((space) => [space.id, space.name]));
+
+  const spaces: PaletteCommand[] = chatSpaces.map((space) => ({
     id: `space:${space.id}`,
     label: space.name,
     section: "Spaces",
@@ -207,6 +211,21 @@ export default function CommandPalette({
     icon: SpacesIcon,
     run: () => void navigate({ to: "/spaces/$spaceId", params: { spaceId: space.id } }),
   }));
+
+  // Chats you can see (your own and your spaces'), searched by title while typing, newest first
+  // on a tie; a chat's space name finds it too. Enter opens the chat.
+  const chats: PaletteCommand[] = useVisibleChats(workspaceId).map((item) => {
+    const space = item.space_id ? spaceNames.get(item.space_id) : undefined;
+
+    return {
+      id: `chat:${item.id}`,
+      label: item.title,
+      section: "Chats",
+      keywords: space ? [space] : [],
+      icon: ChatIcon,
+      run: () => void navigate({ to: "/chats/$chatId", params: { chatId: item.id } }),
+    };
+  });
 
   const commands: PaletteCommand[] = [
     ...(current
@@ -331,7 +350,7 @@ export default function CommandPalette({
     >
       <PaletteSearch
         commands={commands}
-        records={[...records, ...spaces, ...facts]}
+        records={[...records, ...chats, ...spaces, ...facts]}
         select={select}
         placeholder={
           current ? `Search ${current.label.toLowerCase()} and commands…` : "Search or jump to…"
