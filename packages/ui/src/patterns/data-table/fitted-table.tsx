@@ -51,10 +51,10 @@ export function FittedTable<TRow>({
   const shown = rows.filter((row) => matchesSearch(query.search, haystack(row)));
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+    <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-3">
       {action ? (
         <div className="flex min-w-0 items-center gap-2">
-          <div className="min-w-0 flex-1">
+          <div className="hidden min-w-0 flex-1 @2xl:block">
             <ListSearch placeholder={searchPlaceholder} scope={scope} />
           </div>
           {action}

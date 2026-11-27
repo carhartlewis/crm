@@ -7,6 +7,7 @@ import {
   type DataTableColumn,
   StaticTable,
   type StaticTableColumn,
+  useHiddenColumns,
 } from "@crm/ui/patterns/data-table/data-table";
 import { createListSearchParams } from "@crm/ui/patterns/data-table/list-search-params";
 import {
@@ -137,6 +138,7 @@ function discoverColumns(install: {
       id: "name",
       kind: "title",
       header: "Name",
+      hideable: false,
       cell: (row) => <TitleCell>{row.result.name}</TitleCell>,
     },
     {
@@ -345,12 +347,20 @@ function DiscoverSkills({
     adding: install.isPending ? install.variables.sourceId : null,
   });
 
+  // The settings gear, as on Yours; its own URL key, so the two tables hide columns apart.
+  const columnsMenu = useHiddenColumns({
+    scope: "discover",
+    columnsKey: "skills-discover",
+    columns,
+  });
+
   return (
     <StaticTable
       // A new search starts on its first page.
       key={text}
       label={text ? "Matching skills" : "Top skills"}
       columns={columns}
+      columnsMenu={columnsMenu}
       rows={rows}
       getRowId={(row) => row.result.id}
       onRowClick={(row) => (row.skill ? onOpen(row.skill.id) : undefined)}

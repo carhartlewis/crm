@@ -27,6 +27,10 @@ const SEARCH_KEYS = Object.keys(searchParsers);
 /** Wait this long after the last keystroke before the URL (and the query) follows the field. */
 const SEARCH_DELAY_MS = 250;
 
+/**
+ * The search field. Hidden where its container (the table, or the toolbar holding it) is narrower
+ * than 42rem: the viewport can't tell, since the sidebar takes part of it. Wrappers hide too.
+ */
 export function ListSearch({ placeholder, scope }: { placeholder: string; scope?: string }) {
   const [{ q }, setState] = useQueryStates(searchParsers, {
     limitUrlUpdates: debounce(SEARCH_DELAY_MS),
@@ -34,7 +38,7 @@ export function ListSearch({ placeholder, scope }: { placeholder: string; scope?
   });
 
   return (
-    <div className="w-full sm:w-64">
+    <div className="hidden @2xl:block @2xl:w-64">
       <InputGroup>
         <InputGroupAddon>
           <SearchIcon />

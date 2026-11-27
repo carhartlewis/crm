@@ -815,7 +815,9 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
           inert={selecting}
         >
           {lead}
-          {search != null && <div className="lg:order-last lg:ml-auto">{search}</div>}
+          {search != null && (
+            <div className="hidden @2xl:block lg:order-last lg:ml-auto">{search}</div>
+          )}
           {hasFilterControls && (
             <Button
               type="button"

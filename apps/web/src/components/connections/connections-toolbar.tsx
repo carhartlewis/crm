@@ -6,9 +6,9 @@ export type ConnectionsToolbarParts = { tabs: ReactNode; search: ReactNode };
 /** Tabs on the left, search on the right, matching a data table's toolbar line. */
 export function ConnectionsToolbar({ tabs, search }: ConnectionsToolbarParts) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="@container flex flex-wrap items-center gap-3">
       {tabs}
-      <div className="w-full sm:ml-auto sm:w-auto">{search}</div>
+      <div className="hidden @2xl:ml-auto @2xl:block">{search}</div>
     </div>
   );
 }
