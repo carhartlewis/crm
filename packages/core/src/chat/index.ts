@@ -62,14 +62,14 @@ export function spaceDescriptionError(value: string) {
 }
 
 /**
- * What the agent asks a small model after a chat's first turn, to name it in the sidebar.
+ * What the agent asks a small model when a chat's first message arrives, to name it in the
+ * sidebar while the reply is still being written.
  */
-export function chatTitlePrompt(message: string, reply: string) {
+export function chatTitlePrompt(message: string) {
   return [
-    "Name this chat for a sidebar list. Reply with the title only: 2 to 6 words, plain text, no quotes, no full stop, in the language of the message.",
+    "Name this chat for a sidebar list from its first message. Reply with the title only: 2 to 6 words, plain text, no quotes, no full stop, in the language of the message.",
     "",
     `Message: ${message.slice(0, 2_000)}`,
-    `Reply: ${reply.slice(0, 2_000)}`,
   ].join("\n");
 }
 

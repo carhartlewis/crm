@@ -1,10 +1,9 @@
 import { chatTitlePrompt, cleanGeneratedTitle } from "@crm/core/chat";
 
-/** The first turn of a chat, as the title step reads it. */
-export interface FirstTurn {
+/** A chat's first message, as the title step reads it. */
+export interface FirstMessage {
   readonly sessionId: string;
   readonly message: string;
-  readonly reply: string;
 }
 
 export interface ChatTitleOptions {
@@ -16,16 +15,17 @@ export interface ChatTitleOptions {
 }
 
 /**
- * Names a chat after its first turn (ADR 0018). The CRM first titles a chat with the start of its
- * first message; this asks a small model for a short title and saves it. The API keeps it only
- * while no person has renamed the chat. A failure leaves the first title in place.
+ * Names a chat from its first message (ADR 0018), as soon as it arrives: the CRM first titles a
+ * chat with the start of that message; this asks a small model for a short title while the reply
+ * is written, and saves it. The API keeps it only while no person has renamed the chat. A failure
+ * leaves the first title in place.
  */
-export async function nameChat(turn: FirstTurn, options: ChatTitleOptions, signal: AbortSignal) {
+export async function nameChat(turn: FirstMessage, options: ChatTitleOptions, signal: AbortSignal) {
   if (!turn.message.trim()) return;
 
   try {
     const title = cleanGeneratedTitle(
-      await options.generate(chatTitlePrompt(turn.message, turn.reply), signal),
+      await options.generate(chatTitlePrompt(turn.message), signal),
     );
 
     if (title) await options.save(turn.sessionId, title, signal);
