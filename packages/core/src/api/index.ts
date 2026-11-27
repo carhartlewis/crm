@@ -379,8 +379,14 @@ export type Knowledge = typeof Knowledge.Type;
 const GraphRelation = Schema.Literals(["updates", "extends", "derives"]);
 
 /**
+ * The graph's core: the workspace (or the company, on its Knowledge tab) that every source links
+ * back to, as in comp-neo. It is drawn, not stored, so it never opens as a source.
+ */
+export const MEMORY_CORE_ID = "memory-core";
+
+/**
  * Sources and their facts in the shape `@supermemory/memory-graph` draws: each document is a
- * source, each memory a fact extracted from it.
+ * source, each memory a fact extracted from it, plus the core (`MEMORY_CORE_ID`) they link to.
  */
 export const MemoryGraph = Schema.Struct({
   documents: Schema.Array(

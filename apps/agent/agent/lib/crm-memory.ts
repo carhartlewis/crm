@@ -75,7 +75,6 @@ export interface CrmMemory {
   search(input: MemorySearch): Promise<readonly MemoryHit[]>;
   remember(input: MemoryNote): Promise<void>;
   forget(input: MemoryForget): Promise<void>;
-  saveChat(input: { sessionId: string; transcript: string }, signal?: AbortSignal): Promise<void>;
 }
 
 /** What the CRM sends with a refusal. */
@@ -156,9 +155,6 @@ export function crmMemory(options: CrmMemoryOptions): CrmMemory {
     },
     forget: async (input) => {
       await call("POST", "/api/agent/memory/forget", input);
-    },
-    saveChat: async (input, signal) => {
-      await call("POST", "/api/agent/memory/chats", input, signal);
     },
   };
 }

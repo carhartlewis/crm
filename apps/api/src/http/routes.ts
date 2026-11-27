@@ -505,7 +505,6 @@ const AgentBodies = {
     replaces: Schema.optional(Schema.String),
   }),
   forget: Schema.Struct({ ...Target, factId: Schema.String }),
-  chat: Schema.Struct({ sessionId: Schema.String, transcript: Schema.String }),
 };
 
 const agentResponse = <T>(result: AgentResult<T>) =>
@@ -553,7 +552,6 @@ const AgentMemoryRoutes = Layer.effectDiscard(
     yield* post("/api/agent/memory/search", AgentBodies.search, memory.agent.search);
     yield* post("/api/agent/memory/remember", AgentBodies.remember, memory.agent.remember);
     yield* post("/api/agent/memory/forget", AgentBodies.forget, memory.agent.forget);
-    yield* post("/api/agent/memory/chats", AgentBodies.chat, memory.agent.saveChat);
 
     const companies = auth.protectMcp(async (_request, principal) =>
       agentResponse(await memory.agent.companies(principal)),

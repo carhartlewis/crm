@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { JevClient, JevResponse } from "@crm/memory/jev";
 import { EMPTY_RECALL } from "@crm/memory/recall";
 import type { CrmMemory } from "./crm-memory.ts";
-import { chatId, crmMemoryProvider } from "./memory-provider.ts";
+import { crmMemoryProvider } from "./memory-provider.ts";
 import type { TurnMessage } from "./turn-memory.ts";
 
 function fakeMemory() {
@@ -25,9 +25,6 @@ function fakeMemory() {
       calls.push({ method: "remember", input });
     },
     forget: async () => {},
-    saveChat: async (input) => {
-      calls.push({ method: "saveChat", input });
-    },
   };
 
   return { memory, calls };
@@ -38,8 +35,8 @@ const jev = (answers: JevResponse["answers"]): JevClient => ({
 });
 
 const turnContext = (messages: TurnMessage[]) =>
-  // SAFETY: `turn.completed` reads only the session id, the user, `messages` and `abortSignal`,
-  // and this fake gives all four; the rest of eve's context is never touched.
+  // SAFETY: `turn.completed` reads only the user, `messages` and `abortSignal`, and this fake
+  // gives all three; the rest of eve's context is never touched.
   ({
     session: {
       id: "sess_1:abc",
@@ -52,7 +49,7 @@ const turnContext = (messages: TurnMessage[]) =>
   }) as never;
 
 describe("capture", () => {
-  test("saves the chat and replaces the fact a member's message makes out of date", async () => {
+  test("replaces the fact a member's message makes out of date, and never saves the chat", async () => {
     const { memory, calls } = fakeMemory();
 
     const provider = crmMemoryProvider({
@@ -72,13 +69,7 @@ describe("capture", () => {
       turnContext([{ role: "user", content: "Acme moved from Salesforce to HubSpot this month." }]),
     );
 
-    expect(calls[0]).toEqual({
-      method: "saveChat",
-      input: {
-        sessionId: "sess-1-abc",
-        transcript: "Alice: Acme moved from Salesforce to HubSpot this month.",
-      },
-    });
+    expect(calls.map((call) => call.method)).toEqual(["search", "search", "remember"]);
     expect(calls.find((call) => call.method === "remember")?.input).toEqual({
       kind: "agent_fact",
       text: 'On 2026-11-26, Alice said in a CRM chat: "Acme moved from Salesforce to HubSpot this month."',
@@ -87,7 +78,7 @@ describe("capture", () => {
     });
   });
 
-  test("keeps nothing Jev calls passing, and still saves the chat without Jev", async () => {
+  test("keeps nothing from a turn Jev calls passing, or from any turn without Jev", async () => {
     const { memory, calls } = fakeMemory();
 
     const passing = crmMemoryProvider({
@@ -115,10 +106,6 @@ describe("capture", () => {
       turnContext([{ role: "user", content: "Acme moved from Salesforce to HubSpot." }]),
     );
 
-    expect(otherCalls.map((call) => call.method)).toEqual(["saveChat"]);
+    expect(otherCalls).toEqual([]);
   });
-});
-
-test("chat ids keep only letters, digits and hyphens", () => {
-  expect(chatId("ses_01:ab/c")).toBe("ses-01-ab-c");
 });

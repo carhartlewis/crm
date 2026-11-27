@@ -1,6 +1,7 @@
 # 0014: Workspace and company memory in Supermemory, judged by Jev
 
-**Status:** accepted (2026-11)
+**Status:** accepted (2026-11). Chat saving and the graph are superseded by
+[0021](0021-jev-alone-decides-chat-memory.md).
 
 ## Context
 

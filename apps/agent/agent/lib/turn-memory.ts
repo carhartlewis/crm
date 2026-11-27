@@ -2,8 +2,8 @@ import type { Candidate } from "@crm/memory/jev";
 import { z } from "zod";
 
 /**
- * Reads a finished turn for memory: the chat as a transcript, and what in it Jev should judge,
- * the member's own messages and the emails they sent through a connected app. Pure, so it is
+ * Reads a finished turn for memory: what in it Jev should judge, the member's own messages and
+ * the emails they sent through a connected app. Pure, so it is
  * tested without eve.
  */
 
@@ -159,38 +159,6 @@ export function latestTurn(messages: readonly TurnMessage[]) {
   while (start > 0 && messages[start - 1]?.role === "user") start -= 1;
 
   return messages.slice(start);
-}
-
-/** The chat as plain text: who said what, and which emails went out. */
-export function transcriptOf(messages: readonly TurnMessage[], member: string) {
-  const sent = sentEmailCalls(messages);
-
-  return messages
-    .flatMap((message) => {
-      if (message.role === "user") {
-        const text = messageText(message);
-
-        return text ? [`${member}: ${text}`] : [];
-      }
-
-      if (message.role !== "assistant") return [];
-
-      const text = messageText(message);
-
-      const emails = partsOf(message).flatMap((part) => {
-        const email = part.toolCallId === undefined ? undefined : sent.get(part.toolCallId);
-
-        return part.type === "tool-call" && email ? [email] : [];
-      });
-
-      return [
-        ...(text ? [`Assistant: ${text}`] : []),
-        ...emails.map(
-          (email) => `[Email to ${email.to.join(", ")}: ${email.subject}]\n${email.body}`,
-        ),
-      ];
-    })
-    .join("\n\n");
 }
 
 /** Shorter text never holds a lasting fact worth a judgment ("ok", "send it"). */

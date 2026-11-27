@@ -4,6 +4,7 @@ import {
   type MemoryGraph,
   type MemorySourceDetail,
   type MemoryHit,
+  MEMORY_CORE_ID,
   NoActiveWorkspace,
   NotFound,
   UpstreamUnavailable,
@@ -147,14 +148,9 @@ export interface MemoryService {
       caller: AgentCaller,
       input: Target & { factId: string },
     ) => Promise<AgentResult<null>>;
-    readonly saveChat: (
-      caller: AgentCaller,
-      input: { sessionId: string; transcript: string },
-    ) => Promise<AgentResult<null>>;
   };
 }
 
-export const MAX_CHAT_CHARACTERS = 60_000;
 const RESEARCH_SOURCE = "website-research";
 const FACT_LIMIT = 100;
 const SOURCE_LIMIT = 20;
@@ -196,45 +192,126 @@ async function inBatches<T>(items: readonly T[], size: number, work: (item: T) =
   await inBatches(items.slice(size), size, work);
 }
 
-/** Sources and facts in the shape `@supermemory/memory-graph` draws. */
-export function toMemoryGraph(spaceId: string, sources: readonly GraphSource[]): MemoryGraph {
+type GraphDocument = MemoryGraph["documents"][number];
+
+type GraphMemory = GraphDocument["memories"][number];
+
+type GraphRelation = NonNullable<GraphMemory["relation"]>;
+
+/** Who a memory is about: the core of its graph. */
+export interface GraphCore {
+  readonly kind: "workspace" | "company";
+  readonly title: string;
+}
+
+/** The fact that carries a source's link to the core: its first current fact. */
+function anchorOf(memories: readonly GraphMemory[]) {
+  return memories.find((memory) => memory.isLatest && !memory.isForgotten) ?? memories[0];
+}
+
+function withRelations(
+  document: GraphDocument,
+  memoryId: string,
+  relations: Readonly<Record<string, GraphRelation>>,
+): GraphDocument {
   return {
-    documents: sources.map((source) => ({
-      id: source.sourceId,
-      title: source.title,
-      summary: source.summary,
-      documentType: source.kind ?? "source",
-      createdAt: source.createdAt,
-      updatedAt: source.updatedAt,
-      memories: source.facts.map((fact) => ({
-        id: fact.id,
-        memory: fact.text,
-        content: null,
-        isStatic: fact.isStatic,
-        spaceId,
-        isLatest: fact.isLatest,
-        isForgotten: fact.isForgotten,
-        forgetAfter: null,
-        forgetReason: null,
-        version: fact.version,
-        parentMemoryId: null,
-        rootMemoryId: null,
-        createdAt: fact.createdAt,
-        updatedAt: fact.updatedAt,
-        relation: null,
-        updatesMemoryId: null,
-        nextVersionId: null,
-        memoryRelations: null,
-      })),
+    ...document,
+    memories: document.memories.map((memory) =>
+      memory.id === memoryId
+        ? { ...memory, memoryRelations: { ...memory.memoryRelations, ...relations } }
+        : memory,
+    ),
+  };
+}
+
+/**
+ * Links every source to the core, as comp-neo does. The graph draws edges only from facts, so a
+ * source's anchor fact carries its link. A source with no facts yet (a note still being read)
+ * hangs off the first linked fact instead, so it still joins the cluster.
+ */
+function linkToCore(documents: readonly GraphDocument[]): GraphDocument[] {
+  const linked = documents.map((document) => {
+    const anchor = anchorOf(document.memories);
+
+    return anchor ? withRelations(document, anchor.id, { [MEMORY_CORE_ID]: "derives" }) : document;
+  });
+
+  const empty = linked.flatMap((document) => (document.memories.length === 0 ? [document.id] : []));
+  const carrier = linked.find((document) => document.memories.length > 0);
+  const anchor = carrier && anchorOf(carrier.memories);
+
+  if (!carrier || !anchor || empty.length === 0) return linked;
+
+  const links = Object.fromEntries(empty.map((id) => [id, "extends" as const]));
+
+  return linked.map((document) =>
+    document.id === carrier.id ? withRelations(document, anchor.id, links) : document,
+  );
+}
+
+/** Sources and facts in the shape `@supermemory/memory-graph` draws, around their core. */
+export function toMemoryGraph(
+  spaceId: string,
+  sources: readonly GraphSource[],
+  core: GraphCore,
+): MemoryGraph {
+  const documents: GraphDocument[] = sources.map((source) => ({
+    id: source.sourceId,
+    title: source.title,
+    summary: source.summary,
+    documentType: source.kind ?? "source",
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt,
+    memories: source.facts.map((fact) => ({
+      id: fact.id,
+      memory: fact.text,
+      content: null,
+      isStatic: fact.isStatic,
+      spaceId,
+      isLatest: fact.isLatest,
+      isForgotten: fact.isForgotten,
+      forgetAfter: null,
+      forgetReason: null,
+      version: fact.version,
+      parentMemoryId: null,
+      rootMemoryId: null,
+      createdAt: fact.createdAt,
+      updatedAt: fact.updatedAt,
+      relation: null,
+      updatesMemoryId: null,
+      nextVersionId: null,
+      memoryRelations: null,
     })),
-    totals: {
-      sources: sources.length,
-      facts: sources.reduce(
-        (total, source) =>
-          total + source.facts.filter((fact) => fact.isLatest && !fact.isForgotten).length,
-        0,
-      ),
-    },
+  }));
+
+  const totals = {
+    sources: sources.length,
+    facts: sources.reduce(
+      (total, source) =>
+        total + source.facts.filter((fact) => fact.isLatest && !fact.isForgotten).length,
+      0,
+    ),
+  };
+
+  // An empty memory stays empty, so the page shows its empty state.
+  if (documents.length === 0) return { documents, totals };
+
+  const since = documents.map((document) => document.createdAt).toSorted()[0] ?? "";
+
+  return {
+    documents: [
+      {
+        id: MEMORY_CORE_ID,
+        title: core.title,
+        summary: null,
+        documentType: core.kind,
+        createdAt: since,
+        updatedAt: since,
+        memories: [],
+      },
+      ...linkToCore(documents),
+    ],
+    totals,
   };
 }
 
@@ -248,9 +325,6 @@ const unavailable = () =>
 
 const memoryOff = () =>
   new UpstreamUnavailable({ message: "Memory isn't set up on this server (SUPERMEMORY_API_KEY)." });
-
-/** A chat session id from the agent. Company ids are checked with `isCompanyId`. */
-const SAFE_ID = /^[a-zA-Z0-9-]{1,64}$/;
 
 function subjectOf(target: Target): MemorySubject {
   return target.companyId
@@ -395,6 +469,19 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
           Effect.mapError(unavailable),
         )
       : Effect.fail(memoryOff());
+
+  /** The core of a graph, named after its workspace or company. Runs after `target` checks it. */
+  const graphCore = async (workspaceId: string, input: Target): Promise<GraphCore> => {
+    if (input.companyId) {
+      const company = await directory.company(workspaceId, input.companyId);
+
+      return { kind: "company", title: company?.name ?? "Company" };
+    }
+
+    const workspace = await directory.workspace(workspaceId);
+
+    return { kind: "workspace", title: workspace?.name ?? "Workspace" };
+  };
 
   const target = (workspaceId: string, input: Target) =>
     Effect.gen(function* () {
@@ -612,9 +699,15 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
         // The page polls this while a source is read, so the copy follows along.
         void refreshIfStale(workspaceId, input.companyId ?? null);
 
-        const sources = yield* stored("graph", (memory) => memory.graph(ns, GRAPH_SOURCES));
+        const [sources, core] = yield* Effect.all(
+          [
+            stored("graph", (memory) => memory.graph(ns, GRAPH_SOURCES)),
+            Effect.promise(() => graphCore(workspaceId, input)),
+          ],
+          { concurrency: 2 },
+        );
 
-        return toMemoryGraph(ns, sources);
+        return toMemoryGraph(ns, sources, core);
       }),
 
     source: (actor, input) =>
@@ -868,34 +961,6 @@ export function makeMemory(deps: MemoryDependencies): MemoryService {
 
           await memory.forgetFacts(namespace(caller.workspaceId, subjectOf(input)), [input.factId]);
           await deps.mirror.remove(caller.workspaceId, [input.factId]);
-
-          return { ok: true, value: null };
-        }),
-
-      saveChat: (caller, input) =>
-        agentCall(caller, async (memory) => {
-          if (!SAFE_ID.test(input.sessionId)) {
-            return { ok: false, status: 400, message: "Invalid session id." };
-          }
-
-          // The latest part of a long chat matters most; keep its tail.
-          const transcript = input.transcript.trim().slice(-MAX_CHAT_CHARACTERS);
-
-          if (!transcript) return { ok: true, value: null };
-
-          const [author, workspace] = await Promise.all([
-            directory.userName(caller.userId),
-            directory.workspace(caller.workspaceId),
-          ]);
-
-          await write(memory, namespace(caller.workspaceId, { type: "workspace" }), {
-            sourceId: `chat-${input.sessionId}`,
-            workspaceId: caller.workspaceId,
-            kind: "chat",
-            title: `Chat with ${author ?? "a member"}, ${deps.now().toISOString().slice(0, 10)}`,
-            content: transcript,
-            supportingContext: workspace ? workspaceContext(workspace) : "",
-          });
 
           return { ok: true, value: null };
         }),

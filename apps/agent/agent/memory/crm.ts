@@ -13,10 +13,10 @@ import { crmMemoryProvider } from "../lib/memory-provider.ts";
  */
 export default defineMemory({
   description:
-    "CRM memory: lasting facts about the member's own company and the companies in their CRM, from website research, members' notes, past chats and sent emails.",
+    "CRM memory: lasting facts about the member's own company and the companies in their CRM, from website research, members' notes, and what Jev kept from chats and sent emails.",
   provider: crmMemoryProvider({
     memoryFor: (caller) => crmMemory({ apiUrl, token: () => crmToken(caller) }),
-    // Jev runs on the Vercel AI Gateway; without a key, chats are saved but not judged.
+    // Jev runs on the Vercel AI Gateway and alone decides what a chat adds; without a key, nothing.
     jev:
       process.env["AI_GATEWAY_API_KEY"] || process.env["VERCEL_OIDC_TOKEN"] ? gatewayJev() : null,
   }),

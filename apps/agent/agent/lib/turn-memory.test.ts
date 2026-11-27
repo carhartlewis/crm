@@ -4,7 +4,6 @@ import {
   isSendEmailTool,
   latestTurn,
   sentEmails,
-  transcriptOf,
   type TurnMessage,
 } from "./turn-memory.ts";
 
@@ -67,14 +66,5 @@ describe("a turn", () => {
     expect(candidates[1]?.recipients).toEqual(["bob@acme.test"]);
     expect(candidates[1]?.candidate.text).toBe("Subject: Pricing\nOur price is $5k a year.");
     expect(candidatesOf([{ role: "user", content: "ok thanks" }], "Alice", new Date())).toEqual([]);
-  });
-
-  test("reads as a transcript with the emails that went out", () => {
-    const text = transcriptOf(history, "Alice");
-
-    expect(text).toContain("Alice: Hi there");
-    expect(text).toContain("Assistant: Hello!");
-    expect(text).toContain("[Email to bob@acme.test: Pricing]\nOur price is $5k a year.");
-    expect(text).not.toContain("Denied");
   });
 });

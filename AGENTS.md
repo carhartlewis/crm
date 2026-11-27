@@ -116,7 +116,8 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 - Members see memory as the memory graph (`@crm/ui/patterns/memory-graph`, loaded with `preloadable()`): Workspace settings → Workspace Memory, and each company's Knowledge tab.
 - ⌘K searches a synced copy of the facts (`memory_fact`, ADR 0017). Only the `Memory` service writes it: every write marks its memory stale, reads and ⌘K's `POST /api/memory/refresh` refresh stale copies off the request path.
 - New workspaces and companies with a domain are researched through context.dev (`@crm/core/brand` `research`) into one `website-research` source.
-- The agent's `crm` memory slot recalls before each turn, saves every chat, and asks Jev (`experimental_decide`, `typesafe-ai/jev` on the AI Gateway, `AI_GATEWAY_API_KEY`) which messages and sent emails become facts. Judging stays in the agent. Keep the member's words; never summarise them into a fact.
+- The agent's `crm` memory slot recalls before each turn and asks Jev (`experimental_decide`, `typesafe-ai/jev` on the AI Gateway, `AI_GATEWAY_API_KEY`) which messages and sent emails become facts. Jev alone decides: chats themselves are never saved (ADR 0021). Judging stays in the agent. Keep the member's words; never summarise them into a fact.
+- The memory graph has one core (`MEMORY_CORE_ID`, the workspace or company) that every source links to through its first fact, as in comp-neo.
 
 ### Desktop (Electron)
 

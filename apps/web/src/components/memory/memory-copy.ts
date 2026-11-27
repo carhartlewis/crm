@@ -9,7 +9,12 @@ export const SOURCE_KINDS: Record<NonNullable<MemorySource["kind"]>, string> = {
   email: "Email",
 };
 
-const LABELS: ReadonlyMap<string, string> = new Map(Object.entries(SOURCE_KINDS));
+/** The graph's core, which every source links to. */
+const CORE_KINDS = { workspace: "Workspace", company: "Company" };
+
+const LABELS: ReadonlyMap<string, string> = new Map(
+  Object.entries({ ...SOURCE_KINDS, ...CORE_KINDS }),
+);
 
 export function sourceKindLabel(kind: string) {
   return LABELS.get(kind) ?? "Source";

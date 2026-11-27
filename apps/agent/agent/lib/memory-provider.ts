@@ -18,16 +18,16 @@ import {
   candidatesOf,
   latestTurn,
   messageText,
-  transcriptOf,
 } from "./turn-memory.ts";
 
 /**
  * CRM memory as an eve memory provider (ADR 0014):
  *
  * - recall: before each turn, the member's own company and the companies the message names.
- * - capture: after each turn, the whole chat is saved to workspace memory, and Jev judges the
- *   member's messages and sent emails one by one; what it keeps is noted in their words on the
- *   workspace or the company it is about, replacing a fact it makes out of date.
+ * - capture: after each turn, Jev judges the member's messages and sent emails one by one. Jev
+ *   alone decides what memory keeps: a kept message is noted in the member's words on the
+ *   workspace or the company it is about, replacing a fact it makes out of date. The chat itself
+ *   is never saved, so a greeting adds nothing (as in comp-neo).
  * - tools: none here. Search, remember and forget are CRM tools on the MCP gateway
  *   (`crm__search_memory`, `crm__remember`, `crm__forget`; ADR 0018).
  */
@@ -35,7 +35,7 @@ import {
 export interface CrmMemoryProviderOptions {
   /** The CRM memory client for a signed-in user. */
   readonly memoryFor: (caller: CrmCaller) => CrmMemory;
-  /** Jev, or null without an AI Gateway key: chats are still saved, no facts are judged. */
+  /** Jev, or null without an AI Gateway key: then nothing from a chat is kept. */
   readonly jev: JevClient | null;
   readonly now?: () => Date;
   readonly log?: (message: string, cause?: unknown) => void;
@@ -58,11 +58,6 @@ function userOf(caller: Caller) {
   if (!crm || !caller) return null;
 
   return { id: crm.userId, crm, name: MemberName.parse(caller.attributes["name"]) };
-}
-
-/** The CRM keeps one chat source per session; its id allows letters, digits and hyphens. */
-export function chatId(sessionId: string) {
-  return sessionId.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 64);
 }
 
 function subjectsFor(turn: TurnCandidate, companies: readonly CrmCompany[], workspace: string) {
@@ -188,21 +183,12 @@ export function crmMemoryProvider(options: CrmMemoryProviderOptions) {
 
         if (!user) return;
 
-        const memory = options.memoryFor(user.crm);
         const messages: readonly TurnMessage[] = ctx.messages;
-
-        try {
-          await memory.saveChat(
-            { sessionId: chatId(ctx.session.id), transcript: transcriptOf(messages, user.name) },
-            ctx.abortSignal,
-          );
-        } catch (cause) {
-          log("memory: saving the chat failed", cause);
-        }
-
         const candidates = candidatesOf(latestTurn(messages), user.name, now());
 
         if (!options.jev || candidates.length === 0) return;
+
+        const memory = options.memoryFor(user.crm);
 
         try {
           const [companies, recall] = await Promise.all([

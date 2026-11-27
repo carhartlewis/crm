@@ -1,4 +1,5 @@
 import add from "@carbon/icons/es/add/16.js";
+import { MEMORY_CORE_ID } from "@crm/core/api";
 import { Button } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import { preloadable } from "@crm/ui/lib/preloadable";
@@ -142,6 +143,9 @@ export function MemoryView({
           loading={graph.isPending}
           highlightIds={highlighted}
           onOpenMemory={(id) => {
+            // The core is drawn, not stored: there is no source to open.
+            if (id === MEMORY_CORE_ID) return;
+
             void SourceSheet.preload();
             void setState({ source: id });
           }}

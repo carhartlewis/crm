@@ -1,11 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { Invalid, NoActiveWorkspace, NotFound, UpstreamUnavailable } from "@crm/core/api";
+import {
+  Invalid,
+  MEMORY_CORE_ID,
+  NoActiveWorkspace,
+  NotFound,
+  UpstreamUnavailable,
+} from "@crm/core/api";
 import type { BrandResearch } from "@crm/core/brand";
 import { memoryNamespace } from "@crm/memory";
 import { createInMemoryStore } from "@crm/memory/testing";
 import { createMemoryKv } from "@crm/core/kv";
 import { Effect } from "effect";
-import { makeMemory } from "./Memory.ts";
+import { makeMemory, toMemoryGraph } from "./Memory.ts";
 import { createMemoryDirectory } from "./memory-directory-memory.ts";
 import { createMemoryFactMirror } from "./memory-mirror-memory.ts";
 
@@ -273,21 +279,6 @@ describe("the agent", () => {
     expect(knowledge.facts.map((fact) => fact.text)).toEqual(["Acme's champion is now Road."]);
   });
 
-  test("a chat is one source that each save replaces", async () => {
-    const { memory, store } = setup();
-
-    await memory.agent.saveChat(caller, { sessionId: "s-1", transcript: "Alice: hi" });
-    await memory.agent.saveChat(caller, {
-      sessionId: "s-1",
-      transcript: "Alice: hi\nAssistant: hello",
-    });
-
-    const chats = store.sources(ns("ws1")).filter((source) => source.kind === "chat");
-
-    expect(chats).toHaveLength(1);
-    expect(chats[0]?.content).toContain("Assistant: hello");
-  });
-
   test("a non-member or a foreign company is refused", async () => {
     const { memory } = setup();
 
@@ -318,6 +309,28 @@ describe("the agent", () => {
   });
 });
 
+const graphFact = (id: string) => ({
+  id,
+  text: `Fact ${id}`,
+  isStatic: false,
+  isInference: false,
+  isLatest: true,
+  isForgotten: false,
+  version: 1,
+  createdAt: "2026-11-02T00:00:00Z",
+  updatedAt: "2026-11-02T00:00:00Z",
+});
+
+const graphSource = (sourceId: string, facts: ReturnType<typeof graphFact>[]) => ({
+  sourceId,
+  kind: "member_note" as const,
+  title: sourceId,
+  summary: null,
+  createdAt: sourceId === "research" ? "2026-11-01T00:00:00Z" : "2026-11-03T00:00:00Z",
+  updatedAt: "2026-11-03T00:00:00Z",
+  facts,
+});
+
 describe("the memory graph", () => {
   test("draws each source with its facts, and search points back at the source", async () => {
     const { memory } = setup();
@@ -330,6 +343,7 @@ describe("the memory graph", () => {
     expect(graph.documents.map((document) => document.documentType).toSorted()).toEqual([
       "member_note",
       "website_research",
+      "workspace",
     ]);
     expect(graph.totals.sources).toBe(2);
 
@@ -340,6 +354,45 @@ describe("the memory graph", () => {
     const hits = await Effect.runPromise(memory.search(alice, { q: "close deals Q4" }));
 
     expect(hits[0]?.sourceId).toBe(note?.id);
+  });
+
+  test("links every source to its workspace, through a fact", async () => {
+    const graph = toMemoryGraph(
+      "ns",
+      [
+        graphSource("research", [graphFact("f1"), graphFact("f2")]),
+        graphSource("note", [graphFact("f3")]),
+        graphSource("chat", []),
+      ],
+      { kind: "workspace", title: "Roadrunner" },
+    );
+
+    const [core, ...sources] = graph.documents;
+
+    expect(core).toMatchObject({
+      id: MEMORY_CORE_ID,
+      title: "Roadrunner",
+      documentType: "workspace",
+      createdAt: "2026-11-01T00:00:00Z",
+      memories: [],
+    });
+
+    const relations = Object.fromEntries(
+      sources.flatMap((document) =>
+        document.memories.map((memory) => [memory.id, memory.memoryRelations]),
+      ),
+    );
+
+    expect(relations).toEqual({
+      f1: { [MEMORY_CORE_ID]: "derives", chat: "extends" },
+      f2: null,
+      f3: { [MEMORY_CORE_ID]: "derives" },
+    });
+    expect(graph.totals).toEqual({ sources: 3, facts: 3 });
+
+    expect(toMemoryGraph("ns", [], { kind: "workspace", title: "Roadrunner" }).documents).toEqual(
+      [],
+    );
   });
 
   test("is refused for a company outside the workspace", async () => {
@@ -359,7 +412,10 @@ describe("a source", () => {
 
     await Effect.runPromise(memory.addNote(alice, { text: "We close deals in Q4." }));
 
-    const [note] = (await Effect.runPromise(memory.graph(alice, {}))).documents;
+    const note = (await Effect.runPromise(memory.graph(alice, {}))).documents.find(
+      (document) => document.documentType === "member_note",
+    );
+
     const source = await Effect.runPromise(memory.source(alice, { id: note?.id ?? "" }));
 
     expect(source.content).toBe("We close deals in Q4.");
