@@ -161,6 +161,12 @@ export type DataTableProps<TRow, TSub, TColumn extends string = string> = {
   actions?: ReactNode;
   leadingActions?: ReactNode;
   search?: ReactNode;
+  /**
+   * Where `search` sits on wide screens. `end` (default) keeps Filters and Sort on the left, so
+   * their menus and submenus open rightward with room to spare. Use `start` when `search` carries
+   * leading controls of its own, such as tabs.
+   */
+  searchPosition?: "start" | "end";
   meta?: ReactNode;
   empty?: ReactNode;
   groupHeader?: (row: TRow, previous: TRow | undefined) => ReactNode;
@@ -703,6 +709,7 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
   actions,
   leadingActions,
   search,
+  searchPosition = "end",
   meta,
   empty,
   groupHeader,
@@ -791,7 +798,11 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
           )}
           inert={selecting}
         >
-          {search}
+          {search != null && (
+            <div className={cn(searchPosition === "end" && "lg:order-last lg:ml-auto")}>
+              {search}
+            </div>
+          )}
           {hasFilterControls && (
             <Button
               type="button"
@@ -825,7 +836,12 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
             {quiet ? (
               actions
             ) : (
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center lg:ml-auto">
+              <div
+                className={cn(
+                  "grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center",
+                  searchPosition === "start" && "lg:ml-auto",
+                )}
+              >
                 {tabs && (
                   <DropdownMenu>
                     <DropdownMenuTrigger
@@ -927,7 +943,7 @@ export function DataTable<TRow, TSub = unknown, TColumn extends string = string>
                       <ArrowsVertical data-icon="inline-start" />
                       {UI_COPY.sort}
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-48">
+                    <DropdownMenuContent align="start" className="min-w-48">
                       <DropdownMenuRadioGroup
                         value={query.sort}
                         onValueChange={(value) => query.setSort(String(value))}

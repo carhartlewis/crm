@@ -253,6 +253,7 @@ function YourSkills({
     <DataTable
       {...list.tableProps}
       search={toolbar}
+      searchPosition="start"
       meta={null}
       columns={COLUMNS}
       onRowClick={(row) => onOpen(row.id)}
