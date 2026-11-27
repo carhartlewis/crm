@@ -128,7 +128,7 @@ function webTools(web: WebReader): readonly LocalTool[] {
       {
         name: "lookup_company",
         description:
-          "Look up any company on the web (context.dev): name, description, industries, address, social profiles, key pages, public email and phone, stock ticker. Pass its website domain (best), its name, or a work email at it. Use it to research a company before adding it to the CRM or meeting it.",
+          "Look up any company on the web: name, description, industries, address, social profiles, key pages, public email and phone, stock ticker. Pass its website domain (best), its name, or a work email at it. Use it to research a company before adding it to the CRM or meeting it.",
         readOnly: true,
         input: Schema.Struct({
           domain: Schema.optional(Schema.String).annotate({ description: "Such as acme.com." }),
@@ -149,14 +149,14 @@ function webTools(web: WebReader): readonly LocalTool[] {
 
         const profile = await web.lookup(query);
 
-        return profile ? answer(profile) : refuse("context.dev found no company for that.");
+        return profile ? answer(profile) : refuse("No company profile was found for that.");
       },
     ),
     tool(
       {
         name: "read_web_page",
         description:
-          "Read one web page as clean Markdown (context.dev renders it, so pages that need JavaScript work too): a company's pricing, about, careers or blog page, a news article, a document. Long pages are cut.",
+          "Read one web page as clean Markdown (it is rendered first, so pages that need JavaScript work too): a company's pricing, about, careers or blog page, a news article, a document. Long pages are cut.",
         readOnly: true,
         input: Schema.Struct({
           url: Schema.String.annotate({ description: "The full http(s) URL." }),
