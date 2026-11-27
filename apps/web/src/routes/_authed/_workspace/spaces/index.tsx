@@ -5,13 +5,12 @@ import { createFileRoute } from "@tanstack/react-router";
  * the loader only starts the syncs. The page is in index.lazy.tsx.
  */
 export const Route = createFileRoute("/_authed/_workspace/spaces/")({
-  loader: async ({ context: { session } }) => {
+  loader: ({ context: { session } }) => {
     const workspaceId = session.session.activeOrganizationId;
 
     if (!workspaceId) return;
 
-    const { preloadChats } = await import("../../../../lib/chats.ts");
-
-    preloadChats(workspaceId);
+    // Started, not awaited: the page reads synced data as it arrives.
+    void import("../../../../lib/chats.ts").then(({ preloadChats }) => preloadChats(workspaceId));
   },
 });

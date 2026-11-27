@@ -26,9 +26,12 @@ export interface ComposerProps {
   readonly onTypingStart?: () => void;
 }
 
-/** Focuses the field once, as it mounts, without scrolling the page. */
+/**
+ * Focuses the field once, as it mounts, without scrolling the page: you open a chat to type, as
+ * in desktop chat apps. Not on touch screens, where focus raises the keyboard over the chat.
+ */
 function focusField(field: HTMLTextAreaElement | null) {
-  field?.focus({ preventScroll: true });
+  if (field && matchMedia("(pointer: fine)").matches) field.focus({ preventScroll: true });
 }
 
 /** The chat composer: AI Elements' prompt input in the border beam. Enter sends. */

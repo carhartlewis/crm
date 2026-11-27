@@ -1,7 +1,7 @@
 import { SidebarMenu, SidebarMenuItem } from "@crm/ui/components/sidebar";
-import { useRouterState } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { haptic } from "../../lib/haptics.ts";
+import { useShownPathname } from "../../lib/shown-path.ts";
 import { parsePinKey } from "@crm/core/chat";
 import { isPageId, pageById, pageForPath } from "../../lib/pages.ts";
 import {
@@ -22,9 +22,7 @@ export function PinnedNav({ userId, workspaceId }: { userId: string; workspaceId
   // Numbered as Pinned is: pages and chats; pinned spaces have their own group.
   const order = usePinnedOrder(userId).filter((key) => !key.startsWith("space:"));
 
-  const activeId = useRouterState({
-    select: (state) => pageForPath(state.location.pathname)?.id,
-  });
+  const activeId = pageForPath(useShownPathname())?.id;
 
   const listRef = useCallback(
     (list: HTMLUListElement | null) =>

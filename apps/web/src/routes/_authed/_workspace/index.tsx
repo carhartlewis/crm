@@ -23,15 +23,14 @@ export function validateNewChatSearch(search: { space?: SearchValue }): NewChatS
  */
 export const Route = createFileRoute("/_authed/_workspace/")({
   validateSearch: validateNewChatSearch,
-  loader: async ({ context: { session } }) => {
+  loader: ({ context: { session } }) => {
     const workspaceId = session.session.activeOrganizationId;
 
     if (!workspaceId) return;
 
     prewarmChat();
 
-    const { preloadChats } = await import("../../../lib/chats.ts");
-
-    preloadChats(workspaceId);
+    // Started, not awaited: the page reads synced data as it arrives.
+    void import("../../../lib/chats.ts").then(({ preloadChats }) => preloadChats(workspaceId));
   },
 });

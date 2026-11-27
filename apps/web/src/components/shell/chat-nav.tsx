@@ -25,7 +25,7 @@ import {
 } from "@crm/ui/components/sidebar";
 import { SpaceDot } from "@crm/ui/components/space-dot";
 import { useMutation } from "@tanstack/react-query";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -35,6 +35,7 @@ import {
   updateChatMutation,
 } from "../../lib/chats.ts";
 import { haptic } from "../../lib/haptics.ts";
+import { useShownPathname } from "../../lib/shown-path.ts";
 import { isPageId, pageById, pageForPath } from "../../lib/pages.ts";
 import { ariaKeyShortcuts, pinnedShortcut } from "../../lib/shortcuts.ts";
 import { recentChats } from "../../lib/sidebar-layout.ts";
@@ -69,7 +70,7 @@ interface NavProps {
 export default function ChatNav({ userId, workspaceId }: NavProps) {
   const api = useChats(workspaceId, userId);
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const pathname = useShownPathname();
 
   const rowProps = { api, userId, workspaceId, pathname, onRequest: setDialog };
 
@@ -349,7 +350,14 @@ function ChatRow({ chat, icon, shortcutIndex, pinIndex, ...props }: ChatRowProps
       <SidebarMenuButton
         isActive={props.pathname === `/chats/${chat.id}`}
         aria-keyshortcuts={shortcut ? ariaKeyShortcuts(shortcut) : undefined}
-        render={<Link to="/chats/$chatId" params={{ chatId: chat.id }} draggable={false} />}
+        render={
+          <Link
+            to="/chats/$chatId"
+            params={{ chatId: chat.id }}
+            draggable={false}
+            viewTransition={false}
+          />
+        }
       >
         {icon}
         {/* One line: the hover icons take the end of the row, so the hotkey isn't shown here. */}
@@ -392,7 +400,14 @@ function SpaceRow({ space, shortcutIndex, pinIndex, ...props }: SpaceRowProps) {
       <SidebarMenuButton
         isActive={props.pathname === `/spaces/${space.id}`}
         aria-keyshortcuts={shortcut ? ariaKeyShortcuts(shortcut) : undefined}
-        render={<Link to="/spaces/$spaceId" params={{ spaceId: space.id }} draggable={false} />}
+        render={
+          <Link
+            to="/spaces/$spaceId"
+            params={{ spaceId: space.id }}
+            draggable={false}
+            viewTransition={false}
+          />
+        }
       >
         <SpaceDot color={spaceColor(space.color)} />
         <span className="min-w-0 flex-1 truncate">{space.name}</span>

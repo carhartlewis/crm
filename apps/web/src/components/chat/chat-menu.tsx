@@ -13,10 +13,11 @@ import {
 import { carbonIcon } from "@crm/ui/components/icon";
 import { SpaceDot, type SpaceDotColor } from "@crm/ui/components/space-dot";
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 import { toast } from "sonner";
 import { type Chat, deleteChatMutation, updateChatMutation } from "../../lib/chats.ts";
+import { useShownPathname } from "../../lib/shown-path.ts";
 import { folderOf } from "../../lib/sidebar-layout.ts";
 import type { ChatsApi } from "./use-chats.ts";
 
@@ -50,9 +51,7 @@ export interface ChatMenuProps {
 export function ChatMenu({ chat, api, userId, workspaceId, trigger, onRequest }: ChatMenuProps) {
   const navigate = useNavigate();
 
-  const open = useRouterState({
-    select: (state) => state.location.pathname === `/chats/${chat.id}`,
-  });
+  const open = useShownPathname() === `/chats/${chat.id}`;
 
   const pinned = api.layout.pinned.includes(pinKey("chat", chat.id));
   const folder = folderOf(api.layout.folders, chat.id);

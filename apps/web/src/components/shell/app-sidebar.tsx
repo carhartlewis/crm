@@ -15,11 +15,12 @@ import {
   SidebarRail,
 } from "@crm/ui/components/sidebar";
 import { preloadable } from "@crm/ui/lib/preloadable";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { prewarmChat } from "../../lib/chat-api.ts";
 import { usePinnedOrder } from "../../lib/pinned-order.ts";
 import { haptic } from "../../lib/haptics.ts";
+import { useShownPathname } from "../../lib/shown-path.ts";
 import { isSettingsPath } from "../../lib/settings.ts";
 import { shortcuts } from "../../lib/shortcuts.ts";
 import { HotkeyTooltip } from "../hotkey-tooltip.tsx";
@@ -46,7 +47,7 @@ export interface AppSidebarProps {
 }
 
 export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: AppSidebarProps) {
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const pathname = useShownPathname();
   const pinned = usePinnedOrder(userId);
 
   // One highlighted row: a pinned space highlights itself; any other space highlights Spaces.
