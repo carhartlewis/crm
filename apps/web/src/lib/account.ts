@@ -7,15 +7,22 @@ import { squareAvatar } from "./square-avatar.ts";
 /** The longest name a person can save. */
 export const NAME_MAX_LENGTH = 100;
 
-/** Why a name can't be saved, or undefined when it can. */
-export function profileNameError(value: string) {
+/** Why a first name can't be saved, or undefined when it can. */
+export function firstNameError(value: string) {
   const name = value.trim();
 
-  if (!name) return "Enter your name";
+  if (!name) return "Enter your first name";
 
   if (name.length > NAME_MAX_LENGTH) return `Use ${NAME_MAX_LENGTH} characters or fewer`;
 
   return undefined;
+}
+
+/** A last name is optional. */
+export function lastNameError(value: string) {
+  return value.trim().length > NAME_MAX_LENGTH
+    ? `Use ${NAME_MAX_LENGTH} characters or fewer`
+    : undefined;
 }
 
 // The sidebar's account menu reads the session, so a new name or picture shows there too.

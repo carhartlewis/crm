@@ -62,8 +62,8 @@ Shared vocabulary for code, tests, issues and docs. Decisions behind these terms
 
 **Fact**: One statement Supermemory extracted from sources. Members can forget a wrong fact; a newer fact can replace an older one.
 
-**Settings**: Pages under `/settings`; the sidebar swaps to their links. Workspace settings (General, Memory) are shared by every member; personal settings (Profile: name, picture, theme) are the user's own.
+**Settings**: Pages under `/settings`; the sidebar swaps to their links. Workspace settings (General, Workspace Memory) are shared by every member; personal settings (Profile: name, picture, theme) are the user's own.
 
-**Memory graph**: Supermemory's canvas of sources and the facts read from them, in Workspace settings → Memory and on a company's Knowledge tab.
+**Memory graph**: Supermemory's canvas of sources and the facts read from them, in Workspace settings → Workspace Memory and on a company's Knowledge tab.
 
 **Jev**: The decision model (`typesafe-ai/jev` on the Vercel AI Gateway) that judges each chat message and sent email: sensitive, lasting, which company, already known, or a correction. Thresholds in `@crm/memory/jev` decide what is kept.

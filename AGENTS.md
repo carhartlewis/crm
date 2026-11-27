@@ -100,7 +100,7 @@ Before writing Effect code, read `node_modules/effect/AGENTS.md` and the install
 
 - `@crm/memory` (server-only) holds the memory store interface, the Supermemory adapter, Jev's questions and thresholds, and the recall format. Tests use `createInMemoryStore` from `@crm/memory/testing`.
 - One Supermemory namespace per workspace and per company (`memoryNamespace`). The API's `Memory` service is the only writer; it checks membership and keeps `SUPERMEMORY_API_KEY`. Members use `/api/memory/*`, the agent `/api/agent/memory/*` with its MCP token.
-- Members see memory as the memory graph (`@crm/ui/patterns/memory-graph`, loaded with `preloadable()`): Workspace settings → Memory, and each company's Knowledge tab.
+- Members see memory as the memory graph (`@crm/ui/patterns/memory-graph`, loaded with `preloadable()`): Workspace settings → Workspace Memory, and each company's Knowledge tab.
 - New workspaces and companies with a domain are researched through context.dev (`@crm/core/brand` `research`) into one `website-research` source.
 - The agent's `crm` memory slot recalls before each turn, saves every chat, and asks Jev (`experimental_decide`, `typesafe-ai/jev` on the AI Gateway, `AI_GATEWAY_API_KEY`) which messages and sent emails become facts. Judging stays in the agent. Keep the member's words; never summarise them into a fact.
 

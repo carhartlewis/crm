@@ -12,17 +12,17 @@ import { WorkspacePageHeader } from "../shell/page-header.tsx";
 export function SettingsPage({
   title,
   actions,
-  wide = false,
+  fill = false,
   children,
 }: {
   title: string;
   actions?: ReactNode;
-  /** Full width, for the memory graph; otherwise a readable column. */
-  wide?: boolean;
+  /** The whole window below the title bar, for the memory graph; otherwise a readable column. */
+  fill?: boolean;
   children: ReactNode;
 }) {
   return (
-    <PageShell>
+    <PageShell contained={fill} width={fill ? "full" : "standard"}>
       <WorkspacePageHeader>
         <PageShellHeading>
           <PageShellTitle>{title}</PageShellTitle>
@@ -32,8 +32,8 @@ export function SettingsPage({
       <PageShellContent>
         <div
           className={
-            wide
-              ? "flex w-full animate-enter flex-col gap-4"
+            fill
+              ? "flex min-h-0 w-full flex-1 animate-enter flex-col"
               : "mx-auto flex w-full max-w-2xl animate-enter flex-col gap-8"
           }
         >

@@ -13,7 +13,7 @@ export const settingsGroups = [
     label: "Workspace",
     pages: [
       { to: "/settings", label: "General", icon: carbonIcon(building) },
-      { to: "/settings/memory", label: "Memory", icon: carbonIcon(book) },
+      { to: "/settings/memory", label: "Workspace Memory", icon: carbonIcon(book) },
     ],
   },
   {

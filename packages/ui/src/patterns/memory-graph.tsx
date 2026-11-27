@@ -49,6 +49,7 @@ export function MemoryGraph({
   summary,
   highlightIds = NO_IDS,
   onOpenMemory,
+  fill = false,
 }: {
   documents: MemoryGraphDocuments;
   label: string;
@@ -61,13 +62,16 @@ export function MemoryGraph({
   summary?: ReactNode;
   highlightIds?: string[];
   onOpenMemory: (id: string) => void;
+  /** Fill the parent's height (a full-page memory); otherwise a fixed height (a tab). */
+  fill?: boolean;
 }) {
   return (
     <section
+      data-fill={fill || undefined}
       data-slot="memory-graph"
       aria-label={label}
       aria-busy={loading}
-      className="relative h-144 min-h-96 w-full flex-1 overflow-hidden rounded-lg border bg-background select-none"
+      className="relative h-144 min-h-96 w-full flex-1 overflow-hidden rounded-lg border bg-background select-none data-fill:h-full"
     >
       <SupermemoryGraph
         documents={documents}
@@ -101,9 +105,13 @@ export function MemoryGraph({
 }
 
 /** What the graph's frame shows while its chunk loads. */
-export function MemoryGraphSkeleton() {
+export function MemoryGraphSkeleton({ fill = false }: { fill?: boolean }) {
   return (
-    <div className="h-144 min-h-96 w-full overflow-hidden rounded-lg border" aria-busy>
+    <div
+      data-fill={fill || undefined}
+      className="h-144 min-h-96 w-full flex-1 overflow-hidden rounded-lg border data-fill:h-full"
+      aria-busy
+    >
       <Skeleton className="size-full" />
     </div>
   );

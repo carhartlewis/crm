@@ -10,21 +10,12 @@ export interface WorkspaceFormProps {
   readonly onSubmit: (value: WorkspaceInput) => Promise<void>;
   /** Under the submit button, e.g. a way back. */
   readonly footer?: ReactNode;
-  /** The saved values, when editing a workspace. */
-  readonly initial?: WorkspaceInput;
-  /** Defaults to "Create workspace" for the onboarding shell. */
-  readonly submitLabel?: string;
 }
 
 /** Workspace name and website (shared rules from @crm/core/workspace), for the onboarding shell. */
-export function WorkspaceForm({
-  onSubmit,
-  footer,
-  initial,
-  submitLabel = "Create workspace",
-}: WorkspaceFormProps) {
+export function WorkspaceForm({ onSubmit, footer }: WorkspaceFormProps) {
   const form = useForm({
-    defaultValues: { name: initial?.name ?? "", website: initial?.website ?? "" },
+    defaultValues: { name: "", website: "" },
     // Validate when a field is left or on submit; after a submit, re-check live as the user types.
     validationLogic: revalidateLogic({ mode: "blur", modeAfterSubmission: "change" }),
     onSubmit: async ({ value }) => {
@@ -70,8 +61,8 @@ export function WorkspaceForm({
       </FieldGroup>
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(submitting) => (
-          <Button size={initial ? "default" : "hero"} type="submit" loading={submitting}>
-            {submitLabel}
+          <Button size="hero" type="submit" loading={submitting}>
+            Create workspace
           </Button>
         )}
       </form.Subscribe>

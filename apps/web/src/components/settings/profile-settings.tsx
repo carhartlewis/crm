@@ -8,12 +8,14 @@ import { useId, useRef } from "react";
 import { toast } from "sonner";
 import {
   NAME_MAX_LENGTH,
-  profileNameError,
+  firstNameError,
+  lastNameError,
   removeAvatarMutation,
   updateNameMutation,
   uploadAvatarMutation,
 } from "../../lib/account.ts";
 import { initials } from "../../lib/initials.ts";
+import { fullName, nameParts } from "../../lib/person-name.ts";
 import { TextField } from "../text-field.tsx";
 import { SettingsCard } from "./settings-card.tsx";
 
@@ -45,10 +47,10 @@ function NameCard({ name }: { name: string }) {
   });
 
   const form = useForm({
-    defaultValues: { name },
+    defaultValues: nameParts(name),
     validationLogic: revalidateLogic({ mode: "blur", modeAfterSubmission: "change" }),
     onSubmit: async ({ value }) => {
-      await update.mutateAsync(value.name).catch(() => undefined);
+      await update.mutateAsync(fullName(value)).catch(() => undefined);
     },
   });
 
@@ -56,12 +58,12 @@ function NameCard({ name }: { name: string }) {
     <SettingsCard
       title="Name"
       description="The name your workspace sees."
-      hint={`Up to ${NAME_MAX_LENGTH} characters.`}
+      hint={`Up to ${NAME_MAX_LENGTH} characters each.`}
       action={
         <form.Subscribe
           selector={(state) => ({
             submitting: state.isSubmitting,
-            changed: state.values.name.trim() !== name.trim(),
+            changed: fullName(state.values) !== fullName(nameParts(name)),
           })}
         >
           {({ submitting, changed }) => (
@@ -80,9 +82,20 @@ function NameCard({ name }: { name: string }) {
           void form.handleSubmit();
         }}
       >
-        <form.Field name="name" validators={{ onDynamic: ({ value }) => profileNameError(value) }}>
-          {(field) => <TextField field={field} label="Name" autoComplete="name" />}
-        </form.Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <form.Field
+            name="firstName"
+            validators={{ onDynamic: ({ value }) => firstNameError(value) }}
+          >
+            {(field) => <TextField field={field} label="First name" autoComplete="given-name" />}
+          </form.Field>
+          <form.Field
+            name="lastName"
+            validators={{ onDynamic: ({ value }) => lastNameError(value) }}
+          >
+            {(field) => <TextField field={field} label="Last name" autoComplete="family-name" />}
+          </form.Field>
+        </div>
       </form>
     </SettingsCard>
   );

@@ -18,13 +18,14 @@ function WorkspaceMemory() {
   const { data: workspace } = useSuspenseQuery(workspaceQuery(session.user.id, workspaceId));
 
   return (
-    <SettingsPage title="Memory" wide actions={<MemoryActions target={{}} canResearch />}>
+    <SettingsPage title="Workspace Memory" fill actions={<MemoryActions target={{}} canResearch />}>
       <MemoryView
         key={workspaceId}
         userId={session.user.id}
         workspaceId={workspaceId}
         target={{}}
         subject={workspace.name}
+        fill
       />
     </SettingsPage>
   );

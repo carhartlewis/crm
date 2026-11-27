@@ -58,6 +58,8 @@ export interface MemoryViewProps {
   readonly target: MemoryTarget;
   /** Who the memory is about, in copy: the workspace's or the company's name. */
   readonly subject: string;
+  /** Fill the page (Workspace Memory) rather than a fixed height (a company's tab). */
+  readonly fill?: boolean;
 }
 
 /** Add a note, and read the website again when there is one. */
@@ -105,7 +107,13 @@ export function MemoryActions({
  * A memory as comp-neo shows it: Supermemory's graph of sources and the facts read from them,
  * with search over the facts. Opening a source lists its facts, where members forget wrong ones.
  */
-export function MemoryView({ userId, workspaceId, target, subject }: MemoryViewProps) {
+export function MemoryView({
+  userId,
+  workspaceId,
+  target,
+  subject,
+  fill = false,
+}: MemoryViewProps) {
   const [state, setState] = useQueryStates(params, { history: "push" });
 
   const knowledge = useQuery(knowledgeQuery(userId, workspaceId, target));
@@ -150,8 +158,9 @@ export function MemoryView({ userId, workspaceId, target, subject }: MemoryViewP
 
   return (
     <>
-      <Suspense fallback={<MemoryGraphSkeleton />}>
+      <Suspense fallback={<MemoryGraphSkeleton fill={fill} />}>
         <MemoryCanvas
+          fill={fill}
           documents={documents}
           label={`What the CRM knows about ${subject}`}
           labels={LABELS}
