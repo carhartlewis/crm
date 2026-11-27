@@ -61,11 +61,7 @@ const COLUMNS: DataTableColumn<SkillItem, Column>[] = [
     kind: "status",
     header: "Status",
     sortable: true,
-    cell: (row) => (
-      <StatusCell tone={row.enabled ? "done" : "open"}>
-        {row.enabled ? "Enabled" : "Disabled"}
-      </StatusCell>
-    ),
+    cell: (row) => <SkillStatus skill={row} />,
   },
   {
     id: "description",
@@ -113,54 +109,86 @@ function skillRowMenu(actions: {
   };
 }
 
-/** Discover's columns; `adding` is the skill being added, if any. */
+/** A skill's state: enabled or disabled. */
+function SkillStatus({ skill }: { skill: SkillItem }) {
+  return (
+    <StatusCell tone={skill.enabled ? "done" : "open"}>
+      {skill.enabled ? "Enabled" : "Disabled"}
+    </StatusCell>
+  );
+}
+
+/** A Discover row, with the workspace's copy of it once added. */
+interface DiscoverRow {
+  readonly result: SkillsShResult;
+  readonly skill: SkillItem | undefined;
+}
+
+/**
+ * Discover's columns. An added skill shows its status, like in Yours; one not yet added shows
+ * Add in the same place. `adding` is the skill being added, if any.
+ */
 function discoverColumns(install: {
   add: (id: string) => void;
   adding: string | null;
-  /** Whether the workspace has a copy, from the synced skills (not the search's snapshot). */
-  copied: (id: string) => boolean;
-}): StaticTableColumn<SkillsShResult>[] {
+}): StaticTableColumn<DiscoverRow>[] {
   return [
     {
       id: "name",
       kind: "title",
       header: "Name",
-      cell: (row) => <TitleCell>{row.name}</TitleCell>,
+      cell: (row) => <TitleCell>{row.result.name}</TitleCell>,
     },
     {
-      id: "source",
-      kind: "text",
-      header: "Source",
-      cell: (row) => <TextCell>{row.source}</TextCell>,
-    },
-    {
-      id: "installs",
-      kind: "count",
-      header: "Installs",
-      cell: (row) => <CountCell>{row.installs.toLocaleString()}</CountCell>,
-    },
-    {
-      id: "add",
-      kind: "action",
-      header: <span className="sr-only">Add</span>,
-      label: "Add",
+      id: "status",
+      kind: "status",
+      header: "Status",
       cell: (row) =>
-        install.copied(row.id) ? (
-          <span className="text-muted-foreground">Added</span>
+        row.skill ? (
+          <SkillStatus skill={row.skill} />
         ) : (
           <Button
             size="sm"
             variant="outline"
             className="-my-1"
-            onClick={() => install.add(row.id)}
-            loading={install.adding === row.id}
+            onClick={() => install.add(row.result.id)}
+            loading={install.adding === row.result.id}
           >
             <AddIcon />
             Add
           </Button>
         ),
     },
+    {
+      id: "source",
+      kind: "text",
+      header: "Source",
+      cell: (row) => <TextCell>{row.result.source}</TextCell>,
+    },
+    {
+      id: "installs",
+      kind: "count",
+      header: "Installs",
+      cell: (row) => <CountCell>{row.result.installs.toLocaleString()}</CountCell>,
+    },
   ];
+}
+
+/** Enable, disable and remove, shared by both tables' row menus. */
+function useSkillActions(collection: ReturnType<typeof skillsCollection>) {
+  const setEnabled = useMutation({ ...setSkillEnabledMutation, onError });
+
+  const remove = useMutation({
+    ...removeSkillMutation,
+    onError,
+    onSuccess: () => toast("The skill is removed for everyone."),
+  });
+
+  return {
+    toggle: (row: SkillItem) =>
+      setEnabled.mutate({ collection, id: row.id, enabled: !row.enabled }),
+    remove: (row: SkillItem) => remove.mutate({ collection, id: row.id }),
+  };
 }
 
 interface Scope {
@@ -237,13 +265,7 @@ function YourSkills({
   onOpen: (id: string) => void;
 }) {
   const collection = skillsCollection(workspaceId);
-  const setEnabled = useMutation({ ...setSkillEnabledMutation, onError });
-
-  const remove = useMutation({
-    ...removeSkillMutation,
-    onError,
-    onSuccess: () => toast("The skill is removed for everyone."),
-  });
+  const actions = useSkillActions(collection);
 
   const list = useListTable({
     tableId: "skills",
@@ -277,11 +299,7 @@ function YourSkills({
       columns={COLUMNS}
       onRowClick={(row) => onOpen(row.id)}
       onRowHover={preloadSheet}
-      rowActions={skillRowMenu({
-        open: onOpen,
-        toggle: (row) => setEnabled.mutate({ collection, id: row.id, enabled: !row.enabled }),
-        remove: (row) => remove.mutate({ collection, id: row.id }),
-      })}
+      rowActions={skillRowMenu({ open: onOpen, ...actions })}
     />
   );
 }
@@ -300,8 +318,6 @@ function DiscoverSkills({
   const text = query.trim();
   const collection = skillsCollection(scope.workspaceId);
   const results = useQuery(discoverQuery(scope.userId, scope.workspaceId, text));
-  // "Added" follows the synced skills, so an install shows without searching again.
-  const copied = new Set(skills.map((skill) => skill.sourceId));
 
   const install = useMutation({
     ...installSkillMutation,
@@ -315,18 +331,28 @@ function DiscoverSkills({
     },
   });
 
+  const actions = useSkillActions(collection);
+  // The status follows the synced skills, so an install shows without searching again.
+  const bySource = new Map(skills.map((skill) => [skill.sourceId, skill]));
+
+  // A result's id is the skill's source id (`owner/repo/skill`).
+  const rows = (results.data ?? []).map((result) => ({ result, skill: bySource.get(result.id) }));
+
+  const menu = skillRowMenu({ open: onOpen, ...actions });
+
   const columns = discoverColumns({
     add: (sourceId) => install.mutate({ collection, sourceId }),
     adding: install.isPending ? install.variables.sourceId : null,
-    copied: (id) => copied.has(id),
   });
 
   return (
     <StaticTable
       label={text ? "Matching skills" : "Top skills"}
       columns={columns}
-      rows={[...(results.data ?? [])]}
-      getRowId={(row) => row.id}
+      rows={rows}
+      getRowId={(row) => row.result.id}
+      onRowClick={(row) => (row.skill ? onOpen(row.skill.id) : undefined)}
+      rowActions={(row) => (row.skill ? menu(row.skill) : null)}
       loading={results.isPending}
       loadingRows={8}
       empty={
