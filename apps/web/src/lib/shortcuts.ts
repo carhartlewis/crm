@@ -18,8 +18,9 @@ export const shortcuts = {
   back: { code: "BracketLeft", mod: true },
   forward: { code: "BracketRight", mod: true },
   home: { code: "Digit0", alt: true },
-  // Record lists: a plain key, like Linear and Attio. ⌘C is copy and must stay copy.
-  create: { code: "KeyC" },
+  // Opens the create sheet from anywhere. ⌘C stays copy whenever there's something to copy:
+  // see `claimsCopyShortcut`.
+  create: { code: "KeyC", mod: true },
 } as const satisfies Record<string, Shortcut>;
 
 /** ⌥1 to ⌥9 open the pinned pages, in the order the user arranged them. */
@@ -55,4 +56,44 @@ export function shortcutKeys(shortcut: Shortcut, apple = isApple()) {
     ...(shortcut.shift ? [apple ? "⇧" : "Shift"] : []),
     key,
   ];
+}
+
+/** The shortcut as an `aria-keyshortcuts` value, e.g. "Meta+K" or "Alt+1". */
+export function ariaKeyShortcuts(shortcut: Shortcut, apple = isApple()) {
+  const key = KEY_LABELS.get(shortcut.code) ?? shortcut.code.replace(/^(Key|Digit)/, "");
+
+  return [
+    ...(shortcut.mod ? [apple ? "Meta" : "Control"] : []),
+    ...(shortcut.alt ? ["Alt"] : []),
+    ...(shortcut.shift ? ["Shift"] : []),
+    key,
+  ].join("+");
+}
+
+/**
+ * ⌘C creates only when it can't mean copy: no text is selected and focus isn't in a field.
+ * With a selection it copies, as everywhere else on the Mac.
+ */
+/** What `claimsCopyShortcut` reads from a DOM `Selection`. */
+export interface TextSelection {
+  readonly isCollapsed: boolean;
+  toString(): string;
+}
+
+/** What `claimsCopyShortcut` reads from the focused element (`document.activeElement`). */
+export interface FocusedElement {
+  readonly tagName: string;
+  readonly isContentEditable?: boolean;
+}
+
+export function claimsCopyShortcut(
+  selection: TextSelection | null,
+  focused: FocusedElement | null,
+) {
+  const editing =
+    focused !== null &&
+    (focused.isContentEditable === true ||
+      ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName));
+
+  return !editing && (selection === null || selection.isCollapsed || selection.toString() === "");
 }

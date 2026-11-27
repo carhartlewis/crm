@@ -1,13 +1,4 @@
-import { Button } from "@crm/ui/components/button";
 import { DropdownMenuItem } from "@crm/ui/components/dropdown-menu";
-import {
-  AdaptiveSheet,
-  AdaptiveSheetContent,
-  AdaptiveSheetDescription,
-  AdaptiveSheetFooter,
-  AdaptiveSheetHeader,
-  AdaptiveSheetTitle,
-} from "@crm/ui/patterns/adaptive-sheet";
 import { BulkActionsMenu } from "@crm/ui/patterns/data-table/bulk-actions";
 import {
   DataTable,
@@ -31,10 +22,10 @@ import { toast } from "sonner";
 import {
   type Company,
   companiesCollection,
-  createCompanyMutation,
   deleteCompaniesMutation,
   updateCompanyMutation,
 } from "../../lib/companies.ts";
+import { useCreateSheet } from "../../lib/create-sheet.ts";
 import { workspaceQuery } from "../../lib/session.ts";
 import { noPosition, type ListPosition, useListKeys } from "../records/use-list-keys.ts";
 import { CompanyForm } from "./company-form.tsx";
@@ -117,17 +108,10 @@ function companyRowMenu(actions: { open: (id: string) => void; remove: (id: stri
 export interface CompaniesTableProps {
   readonly userId: string;
   readonly workspaceId: string;
-  readonly createOpen: boolean;
-  readonly setCreateOpen: (open: boolean) => void;
 }
 
 /** Companies, synced locally: search, filter and sort never wait on the network. */
-export function CompaniesTable({
-  userId,
-  workspaceId,
-  createOpen,
-  setCreateOpen,
-}: CompaniesTableProps) {
+export function CompaniesTable({ userId, workspaceId }: CompaniesTableProps) {
   const collection = companiesCollection(workspaceId);
 
   const { data: rows = [], isLoading } = useLiveQuery({
@@ -135,21 +119,13 @@ export function CompaniesTable({
   });
 
   const { data: workspace } = useQuery(workspaceQuery(userId, workspaceId));
+  const [createKind] = useCreateSheet();
   const record = useRecordSheetParams({ recordKey: "company", tabs: SHEET_TABS });
   const [position, setPosition] = useState<ListPosition>(noPosition);
   const frame = useRef<HTMLDivElement>(null);
 
   const ownerName = (ownerId: string | null) =>
     workspace?.members.find((member) => member.userId === ownerId)?.user.name ?? null;
-
-  const create = useMutation({
-    ...createCompanyMutation,
-    onSuccess: (id) => {
-      setCreateOpen(false);
-      setPosition({ activeId: id, anchorId: null });
-    },
-    onError: (error) => toast.error(error.message),
-  });
 
   const update = useMutation({
     ...updateCompanyMutation,
@@ -214,9 +190,8 @@ export function CompaniesTable({
     position,
     setPosition,
     selection: list.selection,
-    enabled: !sheetOpen && !createOpen,
+    enabled: !sheetOpen && createKind === null,
     onOpen: open,
-    onCreate: () => setCreateOpen(true),
     onFilter: () => frame.current?.querySelector<HTMLInputElement>('input[type="search"]')?.focus(),
   });
 
@@ -295,32 +270,6 @@ export function CompaniesTable({
           ) : null
         }
       />
-      <AdaptiveSheet open={createOpen} onOpenChange={setCreateOpen}>
-        <AdaptiveSheetContent>
-          <CompanyForm
-            submitLabel="Create company"
-            onSubmit={async (input) => {
-              await create.mutateAsync({ collection, workspaceId, ownerId: userId, input });
-            }}
-            secondary={
-              <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </Button>
-            }
-            sheet={{
-              header: (
-                <AdaptiveSheetHeader>
-                  <AdaptiveSheetTitle>New company</AdaptiveSheetTitle>
-                  <AdaptiveSheetDescription>
-                    It appears in the list at once and syncs to your workspace.
-                  </AdaptiveSheetDescription>
-                </AdaptiveSheetHeader>
-              ),
-              Footer: AdaptiveSheetFooter,
-            }}
-          />
-        </AdaptiveSheetContent>
-      </AdaptiveSheet>
     </div>
   );
 }

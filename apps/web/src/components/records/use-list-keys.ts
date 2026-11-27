@@ -9,7 +9,6 @@ import {
   move,
   toggleActive,
 } from "../../lib/list-navigation.ts";
-import { shortcuts, toHotkey } from "../../lib/shortcuts.ts";
 
 /** The keyboard position in a list: the active row and where a ⇧-range started. */
 export interface ListPosition {
@@ -29,14 +28,13 @@ export interface ListKeysOptions {
   /** Off while a sheet or dialog is open: derived from that state, so it can't drift. */
   readonly enabled: boolean;
   readonly onOpen: (id: string) => void;
-  readonly onCreate: () => void;
   readonly onFilter: () => void;
 }
 
 /**
  * A record list's keys, Linear/Gmail style:
  * j k ↓ ↑ move · g g / ⇧G first / last · Enter or o open · x select · ⇧j ⇧k extend ·
- * Escape clear selection · / filter · c create.
+ * Escape clear selection · / filter. Creating is global (⌘C, components/shell/shortcuts.tsx).
  * Plain keys never fire in text fields (react-hotkeys-hook's default).
  */
 export function useListKeys({
@@ -46,7 +44,6 @@ export function useListKeys({
   selection,
   enabled,
   onOpen,
-  onCreate,
   onFilter,
 }: ListKeysOptions) {
   const options = { enabled, preventDefault: true };
@@ -85,5 +82,4 @@ export function useListKeys({
     [position.activeId, onOpen],
   );
   useHotkeys("slash", onFilter, options, [onFilter]);
-  useHotkeys(toHotkey(shortcuts.create), onCreate, options, [onCreate]);
 }

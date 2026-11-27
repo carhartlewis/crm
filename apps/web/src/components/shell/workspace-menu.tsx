@@ -122,15 +122,18 @@ export function WorkspaceMenu({ userId }: { userId: string }) {
               </DropdownMenuSub>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              closeOnClick={false}
-              disabled={signOut.isPending || signOut.isSuccess}
-              onClick={() => signOut.mutate()}
-            >
-              <LogoutIcon />
-              Log out
-            </DropdownMenuItem>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Account</DropdownMenuLabel>
+              <DropdownMenuItem
+                variant="destructive"
+                closeOnClick={false}
+                disabled={signOut.isPending || signOut.isSuccess}
+                onClick={() => signOut.mutate()}
+              >
+                <LogoutIcon />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
