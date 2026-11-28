@@ -19,7 +19,7 @@ function SignIn() {
   });
 
   return (
-    <OnboardingShell title="The CRM where relationships compound">
+    <OnboardingShell title="The CRM built for Agents">
       <div className="flex w-full flex-col items-center gap-6">
         {/* Success means the page is leaving (for Google, or into the app): keep the spinner. */}
         <Button
