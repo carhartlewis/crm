@@ -187,6 +187,114 @@ describe("contacts", () => {
   });
 });
 
+const ben = (companyId: string) => ({
+  first_name: "Ben",
+  last_name: "Tossell",
+  company_id: companyId,
+});
+
+describe("duplicate contacts", () => {
+  test("a member's duplicate is refused; a search result merges into the contact already there", async () => {
+    const env = setup();
+    const companyId = await withCompany(env);
+    const first = createId("ctc");
+
+    await run(env.records.contacts.create(alice, { id: first, ...ben(companyId) }));
+
+    expect(
+      await outcome(
+        env.records.contacts.create(alice, {
+          id: createId("ctc"),
+          ...ben(companyId),
+          first_name: "Benjamin",
+        }),
+      ),
+    ).toBe("Invalid");
+
+    const again = await run(
+      env.records.contacts.create(alice, {
+        id: createId("ctc"),
+        ...ben(companyId),
+        title: "Founder",
+        linkedin_url: "https://www.linkedin.com/in/ben-tossell-70453537",
+        source: "search",
+      }),
+    );
+
+    expect(again).toMatchObject({ id: first, created: false, duplicate: "name" });
+    expect(env.table("contact").size).toBe(1);
+    // Empty fields fill in; nothing a member typed is replaced.
+    expect(env.table("contact").get(first)).toMatchObject({
+      firstName: "Ben",
+      title: "Founder",
+      linkedinUrl: "https://www.linkedin.com/in/ben-tossell-70453537",
+    });
+
+    // The same profile matches at any company, even without a last name.
+    const elsewhere = await run(
+      env.records.contacts.create(
+        alice,
+        {
+          id: createId("ctc"),
+          first_name: "B",
+          linkedin_url: "https://uk.linkedin.com/in/Ben-Tossell-70453537/",
+        },
+        { onDuplicate: "merge" },
+      ),
+    );
+
+    expect(elsewhere).toMatchObject({ id: first, created: false, duplicate: "linkedin" });
+  });
+
+  test("two people adding the same person at once make one contact", async () => {
+    const env = setup();
+    const companyId = await withCompany(env);
+
+    const [chat, research] = await Promise.all([
+      run(env.records.contacts.create(alice, { id: createId("ctc"), ...ben(companyId) })),
+      run(
+        env.records.contacts.create(alice, {
+          id: createId("ctc"),
+          ...ben(companyId),
+          source: "search",
+        }),
+      ),
+    ]);
+
+    expect(chat.created).toBe(true);
+    expect(research).toMatchObject({ id: chat.id, created: false });
+    expect(env.table("contact").size).toBe(1);
+  });
+
+  test("namesakes at other companies, other workspaces and other profiles stay separate", async () => {
+    const env = setup();
+    const companyId = await withCompany(env);
+    const other = await withCompany(env);
+    const theirs = await withCompany(env, bob);
+
+    await run(
+      env.records.contacts.create(alice, {
+        id: createId("ctc"),
+        ...ben(companyId),
+        linkedin_url: "https://www.linkedin.com/in/ben-1",
+      }),
+    );
+
+    for (const [actor, input] of [
+      [alice, { ...ben(other) }],
+      [alice, { ...ben(companyId), linkedin_url: "https://www.linkedin.com/in/ben-2" }],
+      [bob, { ...ben(theirs), linkedin_url: "https://www.linkedin.com/in/ben-1" }],
+    ] as const) {
+      // oxlint-disable-next-line no-await-in-loop -- each create checks the rows before it.
+      const result = await run(
+        env.records.contacts.create(actor, { id: createId("ctc"), ...input }),
+      );
+
+      expect(result.created).toBe(true);
+    }
+  });
+});
+
 describe("deals", () => {
   test("a new deal starts its research once it is saved; a refused one doesn't", async () => {
     const env = setup();

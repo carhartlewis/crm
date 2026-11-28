@@ -31,79 +31,102 @@ export function createMemoryRecordStore(members: Iterable<string>, now = () => D
   let tables = emptyTables();
   let dealContacts = new Map<string, DealContactRow>();
   let txid = 1000;
+  // Transactions run one at a time, as if each held every lock.
+  let queue: Promise<unknown> = Promise.resolve();
 
   const isMember = async (workspaceId: string, userId: string) =>
     memberships.has(`${workspaceId}:${userId}`);
 
   const store: RecordStore = {
     isMember,
-    transact: async (fn) => {
-      const draft = copy(tables);
-      const draftLinks = new Map(dealContacts);
+    transact: (fn) => {
+      const next = queue.then(() => transactNow(fn));
 
-      const inWorkspace = (table: RecordTable, workspaceId: string, id: string) => {
-        const row = draft[table].get(id);
+      queue = next.catch(() => undefined);
 
-        return row?.["workspaceId"] === workspaceId ? row : null;
-      };
-
-      const tx: RecordTx = {
-        isMember,
-        exists: async (table, id) => draft[table].has(id),
-        get: async (table, workspaceId, id) => inWorkspace(table, workspaceId, id),
-        insert: async (table, row) => {
-          draft[table].set(String(row["id"]), { ...row, updatedAt: now() });
-        },
-        update: async (table, workspaceId, id, patch) => {
-          const row = inWorkspace(table, workspaceId, id);
-
-          if (!row) return false;
-
-          draft[table].set(id, { ...row, ...patch, updatedAt: now() });
-
-          return true;
-        },
-        remove: async (table, workspaceId, id) => {
-          if (!inWorkspace(table, workspaceId, id)) return false;
-
-          draft[table].delete(id);
-
-          // The database cascades: a company takes its deals, a deal its links and activity.
-          if (table === "company") {
-            for (const [dealId, deal] of draft.deal) {
-              if (deal["companyId"] === id) draft.deal.delete(dealId);
-            }
-          }
-
-          for (const [key, link] of draftLinks) {
-            if (link.dealId === id || link.contactId === id) draftLinks.delete(key);
-          }
-
-          return true;
-        },
-        contactsAt: async (workspaceId, companyId) =>
-          [...draft.contact.values()].filter(
-            (row) => row["workspaceId"] === workspaceId && row["companyId"] === companyId,
-          ),
-        putDealContact: async (row) => {
-          draftLinks.set(`${row.dealId}:${row.contactId}`, row);
-        },
-        removeDealContact: async (workspaceId, dealId, contactId) => {
-          const key = `${dealId}:${contactId}`;
-
-          return draftLinks.get(key)?.workspaceId === workspaceId && draftLinks.delete(key);
-        },
-      };
-
-      const result = await fn(tx);
-
-      tables = draft;
-      dealContacts = draftLinks;
-      txid += 1;
-
-      return { result, txid };
+      return next;
     },
   };
+
+  async function transactNow<A>(fn: (tx: RecordTx) => Promise<A>) {
+    const draft = copy(tables);
+    const draftLinks = new Map(dealContacts);
+
+    const inWorkspace = (table: RecordTable, workspaceId: string, id: string) => {
+      const row = draft[table].get(id);
+
+      return row?.["workspaceId"] === workspaceId ? row : null;
+    };
+
+    const tx: RecordTx = {
+      isMember,
+      exists: async (table, id) => draft[table].has(id),
+      get: async (table, workspaceId, id) => inWorkspace(table, workspaceId, id),
+      insert: async (table, row) => {
+        draft[table].set(String(row["id"]), { ...row, updatedAt: now() });
+      },
+      update: async (table, workspaceId, id, patch) => {
+        const row = inWorkspace(table, workspaceId, id);
+
+        if (!row) return false;
+
+        draft[table].set(id, { ...row, ...patch, updatedAt: now() });
+
+        return true;
+      },
+      remove: async (table, workspaceId, id) => {
+        if (!inWorkspace(table, workspaceId, id)) return false;
+
+        draft[table].delete(id);
+
+        // The database cascades: a company takes its deals, a deal its links and activity.
+        if (table === "company") {
+          for (const [dealId, deal] of draft.deal) {
+            if (deal["companyId"] === id) draft.deal.delete(dealId);
+          }
+        }
+
+        for (const [key, link] of draftLinks) {
+          if (link.dealId === id || link.contactId === id) draftLinks.delete(key);
+        }
+
+        return true;
+      },
+      contactsAt: async (workspaceId, companyId) =>
+        [...draft.contact.values()].filter(
+          (row) => row["workspaceId"] === workspaceId && row["companyId"] === companyId,
+        ),
+      contactCandidates: async (workspaceId, { email, linkedinHandle, companyId }) =>
+        [...draft.contact.values()].filter(
+          (row) =>
+            row["workspaceId"] === workspaceId &&
+            ((email !== null && row["email"] === email) ||
+              (linkedinHandle !== null &&
+                String(row["linkedinUrl"] ?? "")
+                  .toLowerCase()
+                  .includes(`linkedin.com/in/${linkedinHandle}`)) ||
+              (companyId !== null && row["companyId"] === companyId)),
+        ),
+      // Transactions here already run one at a time.
+      lock: async () => {},
+      putDealContact: async (row) => {
+        draftLinks.set(`${row.dealId}:${row.contactId}`, row);
+      },
+      removeDealContact: async (workspaceId, dealId, contactId) => {
+        const key = `${dealId}:${contactId}`;
+
+        return draftLinks.get(key)?.workspaceId === workspaceId && draftLinks.delete(key);
+      },
+    };
+
+    const result = await fn(tx);
+
+    tables = draft;
+    dealContacts = draftLinks;
+    txid += 1;
+
+    return { result, txid };
+  }
 
   return {
     store,

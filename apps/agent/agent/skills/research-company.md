@@ -23,13 +23,15 @@ never collect everything for one final batch. Keep `running` until your writes h
      then heads of the functions that matter to this workspace (sales, finance, security, IT,
      operations). Drop rows whose company or domain doesn't match, people who left
      (`titleMatch` is `past`), and anyone already in the CRM (`contactId` is set, or the same
-     name).
+     name). Another session may add people here while you search; the CRM catches that.
    - Add each with `connections__crm__create_contact`: first and last name, title, LinkedIn URL,
      the company's id, and `found_by_search: true`. Leave the email out unless the row's
      `emailStatus` is verified; their own research finds and checks it. Save each contact as
      soon as its identity and current employer are confirmed. Do not wait for a photo, email,
      phone or brief, and do not research each person yourself: creating the row starts their
      independent background research, so their details and photos arrive while you continue.
+     When `create_contact` answers `created: false`, the person was already there: count them
+     as found, not added, and don't add them again.
 4. Fill the gaps with `connections__crm__lookup_company` and its own site through
    `connections__crm__read_web_page` (home, about, contact, pricing), and `web_search` for recent
    news when useful. Save supported fields after each source with

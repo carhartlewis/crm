@@ -3,7 +3,11 @@ import { isCompanyId } from "@crm/core/company";
 import { createId, ID_PREFIXES } from "@crm/core/ids";
 import {
   CONTACT_FIELDS,
+  contactName,
   DEAL_FIELDS,
+  type DuplicateReason,
+  duplicateMessage,
+  findDuplicate,
   DEFAULT_DEAL_STAGE,
   type FieldSpec,
   isActivityId,
@@ -14,6 +18,7 @@ import {
   isLosingStage,
   isOpenStage,
   isRecordSource,
+  linkedinHandle,
   normalizePatch,
   optionalProse,
   optionalText,
@@ -39,6 +44,7 @@ import {
 import {
   type Actor,
   archivedField,
+  camelCase,
   checkReferences,
   done,
   notFound,
@@ -54,8 +60,28 @@ type Write<E = never> = Effect.Effect<TxId, NoActiveWorkspace | Invalid | E>;
 
 type Raw = Readonly<Record<string, string | null | undefined>>;
 
+/**
+ * What happens when a new contact is already in the workspace: `refuse` fails with a message
+ * naming them; `merge` adds nothing, fills the existing contact's empty fields and returns its id.
+ */
+export type OnDuplicate = "refuse" | "merge";
+
+/** A contact create: the row it wrote, or the one it found already there. */
+export interface ContactCreated extends TxId {
+  readonly id: string;
+  readonly created: boolean;
+  /** Why the existing contact is the same person, when `created` is false. */
+  readonly duplicate?: DuplicateReason;
+  readonly archived?: boolean;
+}
+
 export interface ContactsService {
-  readonly create: (actor: Actor, input: Raw & { id: string; first_name: string }) => Write;
+  /** By default a search result merges into a duplicate and anything else is refused. */
+  readonly create: (
+    actor: Actor,
+    input: Raw & { id: string; first_name: string },
+    options?: { readonly onDuplicate?: OnDuplicate },
+  ) => Effect.Effect<ContactCreated, NoActiveWorkspace | Invalid>;
   readonly update: (actor: Actor, id: string, input: PatchInput) => Write<NotFound>;
   readonly remove: (actor: Actor, id: string) => Write<NotFound>;
 }
@@ -143,6 +169,19 @@ function instant(value: string | null | undefined, fallback: Date | null) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/** The columns a merge may fill on an existing contact, never replacing a value. */
+const MERGE_FILLS = ["last_name", "email", "phone", "title", "linkedin_url", "company_id"] as const;
+
+/** A contact row as the duplicate rules read it. */
+const contactIdentity = (row: RecordRow) => ({
+  firstName: textOf(row["firstName"]) ?? "",
+  lastName: textOf(row["lastName"]),
+  email: textOf(row["email"]),
+  linkedinUrl: textOf(row["linkedinUrl"]),
+  companyId: textOf(row["companyId"]),
+  archived: Boolean(row["archivedAt"]),
+});
+
 /** Moves a record's `last_activity_at` forward to `at` (never back). */
 async function touchActivity(
   tx: RecordTx,
@@ -197,7 +236,7 @@ export function makeRecords(
   const write = writer(store);
 
   const contacts: ContactsService = {
-    create: (actor, input) => {
+    create: (actor, input, options = {}) => {
       if (!isContactId(input.id)) return invalid("That contact id is not valid");
 
       const first = requiredText(input.first_name, "First name");
@@ -220,12 +259,86 @@ export function makeRecords(
 
       if (!isRecordSource(source)) return invalid("Unknown source");
 
+      const onDuplicate = options.onDuplicate ?? (source === "search" ? "merge" : "refuse");
+
       const ownerId =
         input.owner_id === undefined ? actor.userId : (fields.value["owner_id"] ?? null);
+
+      const person = {
+        firstName: first.value,
+        lastName: fields.value["last_name"] ?? null,
+        email: fields.value["email"] ?? null,
+        linkedinUrl: fields.value["linkedin_url"] ?? null,
+        companyId: fields.value["company_id"] ?? null,
+      };
+
+      let found: Omit<ContactCreated, "txid"> = { id: input.id, created: true };
 
       return write<Invalid>(actor, "create contact", async (workspaceId, tx) => {
         if (await tx.exists("contact", input.id)) {
           return rejected("A contact with this id already exists");
+        }
+
+        // Agents, research and members add people at the same time: one check at a time.
+        await tx.lock(`contact-identity:${workspaceId}`);
+
+        const duplicate = findDuplicate(
+          person,
+          await tx.contactCandidates(workspaceId, {
+            email: person.email,
+            linkedinHandle: linkedinHandle(person.linkedinUrl),
+            companyId: person.companyId,
+          }),
+          contactIdentity,
+        );
+
+        if (duplicate) {
+          const existing = duplicate.contact;
+          const archived = Boolean(existing["archivedAt"]);
+
+          if (onDuplicate === "refuse") {
+            const name = contactName({
+              first_name: textOf(existing["firstName"]) ?? "",
+              last_name: textOf(existing["lastName"]),
+            });
+
+            return rejected(duplicateMessage(name, duplicate.reason, archived));
+          }
+
+          const id = String(existing["id"]);
+          const fills: RecordPatch = {};
+
+          for (const column of MERGE_FILLS) {
+            const value = fields.value[column];
+            const field = camelCase(column);
+
+            if (value && (existing[field] === null || existing[field] === undefined)) {
+              fills[field] = value;
+            }
+          }
+
+          const problem = await checkReferences(tx, workspaceId, {
+            companyId: textOf(fills["companyId"]),
+          });
+
+          if (problem) return problem;
+
+          if (Object.keys(fills).length > 0) {
+            await tx.update("contact", workspaceId, id, fills);
+
+            if (fills["companyId"]) {
+              await keepPrimaryContact(tx, workspaceId, {
+                contactId: id,
+                before: null,
+                after: textOf(fills["companyId"]),
+                active: !archived,
+              });
+            }
+          }
+
+          found = { id, created: false, duplicate: duplicate.reason, archived };
+
+          return done;
         }
 
         const problem = await checkReferences(tx, workspaceId, {
@@ -252,7 +365,14 @@ export function makeRecords(
         });
 
         return done;
-      }).pipe(Effect.tap(() => Effect.sync(() => events.contactCreated?.(actor, input.id))));
+      }).pipe(
+        Effect.map(({ txid }) => ({ txid, ...found })),
+        Effect.tap((result) =>
+          Effect.sync(() => {
+            if (result.created) events.contactCreated?.(actor, input.id);
+          }),
+        ),
+      );
     },
 
     update: (actor, id, input) => {
