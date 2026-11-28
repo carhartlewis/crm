@@ -61,17 +61,36 @@ export function spaceDescriptionError(value: string) {
   return result.ok ? undefined : result.message;
 }
 
+/** What the title model answers when the first message alone can't name the chat. */
+export const TITLE_NEEDS_REPLY = "?";
+
+/** The first message, and the agent's reply once a vague message needs it. */
+export interface TitleSource {
+  readonly message: string;
+  /** The names of files sent with the message. */
+  readonly filenames?: readonly string[];
+  readonly reply?: string;
+}
+
 /**
- * What the agent asks a small model when a chat's first message arrives, to name it in the
- * sidebar while the reply is still being written. Attached files are named too: "What's this?"
- * with an invoice says little alone.
+ * What the agent asks a small model to name a chat in the sidebar. It asks first when the first
+ * message arrives, while the reply is still being written. The prompt says plainly whether files
+ * are attached: without that, "Who is this person?" reads as a question about a picture. A
+ * message that points at something it doesn't name or attach gets `TITLE_NEEDS_REPLY`, and the
+ * agent asks again with its reply when the turn ends.
  */
-export function chatTitlePrompt(message: string, filenames: readonly string[] = []) {
+export function chatTitlePrompt({ message, filenames = [], reply }: TitleSource) {
+  const rules =
+    "Reply with the title only: 2 to 6 words, plain text, no quotes, no full stop, in the language of the message. Name only what the text says; never assume an image, file or detail it doesn't give.";
+
   return [
-    "Name this chat for a sidebar list from its first message. Reply with the title only: 2 to 6 words, plain text, no quotes, no full stop, in the language of the message. When the message is vague, name it from the attached files.",
+    reply === undefined
+      ? `Name this chat for a sidebar list from its first message. ${rules} When the message is vague, name it from the attached files. When the message points at something it doesn't name and no file is attached (such as "who is this person?"), reply with ${TITLE_NEEDS_REPLY} only.`
+      : `Name this chat for a sidebar list from its first message and the assistant's reply. ${rules} Name the subject the reply settles on (a person, company or task), not the act of asking.`,
     "",
     `Message: ${message.slice(0, 2_000)}`,
-    ...(filenames.length > 0 ? [`Attached files: ${filenames.slice(0, 10).join(", ")}`] : []),
+    `Attached files: ${filenames.length > 0 ? filenames.slice(0, 10).join(", ") : "none"}`,
+    ...(reply === undefined ? [] : [`Reply: ${reply.slice(0, 2_000)}`]),
   ].join("\n");
 }
 
