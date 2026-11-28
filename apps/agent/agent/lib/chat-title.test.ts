@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { nameChat } from "./chat-title.ts";
+import { hasChat, nameChat } from "./chat-title.ts";
+import type { CrmCaller } from "./crm-caller.ts";
 
 const turn = { sessionId: "ses_1", message: "What companies do we have?" };
 
@@ -101,5 +102,27 @@ describe("nameChat", () => {
     );
 
     expect(outcome).toBe("unnamed");
+  });
+});
+
+describe("hasChat", () => {
+  const caller: CrmCaller = {
+    userId: "user_ana",
+    workspaceId: "ws_a",
+    permissionMode: "manual",
+    record: null,
+    origin: "chat",
+    researchJob: null,
+  };
+
+  test("names chats from the CRM, including a record's Agent tab", () => {
+    expect(hasChat(caller)).toBe(true);
+    expect(hasChat({ ...caller, origin: "sheet" })).toBe(true);
+  });
+
+  test("skips background research, callers without a workspace, and no caller", () => {
+    expect(hasChat({ ...caller, origin: "research", researchJob: "research-ctc_1" })).toBe(false);
+    expect(hasChat({ ...caller, workspaceId: null })).toBe(false);
+    expect(hasChat(null)).toBe(false);
   });
 });

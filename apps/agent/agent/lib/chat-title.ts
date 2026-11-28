@@ -4,6 +4,16 @@ import {
   TITLE_NEEDS_REPLY,
   type TitleSource,
 } from "@crm/core/chat";
+import type { CrmCaller } from "./crm-caller.ts";
+
+/**
+ * Whether the session has a chat to name: a turn from the CRM carries its workspace. Background
+ * research (ADR 0025) runs in a session the API starts without a chat row, so naming it costs a
+ * model call and the API answers 404.
+ */
+export function hasChat(caller: CrmCaller | null): caller is CrmCaller {
+  return Boolean(caller?.workspaceId) && caller?.origin !== "research";
+}
 
 /** A chat's first message (and, the second time, the reply), as the title step reads it. */
 export interface FirstMessage extends TitleSource {

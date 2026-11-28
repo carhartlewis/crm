@@ -1,6 +1,6 @@
 import { conversation, reply } from "eve/events";
 import { defineHook } from "eve/hooks";
-import { type ChatTitleOptions, type FirstMessage, nameChat } from "../lib/chat-title.ts";
+import { type ChatTitleOptions, type FirstMessage, hasChat, nameChat } from "../lib/chat-title.ts";
 import { crmCaller } from "../lib/crm-caller.ts";
 import { crmToken } from "../lib/crm-token.ts";
 import { apiUrl } from "../lib/gateway.ts";
@@ -70,7 +70,7 @@ const warn = (cause: unknown) => console.warn("chat title: naming the chat faile
  * When a chat's first message arrives, a small model names it for the sidebar while the agent
  * writes the reply (ADR 0018). A message too vague to name alone waits for the first turn to end,
  * and the model names the chat from the message and the reply. Only for chats from the CRM: the
- * caller carries the chat's workspace, and the API checks the rest.
+ * caller carries the chat's workspace, and the API checks the rest. Background research has no chat.
  *
  * Neither handler awaits the model: eve waits for a hook before the turn goes on, and the reply
  * must not wait for the title. If a hook runs twice, the API keeps the first title (`auto_title`).
@@ -85,7 +85,7 @@ export default defineHook({
 
       const caller = crmCaller(ctx.session.auth.current);
 
-      if (!caller?.workspaceId) return;
+      if (!hasChat(caller)) return;
 
       const turn: FirstMessage = {
         sessionId: ctx.session.id,
@@ -126,7 +126,7 @@ export default defineHook({
         .join("\n")
         .trim();
 
-      if (!caller?.workspaceId || !text) return;
+      if (!hasChat(caller) || !text) return;
 
       void (async () => {
         const turn = await named;
