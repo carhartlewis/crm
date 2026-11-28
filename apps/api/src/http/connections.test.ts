@@ -265,7 +265,7 @@ const app = HttpRouter.toWebHandler(
       Layer.succeed(Usage, makeUsage(emptyUsage)),
       FakeChats,
       Layer.succeed(Intel, makeIntel(createMemoryIntelStore([]).store)),
-      Layer.succeed(CrmTools, { forCaller: () => [] }),
+      Layer.succeed(CrmTools, { forCaller: () => [], contextFor: async () => null }),
       FakeElectric,
       Layer.succeed(
         Skills,

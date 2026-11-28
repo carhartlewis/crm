@@ -746,6 +746,17 @@ const ConnectionRoutes = Layer.effectDiscard(
     );
 
     yield* router.add("GET", "/api/agent/skills", () => HttpEffect.fromWebHandler(agentSkills));
+
+    // Who the agent works for: the member and their workspace's name and website.
+    const agentContext = auth.protectMcp(async (_request, principal) => {
+      const context = await crmTools.contextFor(principal);
+
+      return context
+        ? Response.json(context, { headers: { "cache-control": "no-store" } })
+        : Response.json({ message: "Not a member of this workspace" }, { status: 403 });
+    });
+
+    yield* router.add("GET", "/api/agent/context", () => HttpEffect.fromWebHandler(agentContext));
     // Stateless gateway: no SSE stream to resume and no session to end.
     yield* router.add("GET", "/api/mcp", () =>
       Effect.succeed(HttpServerResponse.empty({ status: 405, headers: { allow: "POST" } })),

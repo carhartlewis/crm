@@ -176,5 +176,13 @@ export function postgresDirectory(pool: Pool): CrmDirectory {
 
       return rows;
     },
+    workspace: async (workspaceId) => {
+      const { rows } = await pool.query<{ name: string; website: string }>(
+        "SELECT name, website FROM workspace WHERE id = $1",
+        [workspaceId],
+      );
+
+      return rows[0] ?? null;
+    },
   };
 }

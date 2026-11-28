@@ -8,6 +8,8 @@ export const gatewayUrl = new URL("/api/mcp", apiUrl).href;
 
 export const agentSkillsUrl = new URL("/api/agent/skills", apiUrl).href;
 
+export const agentContextUrl = new URL("/api/agent/context", apiUrl).href;
+
 export const gatewayAuthorization = gatewayAuth({
   gatewayUrl,
   kv: createNodeRedisKv(process.env["REDIS_URL"] ?? "redis://localhost:56379", "crm"),

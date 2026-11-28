@@ -3,7 +3,7 @@ import type { LocalTool } from "@crm/integrations/gateway";
 import { makeCompanies } from "./Companies.ts";
 import { makeRecords } from "./Records.ts";
 import { createMemoryCompanyStore } from "./record-store-memory.ts";
-import { type CrmDirectory, type CrmToolDeps, crmTools } from "./crm-tools.ts";
+import { agentContext, type CrmDirectory, type CrmToolDeps, crmTools } from "./crm-tools.ts";
 
 const caller = { userId: "user_ana", workspaceId: "ws_a" };
 
@@ -31,7 +31,9 @@ const directory: CrmDirectory = {
   contact: async () => null,
   deals: async () => [],
   deal: async () => null,
-  members: async () => [{ name: "Ana", email: "ana@example.com", role: "owner" }],
+  members: async () => [{ id: "user_ana", name: "Ana", email: "ana@example.com", role: "owner" }],
+  workspace: async (workspaceId) =>
+    workspaceId === "ws_a" ? { name: "Comp AI", website: "trycomp.ai" } : null,
 };
 
 const memoryCalls: string[] = [];
@@ -86,6 +88,20 @@ const byName = (tools: readonly LocalTool[], name: string) => {
 const text = (result: { content: unknown }) =>
   // SAFETY: every CRM tool answers with one text part.
   (result.content as [{ text: string }])[0].text;
+
+describe("agent context", () => {
+  test("names the member and their workspace", async () => {
+    expect(await agentContext(directory, caller)).toEqual({
+      workspace: { name: "Comp AI", website: "trycomp.ai" },
+      member: { id: "user_ana", name: "Ana", email: "ana@example.com", role: "owner" },
+    });
+  });
+
+  test("is null for someone outside the workspace", async () => {
+    expect(await agentContext(directory, { ...caller, userId: "user_bob" })).toBeNull();
+    expect(await agentContext(directory, { ...caller, workspaceId: "ws_b" })).toBeNull();
+  });
+});
 
 describe("CRM tools", () => {
   test("reads are marked read-only, writes are not, and forget is destructive", () => {
