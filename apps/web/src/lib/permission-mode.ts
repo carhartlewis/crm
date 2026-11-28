@@ -20,10 +20,30 @@ export function permissionModeLabel(mode: string) {
   return PERMISSION_MODE_OPTIONS.find((option) => option.value === mode)?.label ?? "Manual";
 }
 
-/** The mode a new chat starts in: the one this person picked last, on this device. */
+/** The mode a new chat starts in, before any chat has synced: the last pick on this device. */
 const storageKey = (userId: string) => `crm:permission-mode:${userId}`;
 
-export function lastPermissionMode(userId: string): PermissionMode {
+/** A synced chat row, as far as its mode goes. */
+interface ModeRow {
+  readonly permission_mode: string;
+  readonly updated_at: string;
+}
+
+/**
+ * The mode a new chat starts in (ADR 0033): the person's mode, which every chat they see shares
+ * except chats in Plan. Read from the synced chats, the newest change first, so every device
+ * agrees; the last pick on this device stands in until a chat has synced.
+ */
+export function lastPermissionMode(userId: string, chats: readonly ModeRow[] = []): PermissionMode {
+  const synced = chats
+    .filter((chat) => chat.permission_mode !== "plan" && isPermissionMode(chat.permission_mode))
+    .reduce<ModeRow | null>(
+      (newest, chat) => (newest && newest.updated_at >= chat.updated_at ? newest : chat),
+      null,
+    )?.permission_mode;
+
+  if (synced && isPermissionMode(synced)) return synced;
+
   try {
     const stored = localStorage.getItem(storageKey(userId)) ?? "";
 

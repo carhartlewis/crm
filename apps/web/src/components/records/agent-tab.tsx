@@ -80,7 +80,7 @@ export function useRecordChat({ kind, recordId, userId, workspaceId }: RecordCha
       title: prompt.title,
       files,
       spaceId: null,
-      permissionMode: lastPermissionMode(userId),
+      permissionMode: lastPermissionMode(userId, chatsCollection(workspaceId).toArray),
       record: { kind, id: recordId },
     });
 
@@ -216,7 +216,8 @@ function RecordConversation({
     onError: (error) => toast.error(error.message),
   });
 
-  const mode = chat?.permission_mode ?? lastPermissionMode(userId);
+  const mode =
+    chat?.permission_mode ?? lastPermissionMode(userId, chatsCollection(workspaceId).toArray);
 
   return (
     <ChatView

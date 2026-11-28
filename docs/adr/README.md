@@ -36,3 +36,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0030](0030-research-queue.md)                      | Research runs as BullMQ jobs: concurrency limits per workspace and in all, slots freed when a session ends; status synced live       |
 | [0031](0031-research-slots-per-kind.md)             | Each kind of research (companies, contacts, deals, fills) has its own slots per workspace                                            |
 | [0032](0032-one-contact-per-person.md)              | One contact per person: the API matches LinkedIn, email or name at the company under a lock; refuse or merge                         |
+| [0033](0033-one-permission-mode-per-person.md)      | Manual, Auto or Bypass changes every chat the person sees; Plan stays per chat; new chats start in the synced mode                   |

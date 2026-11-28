@@ -50,7 +50,7 @@ export interface ChatRow {
   readonly createdById: string | null;
   readonly title: string;
   readonly sessionId: string;
-  /** `manual`, `auto` or `bypass` (ADR 0019). */
+  /** `plan`, `manual`, `auto` or `bypass` (ADR 0019, 0033). */
   readonly permissionMode: string;
   /** The CRM made the title; a person's rename turns it off. Absent means on. */
   readonly autoTitle?: boolean;
@@ -90,6 +90,8 @@ export interface ChatTx {
   chat(id: string): Promise<ChatRow | null>;
   insertChat(row: ChatRow): Promise<void>;
   updateChat(id: string, patch: ChatPatch): Promise<void>;
+  /** Puts every chat the user sees in the workspace (`canSee`) in `mode`, except chats in Plan. */
+  setModeForUser(workspaceId: string, userId: string, mode: PermissionMode): Promise<void>;
   deleteChat(id: string): Promise<void>;
   space(id: string): Promise<SpaceRow | null>;
   insertSpace(row: SpaceRow): Promise<void>;
@@ -417,9 +419,9 @@ export function makeChats(
         if (!isChatId(input.id))
           return yield* new Invalid({ message: "That chat id is not valid" });
 
-        if (input.permissionMode !== undefined && !isPermissionMode(input.permissionMode)) {
-          return yield* badMode();
-        }
+        const permissionMode = input.permissionMode ?? DEFAULT_PERMISSION_MODE;
+
+        if (!isPermissionMode(permissionMode)) return yield* badMode();
 
         const title = normalizeChatTitle(input.title);
 
@@ -460,6 +462,11 @@ export function makeChats(
             return fail(notMember());
           }
 
+          // A new chat's mode is the person's mode too (ADR 0033), as on New chat's mode menu.
+          if (permissionMode !== "plan") {
+            await tx.setModeForUser(workspaceId, actor.id, permissionMode);
+          }
+
           await tx.insertChat({
             id: input.id,
             workspaceId,
@@ -467,7 +474,7 @@ export function makeChats(
             createdById: actor.id,
             title: title.value,
             sessionId,
-            permissionMode: input.permissionMode ?? DEFAULT_PERMISSION_MODE,
+            permissionMode,
             recordKind,
             recordId,
           });
@@ -524,6 +531,12 @@ export function makeChats(
         if (spaceId !== undefined) patch.spaceId = spaceId;
 
         if (mode !== undefined) patch.permissionMode = mode;
+
+        // A mode is the person's, so it changes all their chats (ADR 0033). Plan is for one task:
+        // it changes only this chat, and chats in Plan keep it until their plan runs.
+        if (mode !== undefined && mode !== "plan") {
+          await tx.setModeForUser(workspaceId, actor.id, mode);
+        }
 
         await tx.updateChat(id, patch);
 
@@ -854,6 +867,17 @@ function chatTx(tx: DbTx): ChatTx {
     // `updatedAt` is always written, so the client's txid shows up in the shape stream.
     updateChat: async (id, patch) => {
       await chats.where({ id }).update({ ...patch, updatedAt: new Date() });
+    },
+    setModeForUser: async (workspaceId, userId, mode) => {
+      await tx.query(
+        tx.raw.sql`UPDATE chat SET permission_mode = ${mode}, updated_at = now()
+          WHERE workspace_id = ${workspaceId} AND permission_mode NOT IN ('plan', ${mode})
+            AND (created_by_id = ${userId}
+              OR space_id IN (SELECT space_id FROM chat_space_member WHERE user_id = ${userId}))
+          RETURNING id`
+          .returnsRow({ id: "pg/text@1" })
+          .build(),
+      );
     },
     deleteChat: async (id) => {
       await chats.where({ id }).delete();

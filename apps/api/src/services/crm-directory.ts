@@ -133,10 +133,13 @@ export function postgresDirectory(pool: Pool): CrmDirectory {
 
       return rows[0] ? toCompany(rows[0]) : null;
     },
-    contacts: async (workspaceId, query, companyId, limit) => {
+    contacts: async (workspaceId, query, filter, limit) => {
       const { rows } = await pool.query<ContactRow>(
-        `SELECT ${CONTACT_COLUMNS} WHERE p.workspace_id = $1 AND p.archived_at IS NULL AND ($3 = '' OR p.company_id = $3) AND ($2 = '' OR (p.first_name || ' ' || coalesce(p.last_name, '')) ILIKE '%' || $2 || '%' OR p.email ILIKE '%' || $2 || '%' OR p.title ILIKE '%' || $2 || '%') ORDER BY lower(p.first_name), lower(coalesce(p.last_name, '')) LIMIT $4`,
-        [workspaceId, likeText(query), companyId, limit],
+        `SELECT ${CONTACT_COLUMNS} WHERE p.workspace_id = $1 AND p.archived_at IS NULL AND ($3 = '' OR p.company_id = $3)
+          AND ($5 = '' OR p.id IN (SELECT dc.contact_id FROM deal_contact dc WHERE dc.workspace_id = $1 AND dc.deal_id = $5))
+          AND ($2 = '' OR (p.first_name || ' ' || coalesce(p.last_name, '')) ILIKE '%' || $2 || '%' OR p.email ILIKE '%' || $2 || '%' OR p.title ILIKE '%' || $2 || '%')
+          ORDER BY lower(p.first_name), lower(coalesce(p.last_name, '')) LIMIT $4`,
+        [workspaceId, likeText(query), filter.companyId, limit, filter.dealId],
       );
 
       return rows.map(toContact);
@@ -153,9 +156,10 @@ export function postgresDirectory(pool: Pool): CrmDirectory {
       const { rows } = await pool.query<DealRow>(
         `SELECT ${DEAL_COLUMNS} WHERE d.workspace_id = $1 AND d.archived_at IS NULL AND ($3 = '' OR d.company_id = $3)
           AND ($4 = '' OR ($4 = 'open' AND d.stage IN ${OPEN_STAGES}) OR ($4 = 'closed' AND d.stage NOT IN ${OPEN_STAGES}) OR d.stage = $4)
+          AND ($6 = '' OR d.id IN (SELECT dc.deal_id FROM deal_contact dc WHERE dc.workspace_id = $1 AND dc.contact_id = $6))
           AND ($2 = '' OR d.name ILIKE '%' || $2 || '%' OR c.name ILIKE '%' || $2 || '%')
           ORDER BY d.expected_close_date NULLS LAST, lower(d.name) LIMIT $5`,
-        [workspaceId, likeText(query), filter.companyId, filter.stage, limit],
+        [workspaceId, likeText(query), filter.companyId, filter.stage, limit, filter.contactId],
       );
 
       return rows.map(toDeal);

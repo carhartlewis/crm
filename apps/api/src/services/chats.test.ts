@@ -463,6 +463,52 @@ describe("permission modes", () => {
     expect(modes.at(-1)).toBe("bypass");
   });
 
+  test("a mode changes every chat the person sees; Plan changes only its own chat", async () => {
+    const { chats, rows } = setup();
+    const space = spaceId();
+
+    const [mine, planning, shared, bobs, hidden] = [
+      chatId(),
+      chatId(),
+      chatId(),
+      chatId(),
+      chatId(),
+    ];
+
+    await run(chats.createSpace(bob, { id: space, name: "Sales", color: "blue" }));
+    await run(chats.joinSpace(alice, space));
+    await run(chats.create(alice, { id: mine, title: "Mine", spaceId: null }));
+    await run(chats.create(alice, { id: planning, title: "Plan", spaceId: null }));
+    await run(chats.create(bob, { id: shared, title: "Shared", spaceId: space }));
+    await run(chats.create(bob, { id: bobs, title: "Bob's", spaceId: null }));
+    await run(chats.create(mallory, { id: hidden, title: "Elsewhere", spaceId: null }));
+
+    await run(chats.update(alice, planning, { permissionMode: "plan" }));
+    expect(rows().chats.get(mine)?.permissionMode).toBe("manual");
+
+    await run(chats.update(alice, mine, { permissionMode: "bypass" }));
+
+    const mode = (id: string) => rows().chats.get(id)?.permissionMode;
+
+    expect([mode(mine), mode(shared), mode(planning)]).toEqual(["bypass", "bypass", "plan"]);
+    // Chats Alice can't see keep theirs.
+    expect([mode(bobs), mode(hidden)]).toEqual(["manual", "manual"]);
+
+    // Running the plan picks a mode for it, so the chat leaves Plan with everyone else.
+    await run(chats.update(alice, planning, { permissionMode: "auto" }));
+
+    expect([mode(mine), mode(shared), mode(planning)]).toEqual(["auto", "auto", "auto"]);
+
+    // A chat started in a mode puts the others in it too.
+    const fresh = chatId();
+
+    await run(
+      chats.create(alice, { id: fresh, title: "New", spaceId: null, permissionMode: "manual" }),
+    );
+
+    expect([mode(mine), mode(shared), mode(fresh)]).toEqual(["manual", "manual", "manual"]);
+  });
+
   test("refuses a mode that doesn't exist", async () => {
     const { chats } = setup();
     const id = chatId();

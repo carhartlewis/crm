@@ -153,6 +153,41 @@ describe("CRM tools", () => {
     expect(results.map((result) => result.isError)).toEqual([true, true, true]);
   });
 
+  test("a record's read brings its related records, filtered to it", async () => {
+    const asked: string[] = [];
+    const acme = (await directory.companies("ws_a", "", 1))[0];
+
+    if (!acme) throw new Error("no Acme");
+
+    const related: CrmDirectory = {
+      ...directory,
+      company: async (_, id) => (id === "com_1" ? { ...acme, contacts: 1, openDeals: 0 } : null),
+      contacts: async (workspaceId, _, filter) => {
+        asked.push(`contacts ${workspaceId} ${filter.companyId}|${filter.dealId}`);
+
+        return [];
+      },
+      deals: async (workspaceId, _, filter) => {
+        asked.push(`deals ${workspaceId} ${filter.companyId}|${filter.contactId}|${filter.stage}`);
+
+        return [];
+      },
+    };
+
+    const result = await byName(setup({ directory: related }).tools, "get_company").call({
+      id: "com_1",
+    });
+
+    expect(JSON.parse(text(result))).toMatchObject({
+      name: "Acme",
+      contactCount: 1,
+      openDealCount: 0,
+      contacts: [],
+      deals: [],
+    });
+    expect(asked.toSorted()).toEqual(["contacts ws_a com_1|", "deals ws_a com_1||"]);
+  });
+
   test("refuses input that doesn't match the schema", async () => {
     expect((await byName(setup().tools, "get_company").call({ id: 4 })).isError).toBe(true);
   });

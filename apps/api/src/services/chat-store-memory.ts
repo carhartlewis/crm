@@ -78,6 +78,17 @@ export function createMemoryChatStore(members: Iterable<string>, now = () => Dat
 
           if (chat) draft.chats.set(id, { ...chat, ...patch });
         },
+        setModeForUser: async (workspaceId, userId, mode) => {
+          for (const [id, chat] of draft.chats) {
+            const sees =
+              chat.createdById === userId ||
+              (chat.spaceId !== null && draft.members.has(`${chat.spaceId}:${userId}`));
+
+            if (chat.workspaceId === workspaceId && sees && chat.permissionMode !== "plan") {
+              draft.chats.set(id, { ...chat, permissionMode: mode });
+            }
+          }
+        },
         deleteChat: async (id) => {
           draft.chats.delete(id);
         },
