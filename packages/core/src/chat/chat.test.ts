@@ -5,6 +5,7 @@ import {
   chatFileTypeOf,
   chatTitlePrompt,
   cleanGeneratedTitle,
+  TITLE_NEEDS_REPLY,
   callDecision,
   callKind,
   decodeStoredLayout,
@@ -138,11 +139,25 @@ describe("generated chat titles", () => {
     expect(cleanGeneratedTitle("x".repeat(80))?.length).toBe(60);
   });
 
-  test("the prompt names attached files, and only when there are some", () => {
-    expect(chatTitlePrompt("Whats this", ["TaxInvoice-1614320.pdf"])).toContain(
-      "Attached files: TaxInvoice-1614320.pdf",
-    );
-    expect(chatTitlePrompt("Hi")).not.toContain("Attached files");
+  test("the prompt names attached files, and says so when there are none", () => {
+    expect(
+      chatTitlePrompt({ message: "Whats this", filenames: ["TaxInvoice-1614320.pdf"] }),
+    ).toContain("Attached files: TaxInvoice-1614320.pdf");
+    expect(chatTitlePrompt({ message: "Hi" })).toContain("Attached files: none");
+  });
+
+  test("a vague message may wait for the reply; the second prompt carries the reply", () => {
+    const first = chatTitlePrompt({ message: "Who is this person?" });
+
+    const second = chatTitlePrompt({
+      message: "Who is this person?",
+      reply: "Nathan Owen is a General Partner at Grand Ventures.",
+    });
+
+    expect(first).toContain(`reply with ${TITLE_NEEDS_REPLY} only`);
+    expect(first).not.toContain("Reply:");
+    expect(second).toContain("Reply: Nathan Owen is a General Partner");
+    expect(second).not.toContain(TITLE_NEEDS_REPLY + " only");
   });
 });
 

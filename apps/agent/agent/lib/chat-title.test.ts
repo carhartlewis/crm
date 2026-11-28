@@ -61,4 +61,45 @@ describe("nameChat", () => {
 
     expect(logged).toEqual(["chat title: naming the chat failed"]);
   });
+
+  test("a message that can't name the chat waits for the reply, then names it from both", async () => {
+    const prompts: string[] = [];
+    const saved: string[] = [];
+
+    const options = {
+      generate: async (prompt: string) => {
+        prompts.push(prompt);
+
+        return prompt.includes("Reply:") ? "Nathan Owen, Grand Ventures" : "?";
+      },
+      save: async (_sessionId: string, title: string) => {
+        saved.push(title);
+      },
+    };
+
+    const vague = { sessionId: "ses_1", message: "Who is this person?" };
+
+    expect(await nameChat(vague, options, new AbortController().signal)).toBe("waiting");
+    expect(saved).toEqual([]);
+
+    expect(
+      await nameChat(
+        { ...vague, reply: "Nathan Owen is a General Partner at Grand Ventures." },
+        options,
+        new AbortController().signal,
+      ),
+    ).toBe("named");
+    expect(prompts[1]).toContain("Reply: Nathan Owen");
+    expect(saved).toEqual(["Nathan Owen, Grand Ventures"]);
+  });
+
+  test("with the reply in hand, a second ? leaves the first title", async () => {
+    const outcome = await nameChat(
+      { ...turn, reply: "Hello" },
+      { generate: async () => "?", save: () => Promise.reject(new Error("unreachable")) },
+      new AbortController().signal,
+    );
+
+    expect(outcome).toBe("unnamed");
+  });
 });
