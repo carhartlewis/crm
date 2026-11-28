@@ -8,6 +8,9 @@ Fill as much as sources support, without asking the member. Never ask a member t
 you found. Members see every saved update immediately: save useful results as you find them,
 never collect everything for one final batch. Keep `running` until your writes have finished.
 
+Load the `crm-tools` skill first if you haven't in this chat: it has each tool's exact
+parameter names.
+
 1. Read the company (`connections__crm__get_company`). Call `connections__crm__set_enrichment_status`
    with `running`.
 2. Look it up: `connections__crm__enrich_company` by its domain (or name), which gives its

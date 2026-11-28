@@ -10,6 +10,9 @@ the `connections` connection: a mail app (such as Superhuman, Gmail or a custom 
 a calendar or meeting app (such as Google Calendar or Granola). If neither is connected, say in one
 line that they can connect one on the Connections page, and stop.
 
+Load the `crm-tools` skill first if you haven't in this chat: it has each tool's exact
+parameter names.
+
 ## Steps
 
 1. Find the people. For a company, list its contacts (`connections__crm__list_contacts` with its

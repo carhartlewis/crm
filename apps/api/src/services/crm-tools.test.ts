@@ -117,6 +117,37 @@ describe("CRM tools", () => {
     expect(byName(tools, "list_companies").tool.inputSchema.type).toBe("object");
   });
 
+  test("a call with misnamed parameters is told the names the tool takes", async () => {
+    const { tools } = setup();
+
+    const misnamed = await byName(tools, "get_contact").call({ contactId: "ctc_1" });
+
+    expect(misnamed.isError).toBe(true);
+    expect(text(misnamed)).toBe(
+      "Invalid input for crm__get_contact. Unknown parameters: contactId. crm__get_contact takes id.",
+    );
+
+    const missing = await byName(tools, "list_companies").call({ limit: 0 });
+
+    expect(text(missing)).toBe(
+      "Invalid input for crm__list_companies. crm__list_companies takes query?, limit?.",
+    );
+  });
+
+  test("a refusal after unknown parameters names them", async () => {
+    const { tools } = setup();
+
+    const refused = await byName(tools, "create_company").call({ name: "", companyName: "Globex" });
+
+    expect(text(refused)).toEndWith(
+      "Unknown parameters: companyName. crm__create_company takes name, domain?.",
+    );
+
+    const plain = await byName(tools, "create_company").call({ name: "" });
+
+    expect(text(plain)).not.toContain("takes");
+  });
+
   test("lists the caller's workspace companies", async () => {
     const result = await byName(setup().tools, "list_companies").call({ query: "ac" });
 
@@ -334,3 +365,48 @@ const EMPTY_PROFILE = {
   phone: null,
   stock: null,
 };
+
+describe("the agent's crm-tools skill", () => {
+  // The agent calls these tools without their schemas in view, from the signatures in this
+  // skill; a stale line there makes it send names the tool drops.
+  const skill = new URL("../../../agent/agent/skills/crm-tools/SKILL.md", import.meta.url);
+
+  test("lists every CRM tool with the parameters it takes", async () => {
+    // SAFETY: listing tools never calls these services; each only decides that its tools exist.
+    const present = {} as never;
+
+    const tools = crmTools(
+      {
+        directory,
+        companies: present,
+        records: present,
+        memory,
+        web: present,
+        jev: null,
+        intel: present,
+        fields: present,
+        enrichment: { enrichment: present, matches: present },
+      },
+      caller,
+    );
+
+    const signatures = tools.map((entry) => {
+      const { properties, required: names } = entry.tool.inputSchema;
+      const required = new Set(names ?? []);
+
+      const params = Object.keys(properties ?? {}).map((name) =>
+        required.has(name) ? name : `${name}?`,
+      );
+
+      const access = entry.tool.annotations?.readOnlyHint ? "R" : "W";
+
+      return `${access} connections__${entry.tool.name}(${params.join(", ")})`;
+    });
+
+    const listed = (await Bun.file(skill).text())
+      .split("\n")
+      .filter((line) => /^[RW] connections__crm__/.test(line));
+
+    expect(listed).toEqual(signatures);
+  });
+});

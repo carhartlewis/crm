@@ -217,6 +217,18 @@ const Text = (description: string) =>
 
 const STAGE_HELP = `One of: ${DEAL_STAGES.map((stage) => `${stage.id} (${stage.label})`).join(", ")}.`;
 
+type ToolArguments = Parameters<LocalTool["call"]>[0];
+
+/** The top-level parameters of a tool's input JSON Schema, and which are required. */
+const InputParams = Schema.Struct({
+  properties: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  required: Schema.optional(Schema.Array(Schema.String)),
+});
+
+const decodeInputParams = Schema.decodeUnknownOption(InputParams);
+
+const NO_PARAMS: typeof InputParams.Type = {};
+
 /** One tool: its MCP definition, and a call that decodes its arguments first. */
 export function tool<S extends Schema.Top & { readonly DecodingServices: never }>(
   definition: {
@@ -230,6 +242,24 @@ export function tool<S extends Schema.Top & { readonly DecodingServices: never }
 ): LocalTool {
   const decode = Schema.decodeUnknownOption(definition.input);
   const document = Schema.toJsonSchemaDocument(definition.input);
+  const params = Option.getOrElse(decodeInputParams(document.schema), () => NO_PARAMS);
+  const names = Object.keys(params.properties ?? {});
+  const required = new Set(params.required ?? []);
+
+  const takes = `crm__${definition.name} takes ${
+    names.map((name) => (required.has(name) ? name : `${name}?`)).join(", ") || "no input"
+  }.`;
+
+  /**
+   * The model often calls a deferred tool without reading its schema, guessing names such as
+   * `contactId` for `contact_id`; a struct drops unknown keys, so the call fails for a missing
+   * one. Name the keys it got wrong and the ones the tool takes, so the next call is right.
+   */
+  const hint = (args: ToolArguments) => {
+    const unknown = Object.keys(args).filter((key) => !names.includes(key));
+
+    return unknown.length > 0 ? `Unknown parameters: ${unknown.join(", ")}. ${takes}` : takes;
+  };
 
   return {
     tool: {
@@ -242,11 +272,20 @@ export function tool<S extends Schema.Top & { readonly DecodingServices: never }
         destructiveHint: definition.destructive ?? false,
       },
     },
-    call: async (args) =>
-      Option.match(decode(args), {
-        onNone: () => Promise.resolve(refuse(`Invalid input for crm__${definition.name}.`)),
-        onSome: call,
-      }),
+    call: async (args) => {
+      const input = decode(args);
+
+      if (Option.isNone(input)) {
+        return refuse(`Invalid input for crm__${definition.name}. ${hint(args)}`);
+      }
+
+      const result = await call(input.value);
+      const [content] = result.content;
+      const misnamed = hint(args);
+
+      // A refusal after unknown keys most likely comes from them (a missing `domain`).
+      return result.isError && misnamed !== takes ? refuse(`${content.text} ${misnamed}`) : result;
+    },
   };
 }
 

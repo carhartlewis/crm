@@ -7,6 +7,9 @@ description: Use when the member asks to find, search for, prospect or list peop
 Find the people the member described and give them a list they can add to the CRM. Do the
 search yourself; don't ask what they meant unless two very different readings would change it.
 
+Load the `crm-tools` skill first if you haven't in this chat: it has each tool's exact
+parameter names.
+
 1. Turn the brief into a search for `connections__crm__find_people`:
    - A role at one company: `company_domain` plus `title`. Everyone at a company:
      `company_domain` alone. One person: `full_name` (plus `company_domain` when known).

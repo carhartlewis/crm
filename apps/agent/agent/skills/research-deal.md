@@ -7,6 +7,9 @@ description: Use when asked to research a deal in the CRM (a background research
 Find what matters to this deal and save it as the deal's memory, without asking the member.
 Never change the deal's stage, amount, close date or owner: those are the member's.
 
+Load the `crm-tools` skill first if you haven't in this chat: it has each tool's exact
+parameter names.
+
 1. Read the deal (`connections__crm__get_deal`), its company
    (`connections__crm__get_company`), the people at the company
    (`connections__crm__list_contacts` with its id) and what the CRM remembers: the deal, the
