@@ -79,6 +79,21 @@ export interface DirectoryMember {
   readonly role: string;
 }
 
+export interface DirectoryWorkspace {
+  readonly name: string;
+  readonly website: string;
+}
+
+/**
+ * Who the agent works for in a turn: the member and their workspace. The agent puts it in its
+ * instructions, so "we" and "our" mean the workspace from the first message, before research of a
+ * new workspace has saved any memory.
+ */
+export interface AgentContext {
+  readonly workspace: DirectoryWorkspace;
+  readonly member: DirectoryMember;
+}
+
 /** Workspace-scoped reads for the tools. */
 export interface CrmDirectory {
   companies(
@@ -104,6 +119,22 @@ export interface CrmDirectory {
   ): Promise<readonly DirectoryDeal[]>;
   deal(workspaceId: string, id: string): Promise<DirectoryDeal | null>;
   members(workspaceId: string): Promise<readonly DirectoryMember[]>;
+  workspace(workspaceId: string): Promise<DirectoryWorkspace | null>;
+}
+
+/** The caller's member row and workspace; null when they are not a member of it. */
+export async function agentContext(
+  directory: Pick<CrmDirectory, "members" | "workspace">,
+  caller: { readonly userId: string; readonly workspaceId: string },
+): Promise<AgentContext | null> {
+  const [workspace, members] = await Promise.all([
+    directory.workspace(caller.workspaceId),
+    directory.members(caller.workspaceId),
+  ]);
+
+  const member = members.find((row) => row.id === caller.userId);
+
+  return workspace && member ? { workspace, member } : null;
 }
 
 export interface CrmToolDeps {
@@ -703,7 +734,14 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
 /** The CRM tools for a gateway caller; tests provide `CrmTools.of(...)` with fakes. */
 export class CrmTools extends Context.Service<
   CrmTools,
-  { readonly forCaller: (caller: EnrichmentToolCaller) => readonly LocalTool[] }
+  {
+    readonly forCaller: (caller: EnrichmentToolCaller) => readonly LocalTool[];
+    /** Who the agent works for (`GET /api/agent/context`); null when the caller isn't a member. */
+    readonly contextFor: (caller: {
+      readonly userId: string;
+      readonly workspaceId: string;
+    }) => Promise<AgentContext | null>;
+  }
 >()("@crm/api/services/CrmTools") {
   static readonly layer = Layer.effect(
     CrmTools,
@@ -729,7 +767,10 @@ export class CrmTools extends Context.Service<
           : null,
       };
 
-      return { forCaller: (caller) => crmTools(deps, caller) };
+      return {
+        forCaller: (caller) => crmTools(deps, caller),
+        contextFor: (caller) => agentContext(deps.directory, caller),
+      };
     }),
   ).pipe(
     Layer.provide([

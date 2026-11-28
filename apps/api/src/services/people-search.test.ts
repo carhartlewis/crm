@@ -278,6 +278,7 @@ const EMPTY_DIRECTORY: CrmDirectory = {
   deals: async () => [],
   deal: async () => null,
   members: async () => [],
+  workspace: async () => null,
 };
 
 const NO_MEMORY = {
