@@ -12,48 +12,19 @@ export const researchActive = (record: ResearchRecord) =>
 export interface ResearchStatus {
   readonly state: "queued" | "running" | "failed";
   readonly label: string;
-  readonly detail: string;
 }
-
-const contactCount = (count: number) => `${count} ${count === 1 ? "contact" : "contacts"}`;
 
 /** A company keeps its indicator while its contacts' independent research finishes. */
 export function researchStatus(record: ResearchRecord, people = 0): ResearchStatus | null {
   if (record.archived_at) return null;
 
-  if (record.enrichment_status === "failed") {
-    return {
-      state: "failed",
-      label: "Research interrupted",
-      detail: "Saved details are kept. Use Re-enrich to try again.",
-    };
-  }
+  if (record.enrichment_status === "failed") return { state: "failed", label: "Failed" };
 
-  if (record.enrichment_status === "running") {
-    return {
-      state: "running",
-      label: "Researching",
-      detail: people
-        ? `Researching this company and ${contactCount(people)}. Details appear as they are found.`
-        : "Details appear as they are found.",
-    };
-  }
+  if (record.enrichment_status === "running") return { state: "running", label: "Researching" };
 
-  if (record.enrichment_status === "pending") {
-    return {
-      state: "queued",
-      label: "Research queued",
-      detail: "Waiting for a research slot. It starts on its own.",
-    };
-  }
+  if (record.enrichment_status === "pending") return { state: "queued", label: "Queued" };
 
-  return people > 0
-    ? {
-        state: "running",
-        label: `Researching ${contactCount(people)}`,
-        detail: "Details appear as they are found.",
-      }
-    : null;
+  return people > 0 ? { state: "running", label: "Researching" } : null;
 }
 
 /** The workspace's research right now: sessions running, and records waiting in the queue. */
@@ -91,10 +62,6 @@ export function activityStatus({
           ? `Researching ${running} · ${waiting}`
           : `Researching ${running}`
         : waiting,
-    detail:
-      queued > 0
-        ? "A few records are researched at a time. Queued records start on their own as others finish."
-        : "Details appear as they are found.",
   };
 }
 

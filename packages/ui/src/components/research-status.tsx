@@ -11,32 +11,40 @@ const WarningIcon = carbonIcon(warning16);
 export function ResearchStatus({
   state,
   label,
-  detail,
   compact = false,
 }: {
   state: "queued" | "running" | "failed";
   label: string;
-  detail: string;
   compact?: boolean;
 }) {
+  const icon =
+    state === "running" ? (
+      <Spinner aria-hidden />
+    ) : state === "failed" ? (
+      <WarningIcon aria-hidden />
+    ) : (
+      <TimeIcon aria-hidden />
+    );
+
+  const className =
+    "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm text-xs text-muted-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50";
+
+  if (!compact) {
+    return (
+      <span className={className}>
+        {icon}
+        {label}
+      </span>
+    );
+  }
+
+  // Compact shows only the icon; the tooltip names it.
   return (
     <Tooltip>
-      <TooltipTrigger
-        render={<span />}
-        tabIndex={0}
-        aria-label={`${label}. ${detail}`}
-        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm text-xs text-muted-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50"
-      >
-        {state === "running" ? (
-          <Spinner aria-hidden />
-        ) : state === "failed" ? (
-          <WarningIcon aria-hidden />
-        ) : (
-          <TimeIcon aria-hidden />
-        )}
-        {compact ? <span className="sr-only">{label}</span> : label}
+      <TooltipTrigger render={<span />} tabIndex={0} aria-label={label} className={className}>
+        {icon}
       </TooltipTrigger>
-      <TooltipContent>{detail}</TooltipContent>
+      <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
 }

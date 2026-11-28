@@ -18,7 +18,7 @@ describe("record research feedback", () => {
   test("an optimistic record shows queued feedback before the agent starts", () => {
     expect(researchStatus(record("pending"))).toMatchObject({
       state: "queued",
-      label: "Research queued",
+      label: "Queued",
     });
     expect(researchActive(record("pending"))).toBe(true);
     expect(researchStatus(record("running"))).toMatchObject({
@@ -36,7 +36,7 @@ describe("record research feedback", () => {
     expect(researchStatus(record("skipped"))).toBeNull();
     expect(researchStatus(record("failed"))).toMatchObject({
       state: "failed",
-      label: "Research interrupted",
+      label: "Failed",
     });
   });
 
@@ -57,9 +57,8 @@ describe("record research feedback", () => {
     ]);
     expect(researchStatus(record("complete"), counts.get("com_a"))).toMatchObject({
       state: "running",
-      label: "Researching 2 contacts",
+      label: "Researching",
     });
-    expect(researchStatus(record("complete"), 1)?.label).toBe("Researching 1 contact");
     expect(researchStatus(record("complete"), 0)).toBeNull();
   });
 
