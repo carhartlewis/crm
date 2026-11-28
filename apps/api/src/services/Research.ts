@@ -291,7 +291,12 @@ export class Research extends Context.Service<Research, ResearchService>()(
       const redisUrl = Redacted.value(config.redisUrl);
 
       const limits: QueueLimits = {
-        workspace: config.researchWorkspaceConcurrency,
+        workspace: {
+          company: config.researchCompanyConcurrency,
+          contact: config.researchContactConcurrency,
+          deal: config.researchDealConcurrency,
+          fill: config.researchFillConcurrency,
+        },
         global: config.researchConcurrency,
         leaseMs: DEFAULT_LIMITS.leaseMs,
       };

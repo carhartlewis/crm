@@ -1,6 +1,7 @@
 # 0030: Research runs through a BullMQ queue with concurrency limits
 
-**Status:** accepted (2026-11). Amends [0025](0025-records-fill-themselves.md) and
+**Status:** accepted (2026-11); slots per kind in [0031](0031-research-slots-per-kind.md).
+Amends [0025](0025-records-fill-themselves.md) and
 [0029](0029-contact-and-deal-research-is-memory.md): every record still gets research, but only a
 limited number of sessions run at the same time.
 

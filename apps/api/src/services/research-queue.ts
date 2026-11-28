@@ -3,12 +3,16 @@ import { Schema } from "effect";
 /**
  * The research queue (ADR 0030). Every background research session is a BullMQ job
  * (`research-bullmq.ts`), so a bulk import never starts hundreds of agent sessions at once.
- * BullMQ keeps the line and the global limit; a slot set per workspace keeps each workspace's
- * limit. A job holds its slot for as long as its agent session runs. Postgres keeps each record's
+ * BullMQ keeps the line and the global limit; a slot set per workspace and kind keeps each
+ * workspace's limit for that kind, so a flood of one kind never holds up the others. A job holds its slot for as long as its agent session runs. Postgres keeps each record's
  * status (`pending` → `running` → `complete`/`skipped`/`failed`), and Electric syncs it to the UI.
  */
 
-const JobKind = Schema.Literals(["company", "contact", "deal", "fill"]);
+export const JOB_KINDS = ["company", "contact", "deal", "fill"] as const;
+
+const JobKind = Schema.Literals(JOB_KINDS);
+
+export type JobKind = typeof JobKind.Type;
 
 const FillField = Schema.Struct({ id: Schema.String, entity: Schema.String, label: Schema.String });
 
@@ -32,8 +36,8 @@ export const parseJob = Schema.decodeUnknownOption(ResearchJob);
 
 /** How much research runs at once. Generous: they stop a flood, not normal work. */
 export interface QueueLimits {
-  /** Sessions one workspace may run at once. */
-  readonly workspace: number;
+  /** Sessions of each kind one workspace may run at once. */
+  readonly workspace: Readonly<Record<JobKind, number>>;
   /** Sessions the whole API may run at once (BullMQ's global concurrency). */
   readonly global: number;
   /**
@@ -44,20 +48,23 @@ export interface QueueLimits {
 }
 
 export const DEFAULT_LIMITS: QueueLimits = {
-  workspace: 10,
-  global: 50,
+  workspace: { company: 25, contact: 10, deal: 2, fill: 2 },
+  global: 1000,
   leaseMs: 30 * 60 * 1000,
 };
 
-/** Each workspace's running sessions. Redis in the API; `createMemorySlots` in tests. */
+/**
+ * Each workspace's running sessions, one set per job kind. Redis in the API; `createMemorySlots`
+ * in tests.
+ */
 export interface WorkspaceSlots {
   /**
-   * Takes a slot for the job until `leaseUntil`, freeing lapsed slots first. True when the job
-   * now holds one, including a slot it already held (a job BullMQ runs again after a restart).
+   * Takes a slot of the job's kind until `leaseUntil`, freeing lapsed slots first. True when the
+   * job now holds one, including a slot it already held (a job BullMQ runs again after a restart).
    */
   acquire(job: ResearchJob, at: number, leaseUntil: number, limit: number): Promise<boolean>;
   release(job: ResearchJob): Promise<void>;
-  /** Whether the job holds a slot in this workspace; how a session's end is checked. */
+  /** Whether the job holds a slot of any kind in this workspace; how a session's end is checked. */
   holds(workspaceId: string, jobId: string): Promise<boolean>;
 }
 
@@ -82,14 +89,17 @@ export interface RunDependencies {
 }
 
 /**
- * One job, as BullMQ's worker runs it: `busy` when its workspace is full (the worker delays it),
+ * One job, as BullMQ's worker runs it: `busy` when its workspace has no free slot of its kind (the
+ * worker delays it),
  * otherwise it holds a slot until its session ends, and `done`.
  */
 export async function runResearchJob(job: ResearchJob, deps: RunDependencies) {
   const at = deps.now();
   const leaseUntil = at + deps.limits.leaseMs;
 
-  if (!(await deps.slots.acquire(job, at, leaseUntil, deps.limits.workspace))) return "busy";
+  const limit = deps.limits.workspace[job.kind];
+
+  if (!(await deps.slots.acquire(job, at, leaseUntil, limit))) return "busy";
 
   try {
     if ((await deps.begin(job)) && !(await deps.ends.wait(job.id, leaseUntil))) {
@@ -106,34 +116,39 @@ export async function runResearchJob(job: ResearchJob, deps: RunDependencies) {
 
 /** In-process slots with the Redis slots' rules, for tests. */
 export function createMemorySlots() {
-  /** Workspace → job id → lease end. */
+  /** `<workspace>:<kind>` → job id → lease end. */
   const held = new Map<string, Map<string, number>>();
 
-  const of = (workspaceId: string) => {
-    const slots = held.get(workspaceId) ?? new Map<string, number>();
+  const of = (workspaceId: string, kind: JobKind) => {
+    const key = `${workspaceId}:${kind}`;
+    const slots = held.get(key) ?? new Map<string, number>();
 
-    held.set(workspaceId, slots);
+    held.set(key, slots);
 
     return slots;
   };
 
-  const slots: WorkspaceSlots & { running(workspaceId: string): number } = {
+  const slots: WorkspaceSlots & { running(workspaceId: string, kind?: JobKind): number } = {
     acquire: async (job, at, leaseUntil, limit) => {
-      const workspace = of(job.workspaceId);
+      const lane = of(job.workspaceId, job.kind);
 
-      for (const [id, until] of workspace) if (until <= at) workspace.delete(id);
+      for (const [id, until] of lane) if (until <= at) lane.delete(id);
 
-      if (!workspace.has(job.id) && workspace.size >= limit) return false;
+      if (!lane.has(job.id) && lane.size >= limit) return false;
 
-      workspace.set(job.id, leaseUntil);
+      lane.set(job.id, leaseUntil);
 
       return true;
     },
     release: async (job) => {
-      of(job.workspaceId).delete(job.id);
+      of(job.workspaceId, job.kind).delete(job.id);
     },
-    holds: async (workspaceId, jobId) => of(workspaceId).has(jobId),
-    running: (workspaceId) => of(workspaceId).size,
+    holds: async (workspaceId, jobId) => JOB_KINDS.some((kind) => of(workspaceId, kind).has(jobId)),
+    running: (workspaceId, kind) => {
+      const kinds: readonly JobKind[] = kind ? [kind] : JOB_KINDS;
+
+      return kinds.reduce((sum, each) => sum + of(workspaceId, each).size, 0);
+    },
   };
 
   return slots;

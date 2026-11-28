@@ -2,6 +2,8 @@ import { createBunRedisClient, DelayedError, Queue, Worker } from "bullmq";
 import { RedisClient } from "bun";
 import { Option } from "effect";
 import {
+  JOB_KINDS,
+  type JobKind,
   parseJob,
   type QueueLimits,
   type ResearchJob,
@@ -19,7 +21,7 @@ import {
 export const RESEARCH_QUEUE = "research";
 const PREFIX = "crm:bull";
 
-/** A job whose workspace is full waits about this long before it tries again. */
+/** A job whose workspace has no free slot of its kind waits about this long before it tries again. */
 const BUSY_DELAY_MS = 5000;
 
 /** How often a waiting job checks for its session's end when another API instance got it. */
@@ -30,7 +32,7 @@ const ENDED_TTL_SECONDS = 60 * 60;
 
 type Redis = Pick<RedisClient, "send">;
 
-// KEYS: the workspace's slots. ARGV: job id, now, lease end, limit. Frees lapsed slots, then
+// KEYS: the workspace's slots of one kind. ARGV: job id, now, lease end, limit. Frees lapsed slots, then
 // renews the job's slot or takes a free one. One key, so it is atomic and cluster-safe.
 const ACQUIRE = `
 redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])
@@ -41,16 +43,20 @@ if redis.call('ZSCORE', KEYS[1], ARGV[1]) or redis.call('ZCARD', KEYS[1]) < tonu
 end
 return 0`;
 
-/** Each workspace's running sessions: a sorted set of job ids scored by when their lease ends. */
+/**
+ * Each workspace's running sessions: per kind, a sorted set of job ids scored by when their lease
+ * ends.
+ */
 export function createRedisSlots(redis: Redis, prefix = "crm"): WorkspaceSlots {
-  const key = (workspaceId: string) => `${prefix}:research:slots:${workspaceId}`;
+  const key = (workspaceId: string, kind: JobKind) =>
+    `${prefix}:research:slots:${workspaceId}:${kind}`;
 
   return {
     acquire: async (job, at, leaseUntil, limit) => {
       const taken: number = await redis.send("EVAL", [
         ACQUIRE,
         "1",
-        key(job.workspaceId),
+        key(job.workspaceId, job.kind),
         job.id,
         String(at),
         String(leaseUntil),
@@ -60,12 +66,14 @@ export function createRedisSlots(redis: Redis, prefix = "crm"): WorkspaceSlots {
       return taken === 1;
     },
     release: async (job) => {
-      await redis.send("ZREM", [key(job.workspaceId), job.id]);
+      await redis.send("ZREM", [key(job.workspaceId, job.kind), job.id]);
     },
     holds: async (workspaceId, jobId) => {
-      const score: string | null = await redis.send("ZSCORE", [key(workspaceId), jobId]);
+      const scores: (string | null)[] = await Promise.all(
+        JOB_KINDS.map((kind) => redis.send("ZSCORE", [key(workspaceId, kind), jobId])),
+      );
 
-      return score !== null;
+      return scores.some((score) => score !== null);
     },
   };
 }
@@ -156,7 +164,7 @@ export function createResearchQueue(redisUrl: string, prefix = PREFIX) {
 
 /**
  * Runs research jobs: up to `limits.global` at once across every API instance (BullMQ's global
- * concurrency). A job whose workspace is full goes back to the delayed set and tries again.
+ * concurrency). A job whose workspace has no free slot of its kind goes back to the delayed set and tries again.
  */
 export async function startResearchWorker(
   redisUrl: string,

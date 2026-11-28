@@ -46,7 +46,11 @@ function setup(overrides: Partial<ResearchDependencies> = {}) {
     queue,
     slots,
     ends,
-    limits: { workspace: 3, global: 50, leaseMs: 60_000 },
+    limits: {
+      workspace: { company: 3, contact: 3, deal: 3, fill: 3 },
+      global: 50,
+      leaseMs: 60_000,
+    },
     claim: async (job) => {
       statuses.push(`${job.recordId} running`);
 

@@ -2,22 +2,27 @@ import { describe, expect, test } from "bun:test";
 import {
   createMemoryEnds,
   createMemorySlots,
+  type JobKind,
   type QueueLimits,
   type ResearchJob,
   runResearchJob,
 } from "./research-queue.ts";
 
-const job = (id: string, workspaceId = "ws_a"): ResearchJob => ({
+const job = (id: string, workspaceId = "ws_a", kind: JobKind = "contact"): ResearchJob => ({
   id,
   workspaceId,
   userId: "user_alice",
-  kind: "contact",
+  kind,
   recordId: id,
   field: null,
   operationId: id,
 });
 
-const limits: QueueLimits = { workspace: 2, global: 50, leaseMs: 60_000 };
+const limits: QueueLimits = {
+  workspace: { company: 1, contact: 2, deal: 1, fill: 1 },
+  global: 50,
+  leaseMs: 60_000,
+};
 
 /** Every session starts. */
 const starts = async () => true;
@@ -80,6 +85,30 @@ describe("research jobs", () => {
 
     await env.ends.end("b1");
     expect(await other).toBe("done");
+  });
+
+  test("each kind has its own slots: a full kind never holds up another", async () => {
+    const env = setup();
+
+    void env.run(job("ctc_1"));
+    void env.run(job("ctc_2"));
+    await tick();
+
+    expect(await env.run(job("ctc_3"))).toBe("busy");
+
+    void env.run(job("com_1", "ws_a", "company"));
+    await tick();
+
+    expect(env.begun).toEqual(["ctc_1", "ctc_2", "com_1"]);
+    expect(env.slots.running("ws_a", "contact")).toBe(2);
+    expect(env.slots.running("ws_a", "company")).toBe(1);
+    expect(await env.run(job("com_2", "ws_a", "company"))).toBe("busy");
+
+    // The session's end finds its slot without knowing its kind.
+    expect(await env.slots.holds("ws_a", "com_1")).toBe(true);
+    await env.ends.end("com_1");
+    await tick();
+    expect(env.slots.running("ws_a", "company")).toBe(0);
   });
 
   test("a job run again after a restart keeps its own slot", async () => {
