@@ -32,7 +32,7 @@ import { toast } from "sonner";
 import { rankSearch, type Searchable } from "@crm/ui/lib/search-rank";
 import { queueFirstMessage, seedNewChat } from "../../lib/chat-api.ts";
 import { useChatSpaces, useVisibleChats } from "../../lib/chat-spaces.ts";
-import { startChatMutation } from "../../lib/chats.ts";
+import { chatsCollection, startChatMutation } from "../../lib/chats.ts";
 import { lastPermissionMode } from "../../lib/permission-mode.ts";
 import { accessLabels, connectMutation, useConnectionHits } from "../../lib/connections.ts";
 import { useCreateSheet } from "../../lib/create-sheet.ts";
@@ -432,7 +432,7 @@ export default function CommandPalette({
       userId,
       text: `Find people: ${query}`,
       spaceId: null,
-      permissionMode: lastPermissionMode(userId),
+      permissionMode: lastPermissionMode(userId, chatsCollection(workspaceId).toArray),
     });
   };
 

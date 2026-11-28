@@ -18,12 +18,14 @@ import { ChatMark } from "../../../components/brand.tsx";
 import { Composer } from "../../../components/chat/composer.tsx";
 import { PermissionModeMenu } from "../../../components/chat/permission-mode-menu.tsx";
 import { lastPermissionMode, rememberPermissionMode } from "../../../lib/permission-mode.ts";
+import type { PermissionMode } from "@crm/core/chat";
 import { spaceColor } from "../../../components/chat/chat-menu.tsx";
 import { WorkspacePageHeader } from "../../../components/shell/page-header.tsx";
 import { prewarmChat, queueFirstMessage, seedNewChat } from "../../../lib/chat-api.ts";
 import {
   chatSpaceMembersCollection,
   chatSpacesCollection,
+  chatsCollection,
   oldestFirst,
   startChatMutation,
 } from "../../../lib/chats.ts";
@@ -48,8 +50,10 @@ function NewChatForm({ userId, workspaceId }: { userId: string; workspaceId: str
   const queryClient = useQueryClient();
 
   const { space: spaceId } = Route.useSearch();
-  // New chats start in the mode this person picked last (ADR 0019).
-  const [permissionMode, setPermissionMode] = useState(() => lastPermissionMode(userId));
+  // New chats start in the person's mode, which their chats share (ADR 0033), until they pick one.
+  const chats = useLiveQuery(() => chatsCollection(workspaceId));
+  const [picked, setPermissionMode] = useState<PermissionMode | null>(null);
+  const permissionMode = picked ?? lastPermissionMode(userId, chats.data ?? []);
 
   // Read once per mount: the page remounts (`key`) for another workspace.
   const spaces = useLiveQuery(() => chatSpacesCollection(workspaceId));

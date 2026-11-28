@@ -102,19 +102,19 @@ export interface CrmDirectory {
     limit: number,
   ): Promise<readonly DirectoryCompany[]>;
   company(workspaceId: string, id: string): Promise<DirectoryCompany | null>;
-  /** `companyId` empty means every company. */
+  /** An empty `companyId` or `dealId` doesn't filter. */
   contacts(
     workspaceId: string,
     query: string,
-    companyId: string,
+    filter: { readonly companyId: string; readonly dealId: string },
     limit: number,
   ): Promise<readonly DirectoryContact[]>;
   contact(workspaceId: string, id: string): Promise<DirectoryContact | null>;
-  /** `stage`: a stage id, `open`, `closed`, or empty for all. */
+  /** `stage`: a stage id, `open`, `closed`, or empty for all. An empty filter doesn't filter. */
   deals(
     workspaceId: string,
     query: string,
-    filter: { readonly companyId: string; readonly stage: string },
+    filter: { readonly companyId: string; readonly contactId: string; readonly stage: string },
     limit: number,
   ): Promise<readonly DirectoryDeal[]>;
   deal(workspaceId: string, id: string): Promise<DirectoryDeal | null>;
@@ -206,6 +206,9 @@ const DealId = Schema.String.annotate({
 const OwnerId = Schema.optional(Schema.NullOr(Schema.String)).annotate({
   description: "A member's user id from crm__list_members; null leaves it unassigned.",
 });
+
+/** How many related records a `get_…` read includes: a company's people and deals, and so on. */
+const RELATED_LIMIT = 100;
 
 const Limit = Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 200 })));
 
@@ -341,14 +344,33 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "get_company",
         description:
-          "One company in the CRM: name, domain, industry, location, about, owner, contact and open-deal counts.",
+          "One company in the CRM: name, domain, industry, location, about and owner, with its people (`contacts`) and its deals. Read this to answer who we know at a company or what we have with them; no list call is needed.",
         readOnly: true,
         input: Schema.Struct({ id: CompanyId }),
       },
       async (input) => {
         const company = await deps.directory.company(caller.workspaceId, input.id);
 
-        return company ? answer(company) : refuse("No company with that id in this workspace.");
+        if (!company) return refuse("No company with that id in this workspace.");
+
+        const { contacts: contactCount, openDeals: openDealCount, ...rest } = company;
+
+        const [contacts, deals] = await Promise.all([
+          deps.directory.contacts(
+            caller.workspaceId,
+            "",
+            { companyId: company.id, dealId: "" },
+            RELATED_LIMIT,
+          ),
+          deps.directory.deals(
+            caller.workspaceId,
+            "",
+            { companyId: company.id, contactId: "", stage: "" },
+            RELATED_LIMIT,
+          ),
+        ]);
+
+        return answer({ ...rest, contactCount, openDealCount, contacts, deals });
       },
     ),
     tool(
@@ -407,11 +429,12 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "list_contacts",
         description:
-          "List people in the CRM. Pass `query` to match a name, email or title, and `companyId` for one company's people.",
+          "List people across the CRM. Pass `query` to match a name, email or title, `companyId` for one company's people, and `dealId` for the people on one deal.",
         readOnly: true,
         input: Schema.Struct({
           query: Schema.optional(Schema.String),
           companyId: Schema.optional(CompanyId),
+          dealId: Schema.optional(DealId),
           limit: Limit,
         }),
       },
@@ -420,7 +443,7 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
           contacts: await deps.directory.contacts(
             caller.workspaceId,
             input.query?.trim() ?? "",
-            input.companyId ?? "",
+            { companyId: input.companyId ?? "", dealId: input.dealId ?? "" },
             input.limit ?? 50,
           ),
         }),
@@ -429,7 +452,7 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "get_contact",
         description:
-          "One contact: name, title, email, phone, company, owner and saved memory (profile, facts and source status). Read this before answering who someone is or what we know about them. A memory error means unavailable, not empty.",
+          "One contact: name, title, email, phone, company, owner, the deals they are on (`deals`) and saved memory (profile, facts and source status). Read this before answering who someone is or what we know about them. A memory error means unavailable, not empty.",
         readOnly: true,
         input: Schema.Struct({ id: ContactId }),
       },
@@ -438,10 +461,17 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
 
         if (!contact) return refuse("No contact with that id in this workspace.");
 
-        return answer({
-          ...contact,
-          memory: await deps.memory.knowledge(caller, { contactId: contact.id }),
-        });
+        const [deals, memory] = await Promise.all([
+          deps.directory.deals(
+            caller.workspaceId,
+            "",
+            { companyId: "", contactId: contact.id, stage: "" },
+            RELATED_LIMIT,
+          ),
+          deps.memory.knowledge(caller, { contactId: contact.id }),
+        ]);
+
+        return answer({ ...contact, deals, memory });
       },
     ),
     tool(
@@ -519,11 +549,12 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "list_deals",
         description:
-          "List deals with their company, stage, amount and close date. Filter by `query` (deal or company name), `companyId`, or `stage` (a stage id, `open` or `closed`).",
+          "List deals across the CRM with their company, stage, amount and close date. Filter by `query` (deal or company name), `companyId`, `contactId` (deals that person is on), or `stage` (a stage id, `open` or `closed`).",
         readOnly: true,
         input: Schema.Struct({
           query: Schema.optional(Schema.String),
           companyId: Schema.optional(CompanyId),
+          contactId: Schema.optional(ContactId),
           stage: Schema.optional(Schema.String),
           limit: Limit,
         }),
@@ -533,7 +564,11 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
           deals: await deps.directory.deals(
             caller.workspaceId,
             input.query?.trim() ?? "",
-            { companyId: input.companyId ?? "", stage: input.stage ?? "" },
+            {
+              companyId: input.companyId ?? "",
+              contactId: input.contactId ?? "",
+              stage: input.stage ?? "",
+            },
             input.limit ?? 50,
           ),
         }),
@@ -542,7 +577,7 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "get_deal",
         description:
-          "One deal: stage, amount, currency, close date, company, owner, description and saved memory (profile, facts and source status). Read this before answering what we know about a deal. A memory error means unavailable, not empty.",
+          "One deal: stage, amount, currency, close date, company, owner, description, the people on it (`contacts`) and saved memory (profile, facts and source status). Read this before answering what we know about a deal. A memory error means unavailable, not empty.",
         readOnly: true,
         input: Schema.Struct({ id: DealId }),
       },
@@ -551,10 +586,17 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
 
         if (!deal) return refuse("No deal with that id in this workspace.");
 
-        return answer({
-          ...deal,
-          memory: await deps.memory.knowledge(caller, { dealId: deal.id }),
-        });
+        const [contacts, memory] = await Promise.all([
+          deps.directory.contacts(
+            caller.workspaceId,
+            "",
+            { companyId: "", dealId: deal.id },
+            RELATED_LIMIT,
+          ),
+          deps.memory.knowledge(caller, { dealId: deal.id }),
+        ]);
+
+        return answer({ ...deal, contacts, memory });
       },
     ),
     tool(

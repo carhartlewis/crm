@@ -1,6 +1,7 @@
 # 0019: Permission modes for agent chats
 
-**Status:** accepted (2026-11). Changes the approval rule in
+**Status:** accepted (2026-11); the mode rule is changed by
+[0033](0033-one-permission-mode-per-person.md). Changes the approval rule in
 [0018](0018-chats-spaces-and-folders.md) and [0013](0013-connections-through-an-mcp-gateway.md).
 
 ## Context
