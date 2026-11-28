@@ -1,5 +1,6 @@
 import edit from "@carbon/icons/es/edit/16.js";
 import grid from "@carbon/icons/es/grid/16.js";
+import plug from "@carbon/icons/es/plug/16.js";
 import { buttonVariants } from "@crm/ui/components/button";
 import { carbonIcon } from "@crm/ui/components/icon";
 import {
@@ -32,6 +33,7 @@ import { WorkspaceMenu } from "./workspace-menu.tsx";
 
 const EditIcon = carbonIcon(edit);
 const SpacesIcon = carbonIcon(grid);
+const ConnectionsIcon = carbonIcon(plug);
 
 // Pinned chats and spaces, Spaces, Folders and Recents read synced data: their own chunk. It is
 // the sidebar's main content, so it starts loading with the shell, not on idle.
@@ -55,6 +57,8 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
 
   const spacesActive =
     pathname === "/spaces" || (openSpace !== null && !pinned.includes(`space:${openSpace}`));
+
+  const inSettings = isSettingsPath(pathname);
 
   return (
     <Sidebar variant="inset">
@@ -89,7 +93,7 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
         </HotkeyTooltip>
       </SidebarHeader>
       <SidebarContent className="overscroll-contain">
-        {isSettingsPath(pathname) ? (
+        {inSettings ? (
           <SettingsNav />
         ) : (
           <>
@@ -117,6 +121,17 @@ export function AppSidebar({ userId, workspaceId, onSearch, onSearchIntent }: Ap
         )}
       </SidebarContent>
       <SidebarFooter>
+        {/* Settings has its own Connections row in SettingsNav. */}
+        {inSettings ? null : (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton render={<Link to="/settings/connections" />}>
+                <ConnectionsIcon />
+                <span>Connections</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
         <WorkspaceMenu userId={userId} />
       </SidebarFooter>
       <SidebarRail onHaptic={haptic} />
