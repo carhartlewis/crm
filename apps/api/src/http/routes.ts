@@ -155,7 +155,9 @@ const ContactsHandlers = HttpApiBuilder.group(
 
     return handlers
       .handle("create", ({ payload }) =>
-        Effect.flatMap(actor, (who) => contacts.create(who, payload)),
+        Effect.flatMap(actor, (who) =>
+          contacts.create(who, payload).pipe(Effect.map(({ txid }) => ({ txid }))),
+        ),
       )
       .handle("update", ({ params, payload }) =>
         Effect.flatMap(actor, (who) => contacts.update(who, params.id, payload)),

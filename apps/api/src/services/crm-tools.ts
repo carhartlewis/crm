@@ -417,7 +417,7 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
       {
         name: "create_contact",
         description:
-          "Add a person to the CRM at their company. Every contact needs one: find it with crm__list_companies, or add it with crm__create_company first (for a founder or angel, the company they run or work at). The caller becomes the owner, and the CRM then researches them in the background (email, phone, photo, background). Check crm__list_contacts first so nobody is added twice. Set `found_by_search` when the person came from crm__find_people.",
+          "Add a person to the CRM at their company. Every contact needs one: find it with crm__list_companies, or add it with crm__create_company first (for a founder or angel, the company they run or work at). The caller becomes the owner, and the CRM then researches them in the background (email, phone, photo, background). Nobody is added twice: when the person is already in the CRM (the same LinkedIn profile, the same email, or the same name at the same company), the CRM keeps the existing contact, fills its empty fields from yours, and returns `created: false` with its `id` and why it matched; use that id. Set `found_by_search` when the person came from crm__find_people.",
         readOnly: false,
         input: Schema.Struct({
           first_name: Schema.String,
@@ -436,8 +436,23 @@ export function crmTools(deps: CrmToolDeps, caller: EnrichmentToolCaller): reado
 
         return run(
           deps.records.contacts
-            .create(actor, { ...fields, id, source: searched ? "search" : "manual" })
-            .pipe(Effect.as({ id, created: true })),
+            .create(
+              actor,
+              { ...fields, id, source: searched ? "search" : "manual" },
+              { onDuplicate: "merge" },
+            )
+            .pipe(
+              Effect.map(({ txid: _txid, ...result }) =>
+                result.created
+                  ? { id: result.id, created: true }
+                  : {
+                      ...result,
+                      note: result.archived
+                        ? "Already in the CRM, archived. A member archived them; don't restore them unless asked."
+                        : "Already in the CRM; nothing new was added.",
+                    },
+              ),
+            ),
         );
       },
     ),

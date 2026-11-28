@@ -44,6 +44,20 @@ export interface RecordTx {
   remove(table: RecordTable, workspaceId: string, id: string): Promise<boolean>;
   /** The contacts at a company, archived ones included. */
   contactsAt(workspaceId: string, companyId: string): Promise<readonly RecordRow[]>;
+  /**
+   * Contacts that might be this person, archived ones included: the same email, a LinkedIn URL
+   * that names this handle, or the same company. The caller decides which ones match.
+   */
+  contactCandidates(
+    workspaceId: string,
+    person: {
+      readonly email: string | null;
+      readonly linkedinHandle: string | null;
+      readonly companyId: string | null;
+    },
+  ): Promise<readonly RecordRow[]>;
+  /** Holds `key` until the transaction ends, so two writes that check-then-insert take turns. */
+  lock(key: string): Promise<void>;
   /** Adds the contact to the deal, or sets their role when already on it. */
   putDealContact(row: DealContactRow): Promise<void>;
   removeDealContact(workspaceId: string, dealId: string, contactId: string): Promise<boolean>;
@@ -132,6 +146,37 @@ function recordTx(tx: DbTx): RecordTx {
       (await tables[table].where({ id, workspaceId }).delete()) !== null,
     contactsAt: async (workspaceId, companyId) =>
       await orm.Contact.where({ workspaceId, companyId }).all(),
+    contactCandidates: async (workspaceId, { email, linkedinHandle, companyId }) => {
+      const found = new Map<string, RecordRow>();
+
+      const add = (rows: readonly RecordRow[]) => {
+        for (const row of rows) found.set(String(row["id"]), row);
+      };
+
+      // Stored emails are lower case (`optionalEmail`).
+      if (email) add(await orm.Contact.where({ workspaceId, email }).all());
+
+      if (linkedinHandle) {
+        // A wide net (`_` and a longer handle also match); the caller compares handles exactly.
+        add(
+          await orm.Contact.where({ workspaceId })
+            .where((contact) => contact.linkedinUrl.ilike(`%linkedin.com/in/${linkedinHandle}%`))
+            .all(),
+        );
+      }
+
+      if (companyId) add(await orm.Contact.where({ workspaceId, companyId }).all());
+
+      return [...found.values()];
+    },
+    lock: async (key) => {
+      await tx.query(
+        tx.raw
+          .sql`SELECT 1 AS locked FROM (SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))) AS held`
+          .returnsRow({ locked: "pg/int4@1" })
+          .build(),
+      );
+    },
     putDealContact: async (row) => {
       const key = { dealId: row.dealId, contactId: row.contactId, workspaceId: row.workspaceId };
 

@@ -35,3 +35,4 @@ Short records of decisions that are settled, and why. Rules live in `AGENTS.md`;
 | [0029](0029-contact-and-deal-research-is-memory.md) | A contact's brief and a deal's research brief are the record's memory core; deals research themselves; no research cap               |
 | [0030](0030-research-queue.md)                      | Research runs as BullMQ jobs: concurrency limits per workspace and in all, slots freed when a session ends; status synced live       |
 | [0031](0031-research-slots-per-kind.md)             | Each kind of research (companies, contacts, deals, fills) has its own slots per workspace                                            |
+| [0032](0032-one-contact-per-person.md)              | One contact per person: the API matches LinkedIn, email or name at the company under a lock; refuse or merge                         |

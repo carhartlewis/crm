@@ -16,8 +16,8 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { companiesCollection } from "../../lib/companies.ts";
-import { type Contact, contactsCollection } from "../../lib/contacts.ts";
-import { addPeopleMutation, companyFor, verifiedEmail } from "../../lib/people.ts";
+import { contactsCollection } from "../../lib/contacts.ts";
+import { addPeopleMutation, companyFor, contactFor, verifiedEmail } from "../../lib/people.ts";
 import { useOpenRecord } from "../../lib/records.ts";
 import type { PersonResultRow } from "../../lib/tool-results.ts";
 import { CompanyCell, NameWithMark, PersonAvatar, MARK_SIZE } from "../records/record-visuals.tsx";
@@ -30,22 +30,6 @@ import { CompanyCell, NameWithMark, PersonAvatar, MARK_SIZE } from "../records/r
 
 /** The most rows the table shows; a search returns at most 50. */
 const MAX_ROWS = 50;
-
-/** The CRM contact a row already is: by the id the search found, or by LinkedIn URL or email. */
-function inCrm(row: PersonResultRow, contacts: readonly Contact[]) {
-  if (row.contactId) return row.contactId;
-
-  const email = row.email?.toLowerCase();
-
-  return (
-    contacts.find(
-      (contact) =>
-        !contact.archived_at &&
-        ((row.linkedinUrl && contact.linkedin_url === row.linkedinUrl) ||
-          (email && contact.email?.toLowerCase() === email)),
-    )?.id ?? null
-  );
-}
 
 export function PeopleResults({
   rows,
@@ -66,7 +50,7 @@ export function PeopleResults({
   const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
 
   const shown = rows.slice(0, MAX_ROWS);
-  const existing = shown.map((row) => inCrm(row, contacts));
+  const existing = shown.map((row) => contactFor(row, contacts, companies)?.id ?? null);
   const addable = shown.flatMap((_, index) => (existing[index] ? [] : [index]));
   const picked = addable.filter((index) => selected.has(index));
   const allPicked = addable.length > 0 && picked.length === addable.length;
@@ -218,6 +202,7 @@ export function PeopleResults({
                       workspaceId,
                       ownerId: userId,
                       companies,
+                      contacts,
                       companyRows,
                       contactRows,
                     })

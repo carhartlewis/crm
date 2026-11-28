@@ -1,4 +1,12 @@
-import { CONTACT_FIELDS, fieldError, type FieldSpec, normalizeField } from "@crm/core/records";
+import {
+  CONTACT_FIELDS,
+  contactName,
+  duplicateMessage,
+  fieldError,
+  type FieldSpec,
+  findDuplicate,
+  normalizeField,
+} from "@crm/core/records";
 import { Button } from "@crm/ui/components/button";
 import { Field, FieldGroup, FieldLabel } from "@crm/ui/components/field";
 import {
@@ -18,10 +26,11 @@ import {
   createContactMutation,
 } from "../../lib/contacts.ts";
 import { parseCreateFor, useCreateFor } from "../../lib/create-sheet.ts";
+import { contactIdentity } from "../../lib/people.ts";
 import { useOpenRecord } from "../../lib/records.ts";
 import { SearchDetail } from "../records/detail-fields.tsx";
 import { CompanyLogo, MARK_SIZE } from "../records/record-visuals.tsx";
-import { useCompanies } from "../records/use-crm.ts";
+import { useCompanies, useContacts } from "../records/use-crm.ts";
 import { TextField } from "../text-field.tsx";
 
 const spec = (column: string): FieldSpec =>
@@ -49,6 +58,7 @@ export default function CreateContactSheet({
 }: CreateContactSheetProps) {
   const [createFor] = useCreateFor();
   const { companies } = useCompanies(workspaceId);
+  const { contacts } = useContacts(workspaceId);
   const openRecord = useOpenRecord();
 
   const create = useMutation({
@@ -73,6 +83,35 @@ export default function CreateContactSheet({
             key={createFor ?? "new"}
             onCancel={() => onOpenChange(false)}
             onSubmit={async (input) => {
+              // The API refuses a duplicate too; checking here can offer the one already there.
+              const duplicate = findDuplicate(
+                {
+                  firstName: input.first_name,
+                  lastName: input.last_name,
+                  email: input.email,
+                  linkedinUrl: input.linkedin_url ?? null,
+                  companyId: input.company_id,
+                },
+                contacts,
+                contactIdentity,
+              );
+
+              if (duplicate) {
+                const { contact, reason } = duplicate;
+
+                toast.error(
+                  duplicateMessage(contactName(contact), reason, Boolean(contact.archived_at)),
+                  {
+                    action: {
+                      label: "View",
+                      onClick: () => void openRecord("contact", contact.id),
+                    },
+                  },
+                );
+
+                return;
+              }
+
               await create.mutateAsync({
                 collection: contactsCollection(workspaceId),
                 workspaceId,
